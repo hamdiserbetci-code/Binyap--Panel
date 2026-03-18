@@ -16,13 +16,14 @@ import CariHesaplarPage from '@/components/cari/CariHesaplarPage'
 import BankalarPage from '@/components/banka/BankalarPage'
 import SirketEvraklariPage from '@/components/sirket/SirketEvraklariPage'
 import MalatyaPage from '@/components/malatya/MalatyaPage'
+import MalatyaMaliyetPage from '@/components/malatya/MalatyaMaliyetPage'
 import BildirimSistemi from '@/components/ui/BildirimSistemi'
 import DashboardPage from '@/components/dashboard/DashboardPage'
 import { FolderOpen, Clock, Receipt, TrendingUp, TrendingDown, CreditCard, CheckSquare, LogOut, Menu, BarChart2, Wallet, FileText, LayoutDashboard, ChevronDown, ChevronRight, Users, DollarSign, Shield, RefreshCw, Folder } from 'lucide-react'
 
 type SubPage = 'hakedis' | 'sozlesme' | 'fatura' | 'teminat' | 'yansitma'
 type DokKat = 'sozlesmeler' | 'hakedisler' | 'satis_faturalari' | 'maas_dekontlari' | 'arabulucu_evraklari' | 'alis_faturalari'
-type Page = 'dashboard' | 'projeler' | 'proje-ekipler' | 'proje-puantaj' | 'proje-detay' | 'proje-dokuman' | 'vergi' | 'maliyet' | 'odeme' | 'kasa' | 'cari' | 'banka' | 'sirket' | 'malatya' | 'gorevler' | 'raporlama'
+type Page = 'dashboard' | 'projeler' | 'proje-ekipler' | 'proje-puantaj' | 'proje-detay' | 'proje-dokuman' | 'vergi' | 'maliyet' | 'odeme' | 'kasa' | 'cari' | 'banka' | 'sirket' | 'malatya' | 'malatya-maliyet' | 'gorevler' | 'raporlama'
 
 const VERGI_TURLERI = [
   { id:'kdv', label:'KDV' },
@@ -119,7 +120,7 @@ export default function App() {
     dashboard:'Dashboard', projeler:'Projeler', 'proje-ekipler':'Ekipler',
     'proje-puantaj':'Puantaj', 'proje-detay':'Proje Detay', 'proje-dokuman':'Dökümanlar',
     vergi:'Vergi Süreçleri', maliyet:'Maliyet Kontrolü', odeme:'Ödeme Planı',
-    kasa:'Kasa Takibi', cari:'Cari Hesaplar', banka:'Banka Hesapları', sirket:'Şirket Evrakları', malatya:'Malatya Gider Takibi', gorevler:'Yapılacak İşler', raporlama:'Excel Raporlama'
+    kasa:'Kasa Takibi', cari:'Cari Hesaplar', banka:'Banka Hesapları', sirket:'Şirket Evrakları', malatya:'Malatya Gider Takibi', 'malatya-maliyet':'Malatya Proje Maliyet', gorevler:'Yapılacak İşler', raporlama:'Excel Raporlama'
   }
 
   const navBtn = (id: Page, label: string, icon: React.ReactNode, color = 'blue') => {
@@ -262,6 +263,7 @@ export default function App() {
         {navBtn('kasa', 'Kasa', <Wallet size={16}/>, 'amber')}
         {navBtn('sirket', 'Şirket Evrakları', <FileText size={16}/>, 'cyan')}
         {navBtn('malatya', 'Malatya Giderler', <TrendingDown size={16}/>, 'rose')}
+        {navBtn('malatya-maliyet', 'Malatya Proje Maliyet', <TrendingUp size={16}/>, 'emerald')}
 
         <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Görevler</p>
         {navBtn('gorevler', 'Yapılacak İşler', <CheckSquare size={16}/>, 'rose')}
@@ -310,6 +312,7 @@ export default function App() {
         {activePage === 'kasa' && <KasaPage userId={user.id} firma={firma}/>}
         {activePage === 'sirket' && <SirketEvraklariPage userId={user.id} firma={firma}/>}
         {activePage === 'malatya' && <MalatyaPage userId={user.id}/>}
+        {activePage === 'malatya-maliyet' && <MalatyaMaliyetPage userId={user.id}/>}
         {activePage === 'cari' && <CariHesaplarPage userId={user.id} firma={firma}/>}
         {activePage === 'banka' && <BankalarPage userId={user.id} firma={firma}/>}
         {activePage === 'gorevler' && <GorevlerPage userId={user.id} firmalar={[firma]}/>}
