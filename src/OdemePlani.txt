@@ -1,0 +1,226 @@
+﻿'use client'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase, OdemePlani, Firma } from '@/lib/supabase'
+import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
+import { Plus, Pencil, Trash2, CheckCircle, AlertTriangle, Clock } from 'lucide-react'
+
+interface Props { userId: string; firma: Firma }
+
+const TUR_LABELS: Record<string, string> = { cek:'Çek', vergi:'Vergi', sgk:'SGK', maas:'Maaş', cari:'Cari Hesap', diger:'Diğer' }
+const TUR_COLORS: Record<string, string> = { cek:'bg-purple-50 text-purple-700 border-purple-200', vergi:'bg-red-50 text-red-700 border-red-200', sgk:'bg-orange-50 text-orange-700 border-orange-200', maas:'bg-blue-50 text-blue-700 border-blue-200', cari:'bg-teal-50 text-teal-700 border-teal-200', diger:'bg-slate-100 text-slate-600 border-slate-200' }
+const TUR_BG: Record<string, string> = { cek:'#7e22ce', vergi:'#b91c1c', sgk:'#c2410c', maas:'#1d4ed8', cari:'#0f766e', diger:'#475569' }
+const DURUM_COLORS: Record<string, string> = { beklemede:'bg-amber-50 text-amber-700', odendi:'bg-emerald-50 text-emerald-700', gecikti:'bg-red-50 text-red-600', iptal:'bg-slate-100 text-slate-500' }
+
+export default function OdemePlaniPage({ userId, firma }: Props) {
+  const [odemeler, setOdemeler] = useState<OdemePlani[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState(false)
+  const [editing, setEditing] = useState<OdemePlani | null>(null)
+  const [filtre, setFiltre] = useState('hepsi')
+  const today = new Date().toISOString().split('T')[0]
+
+  const emptyForm = { baslik:'', tur:'vergi', tutar:'', vade_tarihi:'', durum:'beklemede', aciklama:'' }
+  const [form, setForm] = useState(emptyForm)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('odeme_plani').select('*').eq('firma_id', firma.id).order('vade_tarihi', { ascending: true })
+    setOdemeler(data || [])
+    setLoading(false)
+  }, [firma.id])
+
+  useEffect(() => { fetch() }, [fetch])
+
+  function openModal(o?: OdemePlani) {
+    setEditing(o || null)
+    setForm(o ? { baslik:o.baslik, tur:o.tur, tutar:String(o.tutar), vade_tarihi:o.vade_tarihi, durum:o.durum, aciklama:o.aciklama||'' } : emptyForm)
+    setModal(true)
+  }
+
+  async function handleSave() {
+    if (!form.baslik || !form.tutar || !form.vade_tarihi) return
+    const data = { ...form, tutar:parseFloat(form.tutar), firma_id:firma.id, user_id:userId }
+    if (editing) await supabase.from('odeme_plani').update(data).eq('id', editing.id)
+    else await supabase.from('odeme_plani').insert(data)
+    setModal(false); fetch()
+  }
+
+  async function markOdendi(o: OdemePlani) {
+    await supabase.from('odeme_plani').update({ durum:'odendi' }).eq('id', o.id)
+    fetch()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Silmek istediğinize emin misiniz?')) return
+    await supabase.from('odeme_plani').delete().eq('id', id)
+    fetch()
+  }
+
+  // Türlere göre toplamlar
+  const turToplamlari = Object.keys(TUR_LABELS).map(tur => {
+    const turOdemeleri = odemeler.filter(o => o.tur === tur)
+    const bekleyen = turOdemeleri.filter(o => o.durum === 'beklemede').reduce((s, o) => s + o.tutar, 0)
+    const odenen = turOdemeleri.filter(o => o.durum === 'odendi').reduce((s, o) => s + o.tutar, 0)
+    const gecikmisSayi = turOdemeleri.filter(o => o.durum === 'beklemede' && o.vade_tarihi < today).length
+    return { tur, bekleyen, odenen, adet: turOdemeleri.length, gecikmisSayi }
+  }).filter(t => t.adet > 0)
+
+  const genelToplam = odemeler.filter(o => o.durum === 'beklemede').reduce((s, o) => s + o.tutar, 0)
+  const genelOdenen = odemeler.filter(o => o.durum === 'odendi').reduce((s, o) => s + o.tutar, 0)
+  const gecikmisSayi = odemeler.filter(o => o.durum === 'beklemede' && o.vade_tarihi < today).length
+
+  const filtered = odemeler.filter(o => filtre === 'hepsi' ? true : o.tur === filtre)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Ödeme Planı</h2>
+          <p className="text-xs text-slate-400 mt-0.5">{firma.ad}</p>
+        </div>
+        <button onClick={() => openModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium">
+          <Plus size={14} /> Ödeme Ekle
+        </button>
+      </div>
+
+      {/* Genel Özet */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-white rounded-xl border border-slate-100 p-3.5">
+          <p className="text-xs text-slate-500 mb-1">Toplam Bekleyen</p>
+          <p className="text-xl font-semibold text-red-500">{genelToplam.toLocaleString('tr-TR')} ₺</p>
+          <p className="text-xs text-slate-400 mt-0.5">{odemeler.filter(o=>o.durum==='beklemede').length} ödeme</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 p-3.5">
+          <p className="text-xs text-slate-500 mb-1">Toplam Ödenen</p>
+          <p className="text-xl font-semibold text-emerald-600">{genelOdenen.toLocaleString('tr-TR')} ₺</p>
+          <p className="text-xs text-slate-400 mt-0.5">{odemeler.filter(o=>o.durum==='odendi').length} ödeme</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-100 p-3.5">
+          <p className="text-xs text-slate-500 mb-1">Gecikmiş</p>
+          <p className="text-xl font-semibold text-amber-500">{gecikmisSayi}</p>
+          <p className="text-xs text-slate-400 mt-0.5">işlem bekliyor</p>
+        </div>
+      </div>
+
+      {/* Tür bazlı toplamlar */}
+      {turToplamlari.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-100 p-4 mb-4">
+          <p className="text-xs font-medium text-slate-500 mb-3">Tür Bazlı Özet</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {turToplamlari.map(t => (
+              <div key={t.tur} onClick={() => setFiltre(filtre === t.tur ? 'hepsi' : t.tur)}
+                className={`rounded-xl border p-3 cursor-pointer transition-all hover:shadow-sm ${filtre === t.tur ? 'ring-2 ring-blue-400' : ''} ${TUR_COLORS[t.tur]}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold">{TUR_LABELS[t.tur]}</span>
+                  {t.gecikmisSayi > 0 && (
+                    <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-medium">{t.gecikmisSayi} geç</span>
+                  )}
+                </div>
+                <p className="text-base font-bold">{t.bekleyen.toLocaleString('tr-TR')} ₺</p>
+                <p className="text-[10px] opacity-70 mt-0.5">bekleyen • {t.adet} kayıt</p>
+                {t.odenen > 0 && (
+                  <p className="text-[10px] opacity-60 mt-0.5">✓ {t.odenen.toLocaleString('tr-TR')} ₺ ödendi</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filtre butonları */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <button onClick={()=>setFiltre('hepsi')} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filtre==='hepsi'?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>
+          Tümü ({odemeler.length})
+        </button>
+        {Object.entries(TUR_LABELS).map(([k,v]) => {
+          const sayi = odemeler.filter(o=>o.tur===k).length
+          if (sayi === 0) return null
+          return (
+            <button key={k} onClick={()=>setFiltre(k)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filtre===k?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>
+              {v} ({sayi})
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Liste */}
+      {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
+        filtered.length === 0 ? <p className="text-center text-slate-400 py-8 text-sm">Kayıt bulunamadı</p> :
+        <div className="space-y-2">
+          {filtered.map(o => {
+            const gecikti = o.durum==='beklemede' && o.vade_tarihi<today
+            const bugun = o.vade_tarihi===today && o.durum==='beklemede'
+            return (
+              <div key={o.id} className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 ${gecikti?'border-l-4 border-l-red-400 border-y-slate-100 border-r-slate-100':bugun?'border-l-4 border-l-amber-400 border-y-slate-100 border-r-slate-100':'border-slate-100'}`}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
+                  style={{backgroundColor: TUR_BG[o.tur]}}>
+                  {TUR_LABELS[o.tur].slice(0,3).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <p className="text-sm font-medium text-slate-800">{o.baslik}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DURUM_COLORS[o.durum]}`}>
+                      {o.durum==='beklemede'?'Beklemede':o.durum==='odendi'?'Ödendi':o.durum==='gecikti'?'Gecikti':'İptal'}
+                    </span>
+                    {gecikti && <span className="text-[10px] text-red-500 flex items-center gap-1"><AlertTriangle size={10}/>Gecikti</span>}
+                    {bugun && <span className="text-[10px] text-amber-500 flex items-center gap-1"><Clock size={10}/>Bugün</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-400">Vade: {o.vade_tarihi}{o.aciklama && ` • ${o.aciklama}`}</p>
+                </div>
+                <p className="text-sm font-semibold text-red-500 flex-shrink-0">{o.tutar.toLocaleString('tr-TR')} ₺</p>
+                <div className="flex gap-1">
+                  {o.durum==='beklemede' && (
+                    <button onClick={()=>markOdendi(o)} title="Ödendi olarak işaretle"
+                      className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-all">
+                      <CheckCircle size={12}/>
+                    </button>
+                  )}
+                  <button onClick={()=>openModal(o)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all"><Pencil size={12}/></button>
+                  <button onClick={()=>handleDelete(o.id)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all"><Trash2 size={12}/></button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      }
+
+      {modal && (
+        <Modal title={editing ? 'Ödemeyi Düzenle' : 'Yeni Ödeme Ekle'} onClose={() => setModal(false)}
+          footer={<><button className={btnSecondary} onClick={()=>setModal(false)}>İptal</button><button className={btnPrimary} onClick={handleSave}>Kaydet</button></>}>
+          <div className="space-y-3">
+            <FormField label="Başlık" required>
+              <input className={inputCls} value={form.baslik} onChange={e=>setForm({...form,baslik:e.target.value})} placeholder="Ödeme açıklaması" />
+            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Tür">
+                <select className={inputCls} value={form.tur} onChange={e=>setForm({...form,tur:e.target.value})}>
+                  {Object.entries(TUR_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+                </select>
+              </FormField>
+              <FormField label="Tutar (₺)" required>
+                <input type="number" className={inputCls} value={form.tutar} onChange={e=>setForm({...form,tutar:e.target.value})} placeholder="0.00" />
+              </FormField>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Vade Tarihi" required>
+                <input type="date" className={inputCls} value={form.vade_tarihi} onChange={e=>setForm({...form,vade_tarihi:e.target.value})} />
+              </FormField>
+              <FormField label="Durum">
+                <select className={inputCls} value={form.durum} onChange={e=>setForm({...form,durum:e.target.value})}>
+                  <option value="beklemede">Beklemede</option>
+                  <option value="odendi">Ödendi</option>
+                  <option value="gecikti">Gecikti</option>
+                  <option value="iptal">İptal</option>
+                </select>
+              </FormField>
+            </div>
+            <FormField label="Açıklama">
+              <input className={inputCls} value={form.aciklama} onChange={e=>setForm({...form,aciklama:e.target.value})} placeholder="Opsiyonel not" />
+            </FormField>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
