@@ -1,8 +1,10 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
-import { Plus, Pencil, Trash2, CheckCircle, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, TrendingUp, ChevronDown, ChevronRight, FileDown, Upload, AlertCircle, CheckCircle2 } from 'lucide-react'
+import * as XLSXStyle from 'xlsx-js-style'
+import * as XLSX from 'xlsx'
 
 interface Kayit {
   id: string
@@ -45,16 +47,27 @@ const GRUPLAR: { id: string; label: string; renkBg: string; renkText: string; re
   },
 ]
 
+const GRUP_LABEL_TO_ID: Record<string, string> = {
+  'MAL HİZMET ALIŞLARI': 'mal_hizmet',
+  'PERSONEL GİDERLERİ': 'personel',
+  'ÇEŞİTLİ GİDERLER': 'cesitli',
+}
+
 const AY_LABELS = ['Tüm Aylar', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
 
 export default function MalatyaMaliyetPage({ userId }: Props) {
   const [kayitlar, setKayitlar] = useState<Kayit[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
+  const [importModal, setImportModal] = useState(false)
   const [editing, setEditing] = useState<Kayit | null>(null)
   const [selectedYil, setSelectedYil] = useState(new Date().getFullYear())
   const [selectedAy, setSelectedAy] = useState(0)
   const [acikGruplar, setAcikGruplar] = useState<Record<string, boolean>>({ mal_hizmet: true, personel: true, cesitli: true })
+  const [importRows, setImportRows] = useState<any[]>([])
+  const [importErrors, setImportErrors] = useState<string[]>([])
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const today = new Date().toISOString().split('T')[0]
   const yillar = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
 
@@ -137,6 +150,210 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
     fetchKayitlar()
   }
 
+  // ── Şablon İndir ────────────────────────────────────────────────────────────
+  function downloadTemplate() {
+    const wb = XLSXStyle.utils.book_new()
+
+    const headerStyle = {
+      font: { name: 'Arial', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '1E40AF' } },
+      alignment: { horizontal: 'center' as const, vertical: 'center' as const },
+      border: {
+        top: { style: 'thin', color: { rgb: 'FFFFFF' } },
+        bottom: { style: 'thin', color: { rgb: 'FFFFFF' } },
+        left: { style: 'thin', color: { rgb: 'FFFFFF' } },
+        right: { style: 'thin', color: { rgb: 'FFFFFF' } },
+      },
+    }
+    const baseStyle = {
+      font: { name: 'Arial', sz: 9 },
+      border: {
+        top: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        left: { style: 'thin', color: { rgb: 'E2E8F0' } },
+        right: { style: 'thin', color: { rgb: 'E2E8F0' } },
+      },
+    }
+    const noteStyle = { font: { name: 'Arial', sz: 8, color: { rgb: '94A3B8' }, italic: true } }
+
+    const COLS = [
+      'Ana Grup', 'Alt Kategori', 'Tarih (YYYY-AA-GG)',
+      'Tutar', 'Belge No', 'Açıklama', 'Ödeme Durumu', 'Ödeme Tarihi (YYYY-AA-GG)',
+    ]
+    const WIDTHS = [28, 18, 20, 14, 14, 30, 16, 22]
+
+    // Örnek satırlar
+    const ORNEKLER = [
+      ['MAL HİZMET ALIŞLARI', 'NAKLİYE', '2025-03-15', 15000, 'FAT-001', 'Malzeme nakliyesi', 'Ödendi', '2025-03-20'],
+      ['MAL HİZMET ALIŞLARI', 'MALZEME', '2025-03-18', 45000, 'FAT-002', 'Demir malzeme alımı', 'Beklemede', ''],
+      ['MAL HİZMET ALIŞLARI', 'BAKIM ONARIM', '2025-03-22', 8500, '', 'İş makinesi bakımı', 'Beklemede', ''],
+      ['PERSONEL GİDERLERİ', 'ÜCRET', '2025-03-31', 120000, '', 'Mart ayı maaşları', 'Ödendi', '2025-03-31'],
+      ['PERSONEL GİDERLERİ', 'SGK', '2025-03-31', 35000, '', 'Mart SGK primi', 'Beklemede', ''],
+      ['PERSONEL GİDERLERİ', 'MUHTASAR', '2025-03-26', 18000, '', 'Şubat muhtasar', 'Ödendi', '2025-03-26'],
+      ['PERSONEL GİDERLERİ', 'AVANS', '2025-03-10', 5000, '', 'Personel avansı', 'Ödendi', '2025-03-10'],
+      ['PERSONEL GİDERLERİ', 'ARABULUCU', '2025-03-05', 3000, '', '', 'Beklemede', ''],
+      ['PERSONEL GİDERLERİ', 'FERDİ KAZA', '2025-03-01', 2500, 'POL-001', 'Ferdi kaza sigortası', 'Ödendi', '2025-03-01'],
+      ['ÇEŞİTLİ GİDERLER', 'POLİÇE', '2025-03-01', 12000, 'POL-002', 'İnşaat all risk sigortası', 'Ödendi', '2025-03-01'],
+      ['ÇEŞİTLİ GİDERLER', 'VERGİ', '2025-03-25', 9500, '', 'Geçici vergi', 'Beklemede', ''],
+      ['ÇEŞİTLİ GİDERLER', 'MUHASEBE', '2025-03-01', 4000, '', 'Muhasebe hizmet bedeli', 'Ödendi', '2025-03-05'],
+    ]
+
+    const ws: any = {}
+
+    // Açıklama satırı
+    ws[XLSXStyle.utils.encode_cell({ r: 0, c: 0 })] = {
+      v: 'Malatya Proje Maliyet — İçe Aktarım Şablonu  |  Sarı satırlar örnektir, silebilirsiniz.',
+      t: 's', s: noteStyle,
+    }
+
+    // Header
+    COLS.forEach((col, c) => {
+      ws[XLSXStyle.utils.encode_cell({ r: 1, c })] = { v: col, t: 's', s: headerStyle }
+    })
+
+    // Örnek satırlar
+    ORNEKLER.forEach((row, r) => {
+      row.forEach((val, c) => {
+        const isNum = c === 3
+        ws[XLSXStyle.utils.encode_cell({ r: r + 2, c })] = {
+          v: val, t: isNum ? 'n' : 's',
+          s: { ...baseStyle, fill: { fgColor: { rgb: 'FEFCE8' } }, ...(isNum ? { numFmt: '#,##0.00' } : {}) },
+        }
+      })
+    })
+
+    ws['!ref'] = XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: ORNEKLER.length + 2, c: COLS.length - 1 } })
+    ws['!cols'] = WIDTHS.map(w => ({ wch: w }))
+    ws['!rows'] = [{ hpt: 14 }, { hpt: 20 }]
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: COLS.length - 1 } }]
+
+    // Geçerli değerler sayfası
+    const wsRef: any = {}
+    const refData = [
+      ['ANA GRUP', 'ALT KATEGORİ', '', 'ÖDEME DURUMU'],
+      ['MAL HİZMET ALIŞLARI', 'NAKLİYE', '', 'Ödendi'],
+      ['PERSONEL GİDERLERİ', 'MALZEME', '', 'Beklemede'],
+      ['ÇEŞİTLİ GİDERLER', 'BAKIM ONARIM', '', ''],
+      ['', 'ÜCRET', '', ''],
+      ['', 'AVANS', '', ''],
+      ['', 'SGK', '', ''],
+      ['', 'MUHTASAR', '', ''],
+      ['', 'ARABULUCU', '', ''],
+      ['', 'FERDİ KAZA', '', ''],
+      ['', 'POLİÇE', '', ''],
+      ['', 'VERGİ', '', ''],
+      ['', 'MUHASEBE', '', ''],
+    ]
+    refData.forEach((row, r) => {
+      row.forEach((val, c) => {
+        wsRef[XLSXStyle.utils.encode_cell({ r, c })] = {
+          v: val, t: 's',
+          s: r === 0 ? headerStyle : baseStyle,
+        }
+      })
+    })
+    wsRef['!ref'] = XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: refData.length - 1, c: 3 } })
+    wsRef['!cols'] = [{ wch: 26 }, { wch: 18 }, { wch: 4 }, { wch: 16 }]
+
+    XLSXStyle.utils.book_append_sheet(wb, ws, 'Veri Girişi')
+    XLSXStyle.utils.book_append_sheet(wb, wsRef, 'Geçerli Değerler')
+    XLSXStyle.writeFile(wb, 'Malatya_Proje_Maliyet_Sablon.xlsx')
+  }
+
+  // ── Excel Okuma ─────────────────────────────────────────────────────────────
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const data = new Uint8Array(ev.target?.result as ArrayBuffer)
+      const workbook = XLSX.read(data, { type: 'array', cellDates: true })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+      const errors: string[] = []
+      const parsed = rows.map((row: any, i: number) => {
+        const anaGrupLabel = String(row['Ana Grup'] || '').trim().toUpperCase()
+        const altKat = String(row['Alt Kategori'] || '').trim().toUpperCase()
+        const tarihRaw = row['Tarih (YYYY-AA-GG)'] || row['Tarih'] || ''
+        const tutarRaw = row['Tutar'] || 0
+        const odemeDurum = String(row['Ödeme Durumu'] || '').trim()
+        const odemeTarihRaw = row['Ödeme Tarihi (YYYY-AA-GG)'] || row['Ödeme Tarihi'] || ''
+
+        const anaGrupId = GRUP_LABEL_TO_ID[anaGrupLabel]
+        if (!anaGrupId) errors.push(`Satır ${i + 2}: Geçersiz Ana Grup — "${anaGrupLabel}"`)
+
+        const grup = GRUPLAR.find(g => g.id === anaGrupId)
+        if (grup && !grup.alt.includes(altKat)) errors.push(`Satır ${i + 2}: Geçersiz Alt Kategori — "${altKat}"`)
+
+        // Tarih parse
+        let tarih = ''
+        if (tarihRaw instanceof Date) {
+          tarih = tarihRaw.toISOString().split('T')[0]
+        } else {
+          const str = String(tarihRaw).trim()
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) tarih = str
+          else if (/^\d{2}\.\d{2}\.\d{4}$/.test(str)) {
+            const [d, m, y] = str.split('.')
+            tarih = `${y}-${m}-${d}`
+          } else if (str) errors.push(`Satır ${i + 2}: Geçersiz tarih formatı — "${str}" (YYYY-AA-GG olmalı)`)
+        }
+
+        let odemeTarihi = ''
+        if (odemeTarihRaw instanceof Date) {
+          odemeTarihi = odemeTarihRaw.toISOString().split('T')[0]
+        } else {
+          const str = String(odemeTarihRaw).trim()
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) odemeTarihi = str
+          else if (/^\d{2}\.\d{2}\.\d{4}$/.test(str)) {
+            const [d, m, y] = str.split('.')
+            odemeTarihi = `${y}-${m}-${d}`
+          }
+        }
+
+        const tutar = parseFloat(String(tutarRaw).replace(',', '.')) || 0
+        if (!tutar) errors.push(`Satır ${i + 2}: Tutar boş veya geçersiz`)
+
+        const odeme_durumu = odemeDurum === 'Ödendi' ? 'odendi' : 'beklemede'
+
+        return {
+          ana_grup: anaGrupId || '',
+          alt_kategori: altKat,
+          tarih,
+          tutar,
+          aciklama: String(row['Açıklama'] || '').trim(),
+          belge_no: String(row['Belge No'] || '').trim(),
+          odeme_durumu,
+          odeme_tarihi: odemeTarihi || null,
+          user_id: userId,
+          _row: i + 2,
+        }
+      }).filter((r: any) => r.ana_grup && r.tarih && r.tutar)
+
+      setImportErrors(errors)
+      setImportRows(parsed)
+      setImportModal(true)
+    }
+    reader.readAsArrayBuffer(file)
+    e.target.value = ''
+  }
+
+  async function handleImport() {
+    if (importRows.length === 0) return
+    setImporting(true)
+    const payload = importRows.map(({ _row, ...r }) => r)
+    const { error } = await supabase.from('malatya_maliyet').insert(payload)
+    setImporting(false)
+    if (!error) {
+      setImportModal(false)
+      setImportRows([])
+      setImportErrors([])
+      fetchKayitlar()
+    } else {
+      alert('Aktarım sırasında hata oluştu: ' + error.message)
+    }
+  }
+
   const fmt = (v: number) => v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺'
 
   const genelToplam = kayitlar.reduce((s, k) => s + k.tutar, 0)
@@ -153,10 +370,21 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
           <h2 className="text-lg font-semibold text-slate-800">Malatya Proje Maliyet</h2>
           <p className="text-xs text-slate-400 mt-0.5">{AY_LABELS[selectedAy]} {selectedYil}</p>
         </div>
-        <button onClick={() => openModal()}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium">
-          <Plus size={14}/> Kayıt Ekle
-        </button>
+        <div className="flex gap-2">
+          <button onClick={downloadTemplate}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium">
+            <FileDown size={14}/> Şablon İndir
+          </button>
+          <button onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-sm font-medium">
+            <Upload size={14}/> Excel Aktar
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange}/>
+          <button onClick={() => openModal()}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium">
+            <Plus size={14}/> Kayıt Ekle
+          </button>
+        </div>
       </div>
 
       {/* Dönem seçici */}
@@ -206,7 +434,6 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
 
             return (
               <div key={grup.id} className={`rounded-2xl border ${grup.renkBorder} overflow-hidden`}>
-                {/* Grup başlık */}
                 <button
                   onClick={() => toggleGrup(grup.id)}
                   className={`w-full flex items-center justify-between px-4 py-3 ${grup.renkBg}`}>
@@ -227,7 +454,6 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
                   </div>
                 </button>
 
-                {/* Alt kategoriler */}
                 {acik && (
                   <div className="bg-white divide-y divide-slate-50">
                     {grup.alt.map(alt => {
@@ -236,7 +462,6 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
 
                       return (
                         <div key={alt}>
-                          {/* Alt kategori başlık */}
                           <div className="flex items-center justify-between px-4 py-2 bg-slate-50/60">
                             <div className="flex items-center gap-2">
                               <span className="w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0"/>
@@ -253,7 +478,6 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
                             </div>
                           </div>
 
-                          {/* Kayıtlar */}
                           {altKayitlar.length === 0 ? (
                             <div className="px-6 py-2 text-[11px] text-slate-300 italic">Kayıt yok</div>
                           ) : (
@@ -303,7 +527,7 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Kayıt Modal */}
       {modal && (
         <Modal
           title={editing ? 'Kaydı Düzenle' : 'Yeni Kayıt Ekle'}
@@ -352,6 +576,72 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
             <FormField label="Açıklama">
               <input className={inputCls} value={form.aciklama} onChange={e => setForm({ ...form, aciklama: e.target.value })} placeholder="Opsiyonel not"/>
             </FormField>
+          </div>
+        </Modal>
+      )}
+
+      {/* Import Önizleme Modal */}
+      {importModal && (
+        <Modal
+          title={`Excel Aktarım — ${importRows.length} kayıt okundu`}
+          onClose={() => { setImportModal(false); setImportRows([]); setImportErrors([]) }}
+          footer={
+            <>
+              <button className={btnSecondary} onClick={() => { setImportModal(false); setImportRows([]); setImportErrors([]) }}>İptal</button>
+              <button className={btnPrimary} onClick={handleImport} disabled={importing || importRows.length === 0}>
+                {importing ? 'Aktarılıyor...' : `${importRows.length} Kaydı Aktar`}
+              </button>
+            </>
+          }>
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {importErrors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+                <div className="flex items-center gap-2 text-red-700 text-xs font-semibold mb-1">
+                  <AlertCircle size={14}/> {importErrors.length} uyarı (bu satırlar atlanacak)
+                </div>
+                {importErrors.map((e, i) => (
+                  <p key={i} className="text-[11px] text-red-600">{e}</p>
+                ))}
+              </div>
+            )}
+            {importRows.length > 0 && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-2 flex items-center gap-2 text-emerald-700 text-xs font-semibold">
+                <CheckCircle2 size={14}/> {importRows.length} geçerli kayıt aktarılmaya hazır
+              </div>
+            )}
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-600">
+                    <th className="px-2 py-1.5 text-left font-semibold">Ana Grup</th>
+                    <th className="px-2 py-1.5 text-left font-semibold">Alt Kategori</th>
+                    <th className="px-2 py-1.5 text-left font-semibold">Tarih</th>
+                    <th className="px-2 py-1.5 text-right font-semibold">Tutar</th>
+                    <th className="px-2 py-1.5 text-left font-semibold">Durum</th>
+                    <th className="px-2 py-1.5 text-left font-semibold">Açıklama</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importRows.map((r, i) => {
+                    const grup = GRUPLAR.find(g => g.id === r.ana_grup)
+                    return (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                        <td className={`px-2 py-1.5 font-medium ${grup?.renkText || ''}`}>{grup?.label || r.ana_grup}</td>
+                        <td className="px-2 py-1.5 text-slate-600">{r.alt_kategori}</td>
+                        <td className="px-2 py-1.5 text-slate-500">{r.tarih}</td>
+                        <td className="px-2 py-1.5 text-right font-semibold text-red-500">{fmt(r.tutar)}</td>
+                        <td className="px-2 py-1.5">
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${r.odeme_durumu === 'odendi' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                            {r.odeme_durumu === 'odendi' ? 'Ödendi' : 'Beklemede'}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-slate-400 truncate max-w-[120px]">{r.aciklama}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Modal>
       )}
