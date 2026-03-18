@@ -237,8 +237,6 @@ export default function RaporlamaPage({ userId }: Props) {
       .from('malatya_maliyet')
       .select('*')
       .eq('user_id', userId)
-      .gte('tarih', `${selectedYil}-01-01`)
-      .lte('tarih', `${selectedYil}-12-31`)
       .order('tarih', { ascending: true })
     return (data || []).map((k: any) => ({
       ana_grup: k.ana_grup === 'mal_hizmet' ? 'MAL HİZMET ALIŞLARI' : k.ana_grup === 'personel' ? 'PERSONEL GİDERLERİ' : 'ÇEŞİTLİ GİDERLER',
