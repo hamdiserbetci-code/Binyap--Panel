@@ -232,6 +232,26 @@ export default function RaporlamaPage({ userId }: Props) {
     })
   }
 
+  const fetchMalatyaMaliyetData = async () => {
+    const { data } = await supabase
+      .from('malatya_maliyet')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('tarih', `${selectedYil}-01-01`)
+      .lte('tarih', `${selectedYil}-12-31`)
+      .order('tarih', { ascending: true })
+    return (data || []).map((k: any) => ({
+      ana_grup: k.ana_grup === 'mal_hizmet' ? 'MAL HİZMET ALIŞLARI' : k.ana_grup === 'personel' ? 'PERSONEL GİDERLERİ' : 'ÇEŞİTLİ GİDERLER',
+      alt_kategori: k.alt_kategori || '',
+      tarih: k.tarih || '',
+      tutar: k.tutar || 0,
+      aciklama: k.aciklama || '',
+      belge_no: k.belge_no || '',
+      odeme_durumu: k.odeme_durumu === 'odendi' ? 'Ödendi' : 'Beklemede',
+      odeme_tarihi: k.odeme_tarihi || '',
+    }))
+  }
+
   const fetchKasaData = async (firmaId: string) => {
     const { data } = await supabase
       .from('kasa')
@@ -338,6 +358,19 @@ export default function RaporlamaPage({ userId }: Props) {
           { key: 'belge_no', label: 'Belge No', width: 14 },
         ]
       },
+      malatya_maliyet: {
+        title: 'Malatya Proje Maliyet',
+        cols: [
+          { key: 'ana_grup', label: 'Ana Grup', width: 24 },
+          { key: 'alt_kategori', label: 'Alt Kategori', width: 18 },
+          { key: 'tarih', label: 'Tarih', width: 12 },
+          { key: 'tutar', label: 'Tutar (₺)', width: 16, type: 'currency' },
+          { key: 'belge_no', label: 'Belge No', width: 14 },
+          { key: 'aciklama', label: 'Açıklama', width: 28 },
+          { key: 'odeme_durumu', label: 'Ödeme Durumu', width: 16 },
+          { key: 'odeme_tarihi', label: 'Ödeme Tarihi', width: 14 },
+        ]
+      },
     }
 
     const fetchers: Record<string, (id: string) => Promise<any[]>> = {
@@ -346,6 +379,7 @@ export default function RaporlamaPage({ userId }: Props) {
       vergi: fetchVergiData,
       maliyet: fetchMaliyetData,
       kasa: fetchKasaData,
+      malatya_maliyet: () => fetchMalatyaMaliyetData(),
     }
 
     const cfg = configs[type]
@@ -359,14 +393,15 @@ export default function RaporlamaPage({ userId }: Props) {
   const downloadAll = async () => {
     setLoading(true)
     const wb = XLSXStyle.utils.book_new()
-    const types = ['odeme', 'puantaj', 'vergi', 'maliyet', 'kasa']
+    const types = ['odeme', 'puantaj', 'vergi', 'maliyet', 'kasa', 'malatya_maliyet']
     const titles: Record<string, string> = {
       odeme: 'Ödeme Planı', puantaj: 'Puantaj', vergi: 'Vergi',
-      maliyet: 'Maliyet', kasa: 'Kasa'
+      maliyet: 'Maliyet', kasa: 'Kasa', malatya_maliyet: 'Malatya Maliyet'
     }
     const fetchers: Record<string, (id: string) => Promise<any[]>> = {
       odeme: fetchOdemeData, puantaj: fetchPuantajData,
       vergi: fetchVergiData, maliyet: fetchMaliyetData, kasa: fetchKasaData,
+      malatya_maliyet: () => fetchMalatyaMaliyetData(),
     }
     const colsMap: Record<string, ColDef[]> = {
       odeme: [
@@ -411,11 +446,23 @@ export default function RaporlamaPage({ userId }: Props) {
         { key: 'tur', label: 'Tür', width: 10 }, { key: 'tutar', label: 'Tutar (₺)', width: 16, type: 'currency' },
         { key: 'bakiye', label: 'Bakiye (₺)', width: 16, type: 'currency' },
       ],
+      malatya_maliyet: [
+        { key: 'ana_grup', label: 'Ana Grup', width: 24 },
+        { key: 'alt_kategori', label: 'Alt Kategori', width: 18 },
+        { key: 'tarih', label: 'Tarih', width: 12 },
+        { key: 'tutar', label: 'Tutar (₺)', width: 16, type: 'currency' },
+        { key: 'belge_no', label: 'Belge No', width: 14 },
+        { key: 'aciklama', label: 'Açıklama', width: 28 },
+        { key: 'odeme_durumu', label: 'Ödeme Durumu', width: 16 },
+        { key: 'odeme_tarihi', label: 'Ödeme Tarihi', width: 14 },
+      ],
     }
 
     for (const firma of firmalar) {
       for (const type of types) {
-        const rows = await fetchers[type](firma.id)
+        const rows = type === 'malatya_maliyet'
+          ? await fetchMalatyaMaliyetData()
+          : await fetchers[type](firma.id)
         if (rows.length > 0) {
           const sheetName = `${firma.ad.slice(0, 8)}-${titles[type]}`.slice(0, 31)
           const ws = buildSheet(rows, colsMap[type], titles[type], firma.ad, donem)
@@ -492,6 +539,11 @@ export default function RaporlamaPage({ userId }: Props) {
             className={`${btnCls} bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200`}>
             {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
             Kasa
+          </button>
+          <button onClick={() => downloadReport('malatya_maliyet')} disabled={loading}
+            className={`${btnCls} bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200`}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+            Malatya Proje Maliyet
           </button>
         </div>
       </div>
