@@ -10,25 +10,7 @@ const TUR_LABELS: Record<string, string> = {
   cek: 'Çek', vergi: 'Vergi', sgk: 'SGK',
   maas: 'Maaş', cari: 'Cari Hesap', diger: 'Diğer'
 }
-// Projeleri getiren fonksiyonu raporlama içine ekleyin
-const fetchRaporData = async () => {
-  // Mevcut rapor verilerini çek...
-  
-  // PROJELERİ EKLEME:
-  const { data: projelerData } = await supabase
-    .from('projeler')
-    .select('ad, durum, created_at')
-    .eq('firma_id', firma.id);
 
-  // Excel'e yazılacak data setine projeleri de dahil et
-  const excelData = projelerData?.map(p => ({
-    'Proje Adı': p.ad,
-    'Durum': p.durum || 'Aktif',
-    'Kayıt Tarihi': new Date(p.created_at).toLocaleDateString('tr-TR')
-  }));
-  
-  // Excel indirme fonksiyonuna gönder...
-};
 
 
 export default function RaporlamaPage({ userId }: Props) {
