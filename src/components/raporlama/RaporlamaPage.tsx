@@ -383,7 +383,9 @@ export default function RaporlamaPage({ userId }: Props) {
     }
 
     const cfg = configs[type]
-    const rows = await fetchers[type](selectedFirmaId)
+    const rows = type === 'malatya_maliyet'
+      ? await fetchMalatyaMaliyetData()
+      : await fetchers[type](selectedFirmaId)
     const ws = buildSheet(rows, cfg.cols, cfg.title, firma.ad, donem)
     XLSXStyle.utils.book_append_sheet(wb, ws, cfg.title.slice(0, 31))
     XLSXStyle.writeFile(wb, `${firma.ad.slice(0, 12)}_${cfg.title}_${selectedYil}-${String(selectedAy).padStart(2,'0')}.xlsx`)
