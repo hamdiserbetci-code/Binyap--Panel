@@ -370,20 +370,26 @@ export default function App() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-slate-100 px-4 h-14 flex items-center gap-3 flex-shrink-0">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-slate-600"><Menu size={20}/></button>
-          <div className="flex items-center gap-1.5 flex-1 min-w-0 text-sm">
-            <span className="font-semibold text-slate-800">{PAGE_TITLES[activePage]}</span>
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#0A0F1C]">
+        <div className="bg-white/[0.02] border-b border-white/[0.05] shadow-[0_4px_30px_rgba(0,0,0,0.1)] backdrop-blur-md px-5 h-16 flex items-center gap-4 flex-shrink-0 relative z-30">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-white transition-colors"><Menu size={20}/></button>
+          <div className="flex items-center gap-2 flex-1 min-w-0 text-[15px]">
+            <span className="font-semibold text-white tracking-wide">{PAGE_TITLES[activePage]}</span>
             {selectedProje && ['proje-ekipler','proje-puantaj','proje-detay','proje-dokuman'].includes(activePage) && (
-              <><ChevronRight size={14} className="text-slate-300 flex-shrink-0"/>
-              <span className="text-slate-500 truncate">{selectedProje.ad}</span></>
+              <div className="flex items-center gap-2">
+                <ChevronRight size={14} className="text-slate-500 flex-shrink-0"/>
+                <span className="text-indigo-300 font-medium truncate">{selectedProje.ad}</span>
+              </div>
             )}
           </div>
-          {user && <BildirimSistemi userId={user.id}/>}
+          {user && <span className="bg-white/[0.03] p-1 rounded-xl border border-white/[0.05]"><BildirimSistemi userId={user.id}/></span>}
         </div>
-        <div className="flex-1 overflow-hidden bg-slate-50">
-          {renderContent()}
+        <div className="flex-1 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
+          <div className="h-full overflow-y-auto p-4 lg:p-6 relative z-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+            {renderContent()}
+          </div>
         </div>
       </div>
 
