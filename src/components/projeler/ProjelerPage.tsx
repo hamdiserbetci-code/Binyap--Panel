@@ -40,18 +40,38 @@ export default function ProjelerPage({ userId, firma, onProjeSelect, onProjelerU
   }
 
   async function handleSave() {
-    if (!form.ad.trim()) return
-    const data = { ...form, firma_id:firma.id, user_id:userId }
-    if (editing) await supabase.from('projeler').update(data).eq('id', editing.id)
-    else await supabase.from('projeler').insert(data)
-    setModal(false); fetchProjeler()
+    if (!form.ad.trim()) {
+      alert('Proje adı gereklidir.')
+      return
+    }
+    try {
+      const data = { ...form, firma_id:firma.id, user_id:userId }
+      if (editing) {
+        const { error } = await supabase.from('projeler').update(data).eq('id', editing.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('projeler').insert(data)
+        if (error) throw error
+      }
+      setModal(false)
+      await fetchProjeler()
+    } catch (error: any) {
+      console.error('Proje kaydetme hatası:', error)
+      alert('Proje kaydedilemedi: ' + error.message)
+    }
   }
 
   async function handleDelete(p: Proje) {
     if (!confirm(`"${p.ad}" projesini silmek istediğinize emin misiniz?`)) return
-    await supabase.from('projeler').delete().eq('id', p.id)
-    if (selectedProjeId === p.id) onProjeSelect(null)
-    fetchProjeler()
+    try {
+      const { error } = await supabase.from('projeler').delete().eq('id', p.id)
+      if (error) throw error
+      if (selectedProjeId === p.id) onProjeSelect(null)
+      await fetchProjeler()
+    } catch (error: any) {
+      console.error('Proje silme hatası:', error)
+      alert('Proje silinemiyor: ' + error.message)
+    }
   }
 
   return (
