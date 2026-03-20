@@ -26,13 +26,13 @@ const KAT_LABELS: Record<string, string> = {
 }
 
 const KAT_COLORS: Record<string, string> = {
-  tahsilat: 'bg-emerald-50 text-emerald-700',
-  odeme: 'bg-red-50 text-red-700',
-  maas: 'bg-blue-50 text-blue-700',
-  vergi: 'bg-purple-50 text-purple-700',
+  tahsilat: 'bg-emerald-500/10 text-emerald-300',
+  odeme: 'bg-red-500/10 text-red-700',
+  maas: 'bg-blue-500/10 text-blue-300',
+  vergi: 'bg-purple-500/10 text-purple-700',
   sgk: 'bg-orange-50 text-orange-700',
-  cek: 'bg-indigo-50 text-indigo-700',
-  diger: 'bg-slate-100 text-slate-600',
+  cek: 'bg-indigo-500/10 text-indigo-700',
+  diger: 'bg-white/[0.06] text-slate-300',
 }
 
 export default function KasaPage({ userId, firma }: Props) {
@@ -109,7 +109,7 @@ export default function KasaPage({ userId, firma }: Props) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Kasa Takibi</h2>
+          <h2 className="text-lg font-semibold text-white">Kasa Takibi</h2>
           <p className="text-xs text-slate-400 mt-0.5">{firma.ad} — {AY_LABELS[selectedAy]} {selectedYil}</p>
         </div>
         <button onClick={() => openModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium transition-colors">
@@ -119,27 +119,27 @@ export default function KasaPage({ userId, firma }: Props) {
 
       {/* İstatistik kartları */}
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
+        <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <TrendingUp size={16} className="text-emerald-600" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <TrendingUp size={16} className="text-emerald-400" />
             </div>
-            <p className="text-xs text-slate-500">Toplam Giriş</p>
+            <p className="text-xs text-slate-400">Toplam Giriş</p>
           </div>
-          <p className="text-2xl font-bold text-emerald-600">+{toplamGiris.toLocaleString('tr-TR')} ₺</p>
+          <p className="text-2xl font-bold text-emerald-400">+{toplamGiris.toLocaleString('tr-TR')} ₺</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
+        <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-              <TrendingDown size={16} className="text-red-500" />
+            <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+              <TrendingDown size={16} className="text-red-400" />
             </div>
-            <p className="text-xs text-slate-500">Toplam Çıkış</p>
+            <p className="text-xs text-slate-400">Toplam Çıkış</p>
           </div>
-          <p className="text-2xl font-bold text-red-500">-{toplamCikis.toLocaleString('tr-TR')} ₺</p>
+          <p className="text-2xl font-bold text-red-400">-{toplamCikis.toLocaleString('tr-TR')} ₺</p>
         </div>
         <div className={`rounded-xl border p-4 ${mevcutBakiye >= 0 ? 'bg-blue-600 border-blue-700' : 'bg-red-600 border-red-700'}`}>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-white/[0.02]/20 flex items-center justify-center">
               <Wallet size={16} className="text-white" />
             </div>
             <p className="text-xs text-white/80">Mevcut Bakiye</p>
@@ -150,12 +150,12 @@ export default function KasaPage({ userId, firma }: Props) {
 
       {/* Ay/Yıl seçimi */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
-        <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+        <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))} className="bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none">
           {yillar.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex gap-1 flex-wrap">
           {AY_LABELS.slice(1).map((ay, i) => (
-            <button key={i+1} onClick={() => setSelectedAy(i+1)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>{ay}</button>
+            <button key={i+1} onClick={() => setSelectedAy(i+1)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>{ay}</button>
           ))}
         </div>
       </div>
@@ -163,24 +163,24 @@ export default function KasaPage({ userId, firma }: Props) {
       {/* Filtreler */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {[['hepsi','Tümü'],['giris','Girişler'],['cikis','Çıkışlar']].map(([v,l]) => (
-          <button key={v} onClick={() => setFiltre(v)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filtre===v?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>{l}</button>
+          <button key={v} onClick={() => setFiltre(v)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filtre===v?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>{l}</button>
         ))}
         {Object.entries(KAT_LABELS).map(([k,v]) => (
-          <button key={k} onClick={() => setFiltre(k)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filtre===k?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>{v}</button>
+          <button key={k} onClick={() => setFiltre(k)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filtre===k?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>{v}</button>
         ))}
       </div>
 
       {/* Kayıt listesi */}
       {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
         filtered.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-200">
+          <div className="text-center py-12 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
             <Wallet size={36} className="text-slate-200 mx-auto mb-3" />
             <p className="text-slate-400 text-sm">Bu dönem için kayıt yok</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+          <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] overflow-hidden">
             {/* Tablo başlığı */}
-            <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-medium text-slate-500">
+            <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.05] text-xs font-medium text-slate-400">
               <div className="col-span-2">Tarih</div>
               <div className="col-span-4">Açıklama</div>
               <div className="col-span-2">Kategori</div>
@@ -191,27 +191,27 @@ export default function KasaPage({ userId, firma }: Props) {
             </div>
 
             {filtered.map((k, idx) => (
-              <div key={k.id} className={`grid grid-cols-12 gap-2 px-4 py-3 items-center border-b border-slate-50 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                <div className="col-span-2 text-xs text-slate-500">{k.tarih}</div>
+              <div key={k.id} className={`grid grid-cols-12 gap-2 px-4 py-3 items-center border-b border-white/[0.02] last:border-0 ${idx % 2 === 0 ? 'bg-white/[0.02]' : 'bg-white/[0.04]/50'}`}>
+                <div className="col-span-2 text-xs text-slate-400">{k.tarih}</div>
                 <div className="col-span-4">
-                  <p className="text-sm font-medium text-slate-800 truncate">{k.aciklama}</p>
+                  <p className="text-sm font-medium text-white truncate">{k.aciklama}</p>
                   {k.belge_no && <p className="text-[10px] text-slate-400">No: {k.belge_no}</p>}
                 </div>
                 <div className="col-span-2">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${KAT_COLORS[k.kategori]}`}>{KAT_LABELS[k.kategori]}</span>
                 </div>
                 <div className="col-span-1 text-right">
-                  {k.tur === 'giris' && <span className="text-sm font-semibold text-emerald-600">+{k.tutar.toLocaleString('tr-TR')}</span>}
+                  {k.tur === 'giris' && <span className="text-sm font-semibold text-emerald-400">+{k.tutar.toLocaleString('tr-TR')}</span>}
                 </div>
                 <div className="col-span-1 text-right">
-                  {k.tur === 'cikis' && <span className="text-sm font-semibold text-red-500">-{k.tutar.toLocaleString('tr-TR')}</span>}
+                  {k.tur === 'cikis' && <span className="text-sm font-semibold text-red-400">-{k.tutar.toLocaleString('tr-TR')}</span>}
                 </div>
                 <div className="col-span-1 text-right">
-                  <span className={`text-xs font-medium ${k.bakiye >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{k.bakiye.toLocaleString('tr-TR')}</span>
+                  <span className={`text-xs font-medium ${k.bakiye >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{k.bakiye.toLocaleString('tr-TR')}</span>
                 </div>
                 <div className="col-span-1 flex gap-1 justify-end">
-                  <button onClick={() => openModal(k)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-600"><Pencil size={11}/></button>
-                  <button onClick={() => handleDelete(k.id)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={11}/></button>
+                  <button onClick={() => openModal(k)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-300"><Pencil size={11}/></button>
+                  <button onClick={() => handleDelete(k.id)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={11}/></button>
                 </div>
               </div>
             ))}

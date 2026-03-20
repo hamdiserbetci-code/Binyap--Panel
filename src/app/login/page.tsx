@@ -7,7 +7,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [success, setSuccess] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
@@ -17,10 +17,16 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError('E-posta veya şifre hatalı.')
       else window.location.href = '/'
-    } else {
+    } else if (mode === 'register') {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setError(error.message)
       else setSuccess('Kayıt başarılı! E-postanızı doğrulayın.')
+    } else {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) setError(error.message)
+      else setSuccess('Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.')
     }
     setLoading(false)
   }
@@ -39,10 +45,12 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
-          <div className="flex rounded-xl bg-slate-900 p-1 mb-5">
-            <button onClick={() => setMode('login')} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${mode === 'login' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Giriş Yap</button>
-            <button onClick={() => setMode('register')} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${mode === 'register' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Kayıt Ol</button>
-          </div>
+          {mode !== 'forgot' && (
+            <div className="flex rounded-xl bg-slate-900 p-1 mb-5">
+              <button onClick={() => setMode('login')} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${mode === 'login' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Giriş Yap</button>
+              <button onClick={() => setMode('register')} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${mode === 'register' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}>Kayıt Ol</button>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-medium text-slate-400 block mb-1">E-posta</label>
@@ -50,17 +58,44 @@ export default function LoginPage() {
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
                 placeholder="ornek@sirket.com" />
             </div>
-            <div>
-              <label className="text-xs font-medium text-slate-400 block mb-1">Şifre</label>
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
-                placeholder="En az 6 karakter" minLength={6} />
-            </div>
+            {mode !== 'forgot' && (
+              <div>
+                <label className="text-xs font-medium text-slate-400 block mb-1">Şifre</label>
+                <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all"
+                  placeholder="En az 6 karakter" minLength={6} />
+              </div>
+            )}
             {error && <p className="text-xs text-red-400 bg-red-900/30 px-3 py-2 rounded-lg">{error}</p>}
             {success && <p className="text-xs text-emerald-400 bg-emerald-900/30 px-3 py-2 rounded-lg">{success}</p>}
+
+            {mode === 'login' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => { setMode('forgot'); setError(''); setSuccess('') }}
+                  className="text-[12px] text-blue-400 hover:underline"
+                >
+                  Şifremi unuttum
+                </button>
+              </div>
+            )}
+
+            {mode === 'forgot' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setError(''); setSuccess('') }}
+                  className="text-[12px] text-slate-300 hover:underline"
+                >
+                  Girişe dön
+                </button>
+              </div>
+            )}
+
             <button type="submit" disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-xl text-sm transition-all disabled:opacity-60 mt-2">
-              {loading ? 'Yükleniyor...' : mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'}
+              {loading ? 'Yükleniyor...' : mode === 'login' ? 'Giriş Yap' : mode === 'register' ? 'Hesap Oluştur' : 'Bağlantıyı Gönder'}
             </button>
           </form>
         </div>

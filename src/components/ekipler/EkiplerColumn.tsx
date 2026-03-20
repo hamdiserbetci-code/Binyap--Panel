@@ -51,7 +51,7 @@ export default function EkiplerColumn({ userId, firma, proje }: Props) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-700">Ekipler</h3>
+          <h3 className="text-sm font-semibold text-slate-200">Ekipler</h3>
           <p className="text-[11px] text-slate-400 mt-0.5">{proje.ad} • {ekipler.length} üye</p>
         </div>
         <button onClick={() => openEkipModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium transition-colors">
@@ -62,20 +62,20 @@ export default function EkiplerColumn({ userId, firma, proje }: Props) {
       <div className="flex-1 overflow-y-auto space-y-1.5">
         {loading ? <p className="text-center text-slate-400 py-8 text-xs">Yükleniyor...</p> :
           ekipler.length === 0 ? (
-            <div className="text-center py-10 bg-white rounded-xl border border-dashed border-slate-200">
+            <div className="text-center py-10 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
               <Users size={28} className="text-slate-200 mx-auto mb-2"/>
               <p className="text-slate-400 text-xs mb-2">Ekip üyesi yok</p>
-              <button onClick={() => openEkipModal()} className="text-blue-600 text-xs hover:underline">Ekle</button>
+              <button onClick={() => openEkipModal()} className="text-blue-400 text-xs hover:underline">Ekle</button>
             </div>
           ) : ekipler.map(e => (
-            <div key={e.id} className="bg-white rounded-xl border border-slate-100 p-3 flex items-center gap-2.5 hover:border-slate-200 transition-all">
-              <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-semibold text-slate-600 text-xs flex-shrink-0">
+            <div key={e.id} className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3 flex items-center gap-2.5 hover:border-white/[0.08] transition-all">
+              <div className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center font-semibold text-slate-300 text-xs flex-shrink-0">
                 {e.ad_soyad.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <p className="text-xs font-medium text-slate-800 truncate">{e.ad_soyad}</p>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${e.durum==='aktif'?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500'}`}>{e.durum==='aktif'?'Aktif':'Pasif'}</span>
+                  <p className="text-xs font-medium text-white truncate">{e.ad_soyad}</p>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${e.durum==='aktif'?'bg-emerald-500/10 text-emerald-300':'bg-white/[0.06] text-slate-400'}`}>{e.durum==='aktif'?'Aktif':'Pasif'}</span>
                 </div>
                 <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
                   {e.pozisyon && <span>{e.pozisyon}</span>}
@@ -85,8 +85,8 @@ export default function EkiplerColumn({ userId, firma, proje }: Props) {
                 {e.iban && <p className="text-[10px] text-slate-400 mt-0.5 truncate">IBAN: {e.iban}</p>}
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                <button onClick={()=>openEkipModal(e)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-600"><Pencil size={11}/></button>
-                <button onClick={()=>handleEkipDelete(e.id)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={11}/></button>
+                <button onClick={()=>openEkipModal(e)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-slate-300"><Pencil size={11}/></button>
+                <button onClick={()=>handleEkipDelete(e.id)} className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={11}/></button>
               </div>
             </div>
           ))

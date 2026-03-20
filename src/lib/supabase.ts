@@ -2,7 +2,13 @@ import { createClient } from '@supabase/supabase-js'
 
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+  {
+    auth: {
+      // Password recovery ve OAuth dönüşlerinde URL'deki token'ı otomatik yakalamak için
+      detectSessionInUrl: true,
+    },
+  }
 )
 
 export interface Firma { id: string; ad: string; vergi_no?: string; yetkili?: string; [key: string]: any }

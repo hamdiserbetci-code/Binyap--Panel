@@ -21,7 +21,7 @@ export default function RaporlamaPage({ userId }: Props) {
   const [loading, setLoading] = useState(false)
 
   const fetchFirmalar = useCallback(async () => {
-    const { data } = await supabase.from('firmalar').select('*').eq('user_id', userId)
+    const { data } = await supabase.from('firmalar').select('*').order('ad')
     if (data && data.length > 0) {
       setFirmalar(data)
       setSelectedFirmaId(data[0].id)
@@ -269,6 +269,45 @@ export default function RaporlamaPage({ userId }: Props) {
     }))
   }
 
+  const fetchCariData = async (firmaId: string) => {
+    const { data } = await supabase
+      .from('cari_hesaplar')
+      .select('*, firmalar(ad)')
+      .eq('firma_id', firmaId)
+      .eq('user_id', userId)
+      .order('ad', { ascending: true })
+    
+    return (data || []).map((c: any) => ({
+      firma_ad: c.firmalar?.ad || '',
+      ad: c.ad || '',
+      tip: c.tip === 'musteri' ? 'Müşteri' : c.tip === 'tedarikci' ? 'Tedarikçi' : 'Diğer',
+      vkn: c.vkn_tckn || '',
+      telefon: c.telefon || '',
+      bakiye: c.bakiye || 0,
+      notlar: c.notlar || ''
+    }))
+  }
+
+  const fetchBankaData = async (firmaId: string) => {
+    const { data } = await supabase
+      .from('bankalar')
+      .select('*, firmalar(ad)')
+      .eq('firma_id', firmaId)
+      .eq('user_id', userId)
+      .order('banka_adi', { ascending: true })
+    
+    return (data || []).map((b: any) => ({
+      firma_ad: b.firmalar?.ad || '',
+      banka_adi: b.banka_adi || '',
+      sube: b.sube || '',
+      hesap_no: b.hesap_no || '',
+      iban: b.iban || '',
+      para_birimi: b.para_birimi || 'TRY',
+      bakiye: b.bakiye || 0,
+      notlar: b.notlar || ''
+    }))
+  }
+
   // ── Excel İndirme ─────────────────────────────────────────────────────────
 
   const downloadReport = async (type: string) => {
@@ -369,6 +408,31 @@ export default function RaporlamaPage({ userId }: Props) {
           { key: 'odeme_tarihi', label: 'Ödeme Tarihi', width: 14 },
         ]
       },
+      cari: {
+        title: 'Cari Hesaplar',
+        cols: [
+          { key: 'firma_ad', label: 'Firma', width: 18 },
+          { key: 'ad', label: 'Cari Adı', width: 28 },
+          { key: 'tip', label: 'Tür', width: 12 },
+          { key: 'vkn', label: 'VKN/TCKN', width: 16 },
+          { key: 'telefon', label: 'Telefon', width: 16 },
+          { key: 'bakiye', label: 'Bakiye (₺)', width: 16, type: 'currency' },
+          { key: 'notlar', label: 'Notlar', width: 28 },
+        ]
+      },
+      banka: {
+        title: 'Banka Hesapları',
+        cols: [
+          { key: 'firma_ad', label: 'Firma', width: 18 },
+          { key: 'banka_adi', label: 'Banka Adı', width: 22 },
+          { key: 'sube', label: 'Şube', width: 18 },
+          { key: 'hesap_no', label: 'Hesap No', width: 18 },
+          { key: 'iban', label: 'IBAN', width: 28 },
+          { key: 'para_birimi', label: 'Para Birimi', width: 12 },
+          { key: 'bakiye', label: 'Bakiye', width: 16, type: 'currency' },
+          { key: 'notlar', label: 'Notlar', width: 28 },
+        ]
+      },
     }
 
     const fetchers: Record<string, (id: string) => Promise<any[]>> = {
@@ -378,6 +442,8 @@ export default function RaporlamaPage({ userId }: Props) {
       maliyet: fetchMaliyetData,
       kasa: fetchKasaData,
       malatya_maliyet: () => fetchMalatyaMaliyetData(),
+      cari: fetchCariData,
+      banka: fetchBankaData,
     }
 
     const cfg = configs[type]
@@ -393,15 +459,15 @@ export default function RaporlamaPage({ userId }: Props) {
   const downloadAll = async () => {
     setLoading(true)
     const wb = XLSXStyle.utils.book_new()
-    const types = ['odeme', 'puantaj', 'vergi', 'maliyet', 'kasa', 'malatya_maliyet']
+    const types = ['odeme', 'puantaj', 'vergi', 'maliyet', 'kasa', 'malatya_maliyet', 'cari', 'banka']
     const titles: Record<string, string> = {
       odeme: 'Ödeme Planı', puantaj: 'Puantaj', vergi: 'Vergi',
-      maliyet: 'Maliyet', kasa: 'Kasa', malatya_maliyet: 'Malatya Maliyet'
+      maliyet: 'Maliyet', kasa: 'Kasa', malatya_maliyet: 'Malatya Maliyet', cari: 'Cari Hesaplar', banka: 'Banka Hesapları'
     }
     const fetchers: Record<string, (id: string) => Promise<any[]>> = {
       odeme: fetchOdemeData, puantaj: fetchPuantajData,
       vergi: fetchVergiData, maliyet: fetchMaliyetData, kasa: fetchKasaData,
-      malatya_maliyet: () => fetchMalatyaMaliyetData(),
+      malatya_maliyet: () => fetchMalatyaMaliyetData(), cari: fetchCariData, banka: fetchBankaData
     }
     const colsMap: Record<string, ColDef[]> = {
       odeme: [
@@ -456,6 +522,25 @@ export default function RaporlamaPage({ userId }: Props) {
         { key: 'odeme_durumu', label: 'Ödeme Durumu', width: 16 },
         { key: 'odeme_tarihi', label: 'Ödeme Tarihi', width: 14 },
       ],
+      cari: [
+        { key: 'firma_ad', label: 'Firma', width: 18 },
+        { key: 'ad', label: 'Cari Adı', width: 28 },
+        { key: 'tip', label: 'Tür', width: 12 },
+        { key: 'vkn', label: 'VKN/TCKN', width: 16 },
+        { key: 'telefon', label: 'Telefon', width: 16 },
+        { key: 'bakiye', label: 'Bakiye (₺)', width: 16, type: 'currency' },
+        { key: 'notlar', label: 'Notlar', width: 28 },
+      ],
+      banka: [
+        { key: 'firma_ad', label: 'Firma', width: 18 },
+        { key: 'banka_adi', label: 'Banka Adı', width: 22 },
+        { key: 'sube', label: 'Şube', width: 18 },
+        { key: 'hesap_no', label: 'Hesap No', width: 18 },
+        { key: 'iban', label: 'IBAN', width: 28 },
+        { key: 'para_birimi', label: 'Para Birimi', width: 12 },
+        { key: 'bakiye', label: 'Bakiye', width: 16, type: 'currency' },
+        { key: 'notlar', label: 'Notlar', width: 28 },
+      ],
     }
 
     for (const firma of firmalar) {
@@ -483,28 +568,28 @@ export default function RaporlamaPage({ userId }: Props) {
 
   return (
     <div className="p-6 max-w-4xl">
-      <h2 className="text-xl font-bold text-slate-800 mb-1">Excel Raporlama</h2>
-      <p className="text-sm text-slate-500 mb-6">Tüm modüller için profesyonel Excel raporu alın</p>
+      <h2 className="text-xl font-bold text-white mb-1">Excel Raporlama</h2>
+      <p className="text-sm text-slate-400 mb-6">Tüm modüller için profesyonel Excel raporu alın</p>
 
       {/* Filtreler */}
-      <div className="bg-white rounded-xl border border-slate-100 p-4 mb-5 grid grid-cols-3 gap-3">
+      <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4 mb-5 grid grid-cols-3 gap-3">
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Firma</label>
-          <select className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <label className="text-xs font-medium text-slate-300 mb-1 block">Firma</label>
+          <select className="w-full border border-white/[0.08] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={selectedFirmaId} onChange={e => setSelectedFirmaId(e.target.value)}>
             {firmalar.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Yıl</label>
-          <select className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <label className="text-xs font-medium text-slate-300 mb-1 block">Yıl</label>
+          <select className="w-full border border-white/[0.08] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))}>
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Ay</label>
-          <select className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <label className="text-xs font-medium text-slate-300 mb-1 block">Ay</label>
+          <select className="w-full border border-white/[0.08] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={selectedAy} onChange={e => setSelectedAy(Number(e.target.value))}>
             {Object.entries(AY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
@@ -512,21 +597,21 @@ export default function RaporlamaPage({ userId }: Props) {
       </div>
 
       {/* Rapor Butonları */}
-      <div className="bg-white rounded-xl border border-slate-100 p-4 mb-4">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Tekil Raporlar</p>
+      <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4 mb-4">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Tekil Raporlar</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <button onClick={() => downloadReport('odeme')} disabled={loading || !selectedFirmaId}
-            className={`${btnCls} bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200`}>
+            className={`${btnCls} bg-purple-500/10 text-purple-700 hover:bg-purple-100 border border-purple-200`}>
             {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
             Ödeme Planı
           </button>
           <button onClick={() => downloadReport('puantaj')} disabled={loading || !selectedFirmaId}
-            className={`${btnCls} bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200`}>
+            className={`${btnCls} bg-blue-500/10 text-blue-300 hover:bg-blue-100 border border-blue-200`}>
             {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
             Puantaj
           </button>
           <button onClick={() => downloadReport('vergi')} disabled={loading || !selectedFirmaId}
-            className={`${btnCls} bg-red-50 text-red-700 hover:bg-red-100 border border-red-200`}>
+            className={`${btnCls} bg-red-500/10 text-red-700 hover:bg-red-100 border border-red-200`}>
             {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
             Vergi Süreçleri
           </button>
@@ -540,8 +625,18 @@ export default function RaporlamaPage({ userId }: Props) {
             {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
             Kasa
           </button>
+          <button onClick={() => downloadReport('cari')} disabled={loading || !selectedFirmaId}
+            className={`${btnCls} bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200`}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+            Cari Hesaplar
+          </button>
+          <button onClick={() => downloadReport('banka')} disabled={loading || !selectedFirmaId}
+            className={`${btnCls} bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200`}>
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+            Banka Hesapları
+          </button>
           <button onClick={() => downloadReport('malatya_maliyet')} disabled={loading}
-            className={`${btnCls} bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200`}>
+            className={`${btnCls} bg-emerald-500/10 text-emerald-300 hover:bg-emerald-100 border border-emerald-200`}>
             {loading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
             Malatya Proje Maliyet
           </button>
@@ -549,8 +644,8 @@ export default function RaporlamaPage({ userId }: Props) {
       </div>
 
       {/* Tüm Raporlar */}
-      <div className="bg-white rounded-xl border border-slate-100 p-4">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Tüm Firmalar — Tek Dosya</p>
+      <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Tüm Firmalar — Tek Dosya</p>
         <button onClick={downloadAll} disabled={loading || firmalar.length === 0}
           className={`${btnCls} w-full bg-slate-800 text-white hover:bg-slate-900 py-3 text-base`}>
           {loading ? <Loader2 size={18} className="animate-spin" /> : <FileSpreadsheet size={18} />}

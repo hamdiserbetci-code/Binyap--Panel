@@ -67,6 +67,13 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
   const [importRows, setImportRows] = useState<any[]>([])
   const [importErrors, setImportErrors] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
+  const [importStep, setImportStep] = useState<'mapping' | 'preview'>('mapping')
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([])
+  const [rawRows, setRawRows] = useState<any[]>([])
+  const [colMap, setColMap] = useState<Record<string, string>>({
+    ana_grup: '', alt_kategori: '', tarih: '', tutar: '',
+    belge_no: '', aciklama: '', odeme_durumu: '', odeme_tarihi: '',
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const today = new Date().toISOString().split('T')[0]
   const yillar = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
@@ -365,12 +372,12 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
   return (
     <div>
       {/* Başlık */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-800">Malatya Proje Maliyet</h2>
           <p className="text-xs text-slate-400 mt-0.5">{AY_LABELS[selectedAy]} {selectedYil}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
           <button onClick={downloadTemplate}
             className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium">
             <FileDown size={14}/> Şablon İndir
@@ -390,7 +397,7 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
       {/* Dönem seçici */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))}
-          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none w-full sm:w-auto">
           {yillar.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex gap-1 flex-wrap">
@@ -404,7 +411,7 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
       </div>
 
       {/* Özet kartlar */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         <div className="bg-white rounded-xl border border-slate-100 p-4">
           <p className="text-xs text-slate-500 mb-1">Toplam Maliyet</p>
           <p className="text-xl font-bold text-slate-800">{fmt(genelToplam)}</p>
@@ -436,7 +443,7 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
               <div key={grup.id} className={`rounded-2xl border ${grup.renkBorder} overflow-hidden`}>
                 <button
                   onClick={() => toggleGrup(grup.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 ${grup.renkBg}`}>
+                  className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 ${grup.renkBg}`}>
                   <div className="flex items-center gap-2">
                     {acik ? <ChevronDown size={15} className={grup.renkText}/> : <ChevronRight size={15} className={grup.renkText}/>}
                     <span className={`text-sm font-bold ${grup.renkText}`}>{grup.label}</span>
@@ -462,7 +469,7 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
 
                       return (
                         <div key={alt}>
-                          <div className="flex items-center justify-between px-4 py-2 bg-slate-50/60">
+                          <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-slate-50/60">
                             <div className="flex items-center gap-2">
                               <span className="w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0"/>
                               <span className="text-xs font-semibold text-slate-600">{alt}</span>
@@ -483,7 +490,7 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
                           ) : (
                             <div className="divide-y divide-slate-50">
                               {altKayitlar.map(k => (
-                                <div key={k.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/50 transition-all">
+                                <div key={k.id} className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 sm:px-4 py-2.5 hover:bg-slate-50/50 transition-all">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="text-xs text-slate-500">{k.tarih}</span>
@@ -495,8 +502,8 @@ export default function MalatyaMaliyetPage({ userId }: Props) {
                                       {k.odeme_tarihi && <span className="text-[10px] text-emerald-500">Ödeme: {k.odeme_tarihi}</span>}
                                     </div>
                                   </div>
-                                  <span className="text-sm font-semibold text-red-500 flex-shrink-0">{fmt(k.tutar)}</span>
-                                  <div className="flex gap-1 flex-shrink-0">
+                                  <span className={`text-sm font-semibold flex-shrink-0 self-end sm:self-auto ${k.odeme_durumu === 'odendi' ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(k.tutar)}</span>
+                                  <div className="flex gap-1 flex-shrink-0 self-end sm:self-auto">
                                     {k.odeme_durumu === 'beklemede' && (
                                       <button onClick={() => markOdendi(k)} title="Ödendi işaretle"
                                         className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 flex items-center justify-center text-slate-400 hover:text-emerald-500">

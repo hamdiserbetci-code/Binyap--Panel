@@ -152,14 +152,14 @@ export default function BildirimSistemi({ userId }: Props) {
   const saatSayi = bildirimler.filter(b => b.tip === 'saat').length
 
   const TIP_COLORS: Record<string, string> = {
-    gecikti: 'bg-red-50 border-red-200 text-red-700',
-    bugun: 'bg-amber-50 border-amber-200 text-amber-700',
-    yaklasıyor: 'bg-blue-50 border-blue-200 text-blue-600',
-    saat: 'bg-purple-50 border-purple-200 text-purple-700',
+    gecikti: 'bg-red-500/10 border-red-200 text-red-700',
+    bugun: 'bg-amber-500/10 border-amber-200 text-amber-300',
+    yaklasıyor: 'bg-blue-500/10 border-blue-200 text-blue-400',
+    saat: 'bg-purple-500/10 border-purple-200 text-purple-700',
   }
 
   const TIP_ICONS: Record<string, React.ReactNode> = {
-    gecikti: <AlertTriangle size={14} className="text-red-500 flex-shrink-0"/>,
+    gecikti: <AlertTriangle size={14} className="text-red-400 flex-shrink-0"/>,
     bugun: <Clock size={14} className="text-amber-500 flex-shrink-0"/>,
     yaklasıyor: <Bell size={14} className="text-blue-500 flex-shrink-0"/>,
     saat: <AlarmClock size={14} className="text-purple-500 flex-shrink-0"/>,
@@ -168,7 +168,7 @@ export default function BildirimSistemi({ userId }: Props) {
   return (
     <div className="relative">
       <button onClick={() => setAcik(!acik)}
-        className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${acik ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-500'}`}>
+        className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${acik ? 'bg-blue-600 text-white' : 'bg-white/[0.02] border border-white/[0.08] text-slate-400 hover:border-blue-300 hover:text-blue-500'}`}>
         <Bell size={16}/>
         {bildirimler.length > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
@@ -178,21 +178,21 @@ export default function BildirimSistemi({ userId }: Props) {
       </button>
 
       {acik && (
-        <div className="absolute right-0 top-11 w-80 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+        <div className="absolute right-0 top-11 w-80 bg-white/[0.02] rounded-2xl border border-white/[0.08] shadow-xl shadow-black/20-xl z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05] bg-white/[0.04]">
             <div className="flex items-center gap-2">
-              <Bell size={14} className="text-slate-600"/>
-              <p className="text-sm font-semibold text-slate-800">Bildirimler</p>
+              <Bell size={14} className="text-slate-300"/>
+              <p className="text-sm font-semibold text-white">Bildirimler</p>
               {bildirimler.length > 0 && (
                 <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">{bildirimler.length}</span>
               )}
             </div>
-            <button onClick={() => setAcik(false)} className="text-slate-400 hover:text-slate-600"><X size={14}/></button>
+            <button onClick={() => setAcik(false)} className="text-slate-400 hover:text-slate-300"><X size={14}/></button>
           </div>
 
           {!izinVerildi && (
-            <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
-              <p className="text-xs text-blue-600">Tarayıcı bildirimleri için izin verin</p>
+            <div className="px-4 py-3 bg-blue-500/10 border-b border-blue-100 flex items-center justify-between">
+              <p className="text-xs text-blue-400">Tarayıcı bildirimleri için izin verin</p>
               <button onClick={tarayicIzniIste} className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg font-medium hover:bg-blue-700">İzin Ver</button>
             </div>
           )}
@@ -205,10 +205,10 @@ export default function BildirimSistemi({ userId }: Props) {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-4 gap-0 border-b border-slate-100">
-                {gecikmisSayi > 0 && <div className="flex flex-col items-center py-2.5 border-r border-slate-100"><p className="text-lg font-bold text-red-500">{gecikmisSayi}</p><p className="text-[10px] text-slate-400">Gecikmiş</p></div>}
-                {bugunSayi > 0 && <div className="flex flex-col items-center py-2.5 border-r border-slate-100"><p className="text-lg font-bold text-amber-500">{bugunSayi}</p><p className="text-[10px] text-slate-400">Bugün</p></div>}
-                {yaklasanSayi > 0 && <div className="flex flex-col items-center py-2.5 border-r border-slate-100"><p className="text-lg font-bold text-blue-500">{yaklasanSayi}</p><p className="text-[10px] text-slate-400">Yaklaşan</p></div>}
+              <div className="grid grid-cols-4 gap-0 border-b border-white/[0.05]">
+                {gecikmisSayi > 0 && <div className="flex flex-col items-center py-2.5 border-r border-white/[0.05]"><p className="text-lg font-bold text-red-400">{gecikmisSayi}</p><p className="text-[10px] text-slate-400">Gecikmiş</p></div>}
+                {bugunSayi > 0 && <div className="flex flex-col items-center py-2.5 border-r border-white/[0.05]"><p className="text-lg font-bold text-amber-500">{bugunSayi}</p><p className="text-[10px] text-slate-400">Bugün</p></div>}
+                {yaklasanSayi > 0 && <div className="flex flex-col items-center py-2.5 border-r border-white/[0.05]"><p className="text-lg font-bold text-blue-500">{yaklasanSayi}</p><p className="text-[10px] text-slate-400">Yaklaşan</p></div>}
                 {saatSayi > 0 && <div className="flex flex-col items-center py-2.5"><p className="text-lg font-bold text-purple-500">{saatSayi}</p><p className="text-[10px] text-slate-400">Saat</p></div>}
               </div>
 
@@ -228,7 +228,7 @@ export default function BildirimSistemi({ userId }: Props) {
                     {/* Erteleme butonları - sadece saat bildirimleri için */}
                     {b.tip === 'saat' && (
                       <div className="flex gap-1 flex-wrap mt-1">
-                        <span className="text-[10px] text-purple-600 font-medium mr-1">Ertele:</span>
+                        <span className="text-[10px] text-purple-400 font-medium mr-1">Ertele:</span>
                         {ERTELEME_SECENEKLERI.map(dk => (
                           <button key={dk} onClick={() => handleErteleme(b, dk)}
                             className="text-[10px] bg-purple-100 hover:bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full font-medium transition-colors">

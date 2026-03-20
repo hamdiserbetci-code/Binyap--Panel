@@ -1,10 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, Maliyet, Firma, AY_LABELS } from '@/lib/supabase'
-import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
-import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, Building2, BarChart2 } from 'lucide-react'
-
-interface Props { userId: string; firma: Firma }
+export default function MaliyetPage() {
+  return <div className="p-6 text-center text-slate-600"><p>Maliyet sayfası devre dışı.</p></div>
+}
 
 export default function MaliyetPage({ userId, firma }: Props) {
   const [firmalar, setFirmalar] = useState<Firma[]>([])
@@ -163,22 +160,21 @@ export default function MaliyetPage({ userId, firma }: Props) {
     { label:'Demirbaşlar', value:(m as any).demirbaslar||0, tip:'gider' },
     { label:'Devreden Stok', value:(m as any).devreden_stok||0, tip:'gider' },
     { label:'Yıllara Yayılan Maliyetler', value:(m as any).yillara_yaygin_maliyetler||0, tip:'gider' },
-    { label:'Diğer Giderler', value:m.diger_giderler, tip:'gider' },
-    { label:'Devreden KDV', value:(m as any).devreden_kdv||0, tip:'bilgi' },
-  ].filter(r => r.value !== 0) : []
+    { label:'Diğer Giderler', value:m.diger_giderler, tip:'gider' }
+  ].filter(r => r.value !== 0) : [];
 
   const insaatRows = m ? [
     { label:'Yıllara Yayılan İnşaat Geliri', value:(m as any).yyllara_yaygin_insaat_geliri||0, tip:'gelir' },
     { label:'Yıllara Yayılan İnşaat Maliyeti', value:(m as any).yillara_yaygin_insaat_maliyeti||0, tip:'gider' },
     { label:'Yıllara Yayılan İnşaat Kârı', value:(m as any).yillara_yaygin_insaat_kar||0, tip:'bilgi' },
-  ].filter(r => r.value !== 0) : []
+  ].filter(r => r.value !== 0) : [];
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-5 bg-white rounded-xl border border-slate-100 p-1.5">
+      <div className="flex items-center gap-2 mb-5 bg-white/[0.02] rounded-xl border border-white/[0.05] p-1.5">
         {firmalar.map(f => (
           <button key={f.id} onClick={() => setActiveFirma(f)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center ${activeFirma?.id === f.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center ${activeFirma?.id === f.id ? 'bg-blue-600 text-white shadow-xl shadow-black/20-lg shadow-xl shadow-black/20-black/20' : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]'}`}>
             <Building2 size={14}/> {f.ad}
           </button>
         ))}
@@ -186,13 +182,13 @@ export default function MaliyetPage({ userId, firma }: Props) {
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Maliyet Kontrolü</h2>
+          <h2 className="text-lg font-semibold text-white">Maliyet Kontrolü</h2>
           <p className="text-xs text-slate-400 mt-0.5">{activeFirma?.ad} — {AY_LABELS[selectedAy]} {selectedYil}</p>
         </div>
         <div className="flex gap-2">
-          <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-1">
-            <button onClick={() => setGorunum('aylik')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${gorunum==='aylik'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-700'}`}>Aylık</button>
-            <button onClick={() => setGorunum('kumülatif')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${gorunum==='kumülatif'?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-700'}`}>
+          <div className="flex bg-white/[0.02] border border-white/[0.08] rounded-xl p-1 gap-1">
+            <button onClick={() => setGorunum('aylik')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${gorunum==='aylik'?'bg-blue-600 text-white':'text-slate-400 hover:text-slate-200'}`}>Aylık</button>
+            <button onClick={() => setGorunum('kumülatif')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${gorunum==='kumülatif'?'bg-blue-600 text-white':'text-slate-400 hover:text-slate-200'}`}>
               <BarChart2 size={11}/> Kümülatif
             </button>
           </div>
@@ -203,13 +199,13 @@ export default function MaliyetPage({ userId, firma }: Props) {
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap items-center">
-        <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+        <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))} className="bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none">
           {yillar.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex gap-1 flex-wrap">
           {AY_LABELS.slice(1).map((ay, i) => (
             <button key={i+1} onClick={() => setSelectedAy(i+1)}
-              className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>{ay}</button>
+              className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>{ay}</button>
           ))}
         </div>
       </div>
@@ -218,16 +214,16 @@ export default function MaliyetPage({ userId, firma }: Props) {
         <>
           {gorunum === 'kumülatif' && (
             <div className="mb-4">
-              <p className="text-xs font-medium text-slate-500 mb-2">📊 Kümülatif — Ocak → {AY_LABELS[selectedAy]} {selectedYil} ({kumAylar.length} ay)</p>
+              <p className="text-xs font-medium text-slate-400 mb-2">📊 Kümülatif — Ocak → {AY_LABELS[selectedAy]} {selectedYil} ({kumAylar.length} ay)</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                <div className="bg-white rounded-xl border border-emerald-100 p-4">
-                  <p className="text-xs text-slate-500 mb-1">Kümülatif Gelir</p>
-                  <p className="text-base sm:text-xl font-bold text-emerald-600">{fmt(kumGelir)}</p>
+                <div className="bg-white/[0.02] rounded-xl border border-emerald-100 p-4">
+                  <p className="text-xs text-slate-400 mb-1">Kümülatif Gelir</p>
+                  <p className="text-base sm:text-xl font-bold text-emerald-400">{fmt(kumGelir)}</p>
                   <p className="text-[10px] text-slate-400 mt-1">{kumAylar.length} ay toplamı</p>
                 </div>
-                <div className="bg-white rounded-xl border border-red-100 p-4">
-                  <p className="text-xs text-slate-500 mb-1">Kümülatif Gider</p>
-                  <p className="text-base sm:text-xl font-bold text-red-500">{fmt(kumGider)}</p>
+                <div className="bg-white/[0.02] rounded-xl border border-red-100 p-4">
+                  <p className="text-xs text-slate-400 mb-1">Kümülatif Gider</p>
+                  <p className="text-base sm:text-xl font-bold text-red-400">{fmt(kumGider)}</p>
                   <p className="text-[10px] text-slate-400 mt-1">{kumAylar.length} ay toplamı</p>
                 </div>
                 <div className={`rounded-xl border p-4 ${kumKarZarar >= 0 ? 'bg-blue-600 border-blue-700' : 'bg-red-600 border-red-700'}`}>
@@ -240,15 +236,15 @@ export default function MaliyetPage({ userId, firma }: Props) {
                 <div className="bg-slate-800 rounded-xl p-4 mb-3">
                   <p className="text-xs text-slate-400 mb-2">📅 {selectedYil} Yıllık Toplam ({tumYilMaliyet.length} ay)</p>
                   <div className="flex flex-wrap gap-3 items-end justify-between">
-                    <div><p className="text-[10px] text-slate-500">Gelir</p><p className="text-sm font-semibold text-emerald-400">{fmt(yilGelir)}</p></div>
-                    <div><p className="text-[10px] text-slate-500">Gider</p><p className="text-sm font-semibold text-red-400">{fmt(yilGider)}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Gelir</p><p className="text-sm font-semibold text-emerald-400">{fmt(yilGelir)}</p></div>
+                    <div><p className="text-[10px] text-slate-400">Gider</p><p className="text-sm font-semibold text-red-400">{fmt(yilGider)}</p></div>
                     <div className="text-right"><p className="text-[10px] text-slate-400">Net</p><p className={`text-lg font-bold ${yilKarZarar >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(yilKarZarar)}</p></div>
                   </div>
                 </div>
               )}
               {tumYilMaliyet.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                  <div className="grid grid-cols-5 gap-1 px-2 sm:px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] sm:text-xs font-medium text-slate-500">
+                <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] overflow-hidden">
+                  <div className="grid grid-cols-5 gap-1 px-2 sm:px-4 py-2 bg-white/[0.04] border-b border-white/[0.05] text-[10px] sm:text-xs font-medium text-slate-400">
                     <div>Ay</div><div className="text-right">Gelir</div><div className="text-right">Gider</div><div className="text-right">Kâr/Zarar</div><div className="text-right">Kümülatif</div>
                   </div>
                   {(() => {
@@ -262,12 +258,12 @@ export default function MaliyetPage({ userId, firma }: Props) {
                       const net = gelir - gider
                       kumTotal += net
                       return (
-                        <div key={x.id} className={`grid grid-cols-5 gap-1 px-2 sm:px-4 py-2 border-b border-slate-50 last:border-0 text-sm ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} ${x.ay === selectedAy ? 'ring-1 ring-inset ring-blue-200' : ''}`}>
-                          <div className="text-slate-700 font-medium">{AY_LABELS[x.ay]}</div>
-                          <div className="text-right text-emerald-600 font-medium">{fmt(gelir)}</div>
-                          <div className="text-right text-red-500">{fmt(gider)}</div>
-                          <div className={`text-right font-medium ${net >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(net)}</div>
-                          <div className={`text-right font-bold ${kumTotal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(kumTotal)}</div>
+                        <div key={x.id} className={`grid grid-cols-5 gap-1 px-2 sm:px-4 py-2 border-b border-white/[0.02] last:border-0 text-sm ${i % 2 === 0 ? 'bg-white/[0.02]' : 'bg-white/[0.04]/50'} ${x.ay === selectedAy ? 'ring-1 ring-inset ring-blue-200' : ''}`}>
+                          <div className="text-slate-200 font-medium">{AY_LABELS[x.ay]}</div>
+                          <div className="text-right text-emerald-400 font-medium">{fmt(gelir)}</div>
+                          <div className="text-right text-red-400">{fmt(gider)}</div>
+                          <div className={`text-right font-medium ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{fmt(net)}</div>
+                          <div className={`text-right font-bold ${kumTotal >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(kumTotal)}</div>
                         </div>
                       )
                     })
@@ -280,84 +276,78 @@ export default function MaliyetPage({ userId, firma }: Props) {
           {gorunum === 'aylik' && (
             <>
               {!m ? (
-                <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-200">
+                <div className="text-center py-16 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
                   <TrendingUp size={40} className="text-slate-200 mx-auto mb-3"/>
                   <p className="text-slate-400 text-sm mb-3">Bu dönem için maliyet kaydı yok</p>
                   <button onClick={() => openModal()} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700">Maliyet Ekle</button>
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                    <div className="bg-white rounded-xl border border-slate-100 p-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4 flex flex-col justify-center">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center"><TrendingUp size={16} className="text-emerald-600"/></div>
-                        <p className="text-xs text-slate-500">Toplam Gelir</p>
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center"><TrendingUp size={16} className="text-emerald-400"/></div>
+                        <p className="text-xs text-slate-400">Toplam Gelir</p>
                       </div>
-                      <p className="text-lg sm:text-2xl font-bold text-emerald-600">{fmt(toplamGelir)}</p>
+                      <p className="text-lg sm:text-2xl font-bold text-emerald-400">{fmt(toplamGelir)}</p>
                     </div>
-                    <div className="bg-white rounded-xl border border-slate-100 p-4">
+                    <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4 flex flex-col justify-center">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center"><TrendingDown size={16} className="text-red-500"/></div>
-                        <p className="text-xs text-slate-500">Toplam Gider</p>
+                        <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center"><TrendingDown size={16} className="text-red-400"/></div>
+                        <p className="text-xs text-slate-400">Toplam Gider</p>
                       </div>
-                      <p className="text-lg sm:text-2xl font-bold text-red-500">{fmt(toplamGider)}</p>
+                      <p className="text-lg sm:text-2xl font-bold text-red-400">{fmt(toplamGider)}</p>
                     </div>
-                    <div className={`rounded-xl border p-4 ${karZarar >= 0 ? 'bg-blue-600 border-blue-700' : 'bg-red-600 border-red-700'}`}>
+                    <div className={`rounded-xl border p-4 flex flex-col justify-center ${karZarar >= 0 ? 'bg-blue-600 border-blue-700' : 'bg-red-600 border-red-700'}`}>
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-white/[0.02]/20 flex items-center justify-center">
                           {karZarar >= 0 ? <TrendingUp size={16} className="text-white"/> : <TrendingDown size={16} className="text-white"/>}
                         </div>
                         <p className="text-xs text-white/80">{karZarar >= 0 ? 'Net Kâr' : 'Net Zarar'}</p>
                       </div>
                       <p className="text-lg sm:text-2xl font-bold text-white">{fmt(Math.abs(karZarar))}</p>
                     </div>
+                    <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4 flex flex-col justify-center">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center"><BarChart2 size={16} className="text-blue-400"/></div>
+                        <p className="text-xs text-slate-400">Devreden KDV</p>
+                      </div>
+                      <p className="text-lg sm:text-2xl font-bold text-blue-400">{fmt((m as any).devreden_kdv || 0)}</p>
+                    </div>
                   </div>
-                  <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-50 flex items-center justify-between">
-                      <p className="text-sm font-medium text-slate-700">Detay</p>
+                  <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] overflow-hidden">
+                    <div className="px-4 py-3 border-b border-white/[0.02] flex items-center justify-between">
+                      <p className="text-sm font-medium text-slate-200">Detay</p>
                       <div className="flex gap-2">
-                        <button onClick={() => openModal(m)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline"><Pencil size={11}/> Düzenle</button>
-                        <button onClick={() => handleDelete(m.id)} className="flex items-center gap-1 text-xs text-red-500 hover:underline"><Trash2 size={11}/> Sil</button>
+                        <button onClick={() => openModal(m)} className="flex items-center gap-1 text-xs text-blue-400 hover:underline"><Pencil size={11}/> Düzenle</button>
+                        <button onClick={() => handleDelete(m.id)} className="flex items-center gap-1 text-xs text-red-400 hover:underline"><Trash2 size={11}/> Sil</button>
                       </div>
                     </div>
-                    <div className="divide-y divide-slate-50">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-4">
                       {detayRows.map(row => (
-                        <div key={row.label} className="flex items-center justify-between px-4 py-2.5">
-                          <div className="flex items-center gap-2">
+                        <div key={row.label} className="bg-white/[0.04] border border-white/[0.05] rounded-xl p-3 flex flex-col justify-center">
+                          <div className="flex items-center gap-2 mb-2">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${row.tip==='gelir'?'bg-emerald-400':row.tip==='bilgi'?'bg-blue-400':'bg-red-400'}`}/>
-                            <span className="text-sm text-slate-600">{row.label}</span>
+                            <span className="text-xs text-slate-400">{row.label}</span>
                           </div>
-                          <span className={`text-sm font-medium ${row.tip==='gelir'?'text-emerald-600':row.tip==='bilgi'?'text-blue-600':'text-red-500'}`}>
-                            {row.tip==='bilgi'?'':row.tip==='gelir'?'+':'-'}{row.value.toLocaleString('tr-TR')} ₺
+                          <span className={`text-sm sm:text-base font-bold ${row.tip==='gelir'?'text-emerald-400':row.tip==='bilgi'?'text-blue-400':'text-red-400'}`}>
+                            {row.tip==='bilgi'?'':row.tip==='gelir'?'+':'-'}{fmt(row.value)}
                           </span>
                         </div>
                       ))}
-                      {(m as any).devreden_kdv > 0 && (
-                        <div className="px-4 py-2.5 bg-blue-50 flex items-center justify-between">
-                          <span className="text-sm text-blue-700">Devreden KDV</span>
-                          <span className="text-sm font-medium text-blue-700">{fmt((m as any).devreden_kdv)}</span>
-                        </div>
-                      )}
-                      {insaatRows.length > 0 && (
-                        <>
-                          <div className="px-4 py-2 bg-amber-50 border-t border-amber-100">
-                            <p className="text-xs font-semibold text-amber-700">🏗️ Yıllara Yaygın İnşaat</p>
+                      {insaatRows.length > 0 && insaatRows.map(row => (
+                        <div key={row.label} className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col justify-center">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${row.tip==='gelir'?'bg-emerald-400':row.tip==='bilgi'?'bg-amber-400':'bg-red-400'}`}/>
+                            <span className="text-xs text-amber-300">{row.label}</span>
                           </div>
-                          {insaatRows.map(row => (
-                            <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-amber-50/50">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${row.tip==='gelir'?'bg-emerald-400':row.tip==='bilgi'?'bg-amber-400':'bg-red-400'}`}/>
-                                <span className="text-sm text-slate-600">{row.label}</span>
-                              </div>
-                              <span className={`text-sm font-medium ${row.tip==='gelir'?'text-emerald-600':row.tip==='bilgi'?'text-amber-600':'text-red-500'}`}>
-                                {row.value.toLocaleString('tr-TR')} ₺
-                              </span>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                      {m.notlar && <div className="px-4 py-3 bg-slate-50"><p className="text-xs text-slate-500">📌 {m.notlar}</p></div>}
+                          <span className={`text-sm sm:text-base font-bold flex-shrink-0 ${row.tip==='gelir'?'text-emerald-400':row.tip==='bilgi'?'text-amber-400':'text-red-400'}`}>
+                            {fmt(row.value)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
+                    {m.notlar && <div className="px-4 py-3 bg-white/[0.04] border-t border-white/[0.02]"><p className="text-xs text-slate-400">📌 {m.notlar}</p></div>}
                   </div>
                 </>
               )}
@@ -370,9 +360,9 @@ export default function MaliyetPage({ userId, firma }: Props) {
         <Modal title={editing ? 'Maliyet Düzenle' : 'Maliyet Ekle'} onClose={() => setModal(false)}
           footer={<><button className={btnSecondary} onClick={() => setModal(false)}>İptal</button><button className={btnPrimary} onClick={handleSave}>Kaydet</button></>}>
           <div className="space-y-3">
-            <p className="text-xs font-medium text-slate-500 bg-slate-50 px-3 py-2 rounded-lg">📅 {activeFirma?.ad} — {AY_LABELS[selectedAy]} {selectedYil}</p>
+            <p className="text-xs font-medium text-slate-400 bg-white/[0.04] px-3 py-2 rounded-lg">📅 {activeFirma?.ad} — {AY_LABELS[selectedAy]} {selectedYil}</p>
 
-            <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg">📈 GELİRLER</p>
+            <p className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 px-3 py-1.5 rounded-lg">📈 GELİRLER</p>
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Satış Faturaları (₺)"><input type="number" className={inputCls} value={form.satis_faturalari} onChange={e=>setForm({...form,satis_faturalari:e.target.value})} placeholder="0"/></FormField>
               <FormField label="Yıllara Yayılan Satışlar (₺)"><input type="number" className={inputCls} value={form.yillara_yaygin_satislar} onChange={e=>setForm({...form,yillara_yaygin_satislar:e.target.value})} placeholder="0"/></FormField>
@@ -381,7 +371,7 @@ export default function MaliyetPage({ userId, firma }: Props) {
               <FormField label="Diğer Gelirler (₺)"><input type="number" className={inputCls} value={form.diger_gelirler} onChange={e=>setForm({...form,diger_gelirler:e.target.value})} placeholder="0"/></FormField>
             </div>
 
-            <p className="text-xs font-semibold text-red-700 bg-red-50 px-3 py-1.5 rounded-lg">📉 GİDERLER</p>
+            <p className="text-xs font-semibold text-red-700 bg-red-500/10 px-3 py-1.5 rounded-lg">📉 GİDERLER</p>
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Alış Faturaları (₺)"><input type="number" className={inputCls} value={form.alis_faturalari} onChange={e=>setForm({...form,alis_faturalari:e.target.value})} placeholder="0"/></FormField>
               <FormField label="İşçilik Giderleri (₺)"><input type="number" className={inputCls} value={form.iscilik} onChange={e=>setForm({...form,iscilik:e.target.value})} placeholder="0"/></FormField>
@@ -404,10 +394,10 @@ export default function MaliyetPage({ userId, firma }: Props) {
             </div>
             <FormField label="Diğer Giderler (₺)"><input type="number" className={inputCls} value={form.diger_giderler} onChange={e=>setForm({...form,diger_giderler:e.target.value})} placeholder="0"/></FormField>
 
-            <p className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg">📋 DİĞER BİLGİLER</p>
+            <p className="text-xs font-semibold text-blue-300 bg-blue-500/10 px-3 py-1.5 rounded-lg">📋 DİĞER BİLGİLER</p>
             <FormField label="Devreden KDV (₺)"><input type="number" className={inputCls} value={form.devreden_kdv} onChange={e=>setForm({...form,devreden_kdv:e.target.value})} placeholder="0"/></FormField>
 
-            <p className="text-xs font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg">🏗️ YILLARA YAYGIN İNŞAAT</p>
+            <p className="text-xs font-semibold text-amber-300 bg-amber-500/10 px-3 py-1.5 rounded-lg">🏗️ YILLARA YAYGIN İNŞAAT</p>
             <div className="grid grid-cols-3 gap-3">
               <FormField label="İnşaat Geliri (₺)"><input type="number" className={inputCls} value={form.yyllara_yaygin_insaat_geliri} onChange={e=>setForm({...form,yyllara_yaygin_insaat_geliri:e.target.value})} placeholder="0"/></FormField>
               <FormField label="İnşaat Maliyeti (₺)"><input type="number" className={inputCls} value={form.yillara_yaygin_insaat_maliyeti} onChange={e=>setForm({...form,yillara_yaygin_insaat_maliyeti:e.target.value})} placeholder="0"/></FormField>

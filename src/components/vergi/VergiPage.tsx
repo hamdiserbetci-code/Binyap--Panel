@@ -131,7 +131,7 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-800">{baslik}</h2>
+          <h2 className="text-base font-semibold text-white">{baslik}</h2>
           <p className="text-xs text-slate-400 mt-0.5">{firma.ad} — {AY_LABELS[selectedAy]} {selectedYil}</p>
         </div>
         <button onClick={() => openModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium">
@@ -141,13 +141,13 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
 
       {/* Dönem seçici */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
-        <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+        <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))} className="bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none">
           {yillar.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex gap-1 flex-wrap">
           {AY_LABELS.slice(1).map((ay, i) => (
             <button key={i+1} onClick={() => setSelectedAy(i+1)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>{ay}</button>
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>{ay}</button>
           ))}
         </div>
       </div>
@@ -155,23 +155,23 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
       {/* Süreç listesi */}
       {loading ? <p className="text-center text-slate-400 py-6 text-sm">Yükleniyor...</p> :
         surecleri.length === 0 ? (
-          <div className="text-center py-8 bg-white rounded-xl border border-dashed border-slate-200 mb-4">
+          <div className="text-center py-8 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08] mb-4">
             <FileText size={28} className="text-slate-200 mx-auto mb-2"/>
             <p className="text-slate-400 text-sm mb-2">Bu dönem için kayıt yok</p>
-            <button onClick={() => openModal()} className="text-blue-600 text-sm hover:underline">Kayıt ekle</button>
+            <button onClick={() => openModal()} className="text-blue-400 text-sm hover:underline">Kayıt ekle</button>
           </div>
         ) : (
           <div className="space-y-2 mb-4">
             {surecleri.map(s => {
               const gecikti = s.son_tarih && s.son_tarih < today && s.durum !== 'tamamlandi' && s.durum !== 'beyan_edildi'
               return (
-                <div key={s.id} className={`bg-white rounded-xl border p-3.5 ${gecikti?'border-l-4 border-l-red-400 border-y-slate-100 border-r-slate-100':'border-slate-100'}`}>
+                <div key={s.id} className={`bg-white/[0.02] rounded-xl border p-3.5 ${gecikti?'border-l-4 border-l-red-400 border-y-slate-100 border-r-slate-100':'border-white/[0.05]'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {!vergiTur && <p className="text-sm font-medium text-slate-800">{VERGI_TUR_LABELS[s.tur] || s.tur}</p>}
+                        {!vergiTur && <p className="text-sm font-medium text-white">{VERGI_TUR_LABELS[s.tur] || s.tur}</p>}
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DURUM_COLORS[s.durum]}`}>{DURUM_LABELS[s.durum]}</span>
-                        {gecikti && <span className="text-[10px] text-red-500 flex items-center gap-1"><AlertTriangle size={10}/>Gecikti</span>}
+                        {gecikti && <span className="text-[10px] text-red-400 flex items-center gap-1"><AlertTriangle size={10}/>Gecikti</span>}
                       </div>
                       <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
                         {s.son_tarih && <span>Son tarih: {s.son_tarih}</span>}
@@ -183,12 +183,12 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
                     <div className="flex gap-1 flex-shrink-0">
                       {s.durum !== 'tamamlandi' && (
                         <select value={s.durum} onChange={e => updateDurum(s, e.target.value)}
-                          className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] outline-none">
+                          className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1 text-[11px] outline-none">
                           {Object.entries(DURUM_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                         </select>
                       )}
-                      <button onClick={() => openModal(s)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
-                      <button onClick={() => handleDelete(s.id)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                      <button onClick={() => openModal(s)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-white/[0.04] flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
+                      <button onClick={() => handleDelete(s.id)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={12}/></button>
                     </div>
                   </div>
                 </div>
@@ -199,11 +199,11 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
       }
 
       {/* PDF Yükleme */}
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
-          <p className="text-sm font-medium text-slate-700">📎 Dökümanlar</p>
+      <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.02]">
+          <p className="text-sm font-medium text-slate-200">📎 Dökümanlar</p>
           <button onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors">
+            className="flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-slate-300 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors">
             <Upload size={12}/> PDF Yükle
           </button>
           <input ref={fileRef} type="file" accept="*" className="hidden"
@@ -216,7 +216,7 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
           onDragLeave={() => setDragOver(false)}
           onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if(f) handleFileUpload(f) }}
           onClick={() => fileRef.current?.click()}
-          className={`mx-4 my-3 border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${dragOver?'border-blue-400 bg-blue-50':'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}>
+          className={`mx-4 my-3 border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${dragOver?'border-blue-400 bg-blue-500/10':'border-white/[0.08] hover:border-blue-300 hover:bg-white/[0.04]'}`}>
           {uploading ? (
             <p className="text-sm text-blue-500">Yükleniyor...</p>
           ) : (
@@ -233,21 +233,21 @@ export default function VergiPage({ userId, firma, vergiTur }: Props) {
         ) : (
           <div className="divide-y divide-slate-50 pb-2">
             {dokumanlar.map(d => (
-              <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/50">
-                <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
+              <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04]/50">
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-100 flex items-center justify-center flex-shrink-0">
                   <FileText size={14} className="text-red-400"/>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-700 truncate">{d.dosya_adi}</p>
+                  <p className="text-xs font-medium text-slate-200 truncate">{d.dosya_adi}</p>
                   <p className="text-[10px] text-slate-400">{formatBytes(d.dosya_boyut)} • {d.olusturulma?.split('T')[0]}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <button onClick={() => handleDownload(d)}
-                    className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center text-slate-400 hover:text-blue-500">
+                    className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-blue-500/10 hover:border-blue-200 flex items-center justify-center text-slate-400 hover:text-blue-500">
                     <Download size={12}/>
                   </button>
                   <button onClick={() => handleDokDelete(d)}
-                    className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500">
+                    className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400">
                     <X size={12}/>
                   </button>
                 </div>

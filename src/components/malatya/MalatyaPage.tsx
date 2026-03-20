@@ -31,22 +31,22 @@ const KATEGORILER = [
 ]
 
 const KAT_COLORS: Record<string, string> = {
-  'Nakliye Giderleri': 'bg-blue-50 text-blue-700',
+  'Nakliye Giderleri': 'bg-blue-500/10 text-blue-300',
   'Malzeme Alış Giderleri': 'bg-orange-50 text-orange-700',
-  'Kiralama Giderleri': 'bg-purple-50 text-purple-700',
-  'Personel Ücretleri': 'bg-emerald-50 text-emerald-700',
+  'Kiralama Giderleri': 'bg-purple-500/10 text-purple-700',
+  'Personel Ücretleri': 'bg-emerald-500/10 text-emerald-300',
   'SGK Ödemeleri': 'bg-teal-50 text-teal-700',
-  'Muhtasar Ödemeleri': 'bg-red-50 text-red-700',
-  'Muhasebe Ödemeleri': 'bg-indigo-50 text-indigo-700',
-  'SMMM Ödemeleri': 'bg-violet-50 text-violet-700',
-  'Arabuluculuk Giderleri': 'bg-amber-50 text-amber-700',
-  'Poliçe Giderleri': 'bg-cyan-50 text-cyan-700',
+  'Muhtasar Ödemeleri': 'bg-red-500/10 text-red-700',
+  'Muhasebe Ödemeleri': 'bg-indigo-500/10 text-indigo-700',
+  'SMMM Ödemeleri': 'bg-violet-500/10 text-violet-700',
+  'Arabuluculuk Giderleri': 'bg-amber-500/10 text-amber-300',
+  'Poliçe Giderleri': 'bg-cyan-500/10 text-cyan-700',
   'Avans Ödemeleri': 'bg-pink-50 text-pink-700',
   'Geçici Vergi Ödemeleri': 'bg-rose-50 text-rose-700',
-  'Kurumlar Vergisi Ödemeleri': 'bg-red-50 text-red-800',
-  'MTV Ödemeleri': 'bg-slate-100 text-slate-700',
+  'Kurumlar Vergisi Ödemeleri': 'bg-red-500/10 text-red-800',
+  'MTV Ödemeleri': 'bg-white/[0.06] text-slate-200',
   'Trafik Cezaları': 'bg-red-100 text-red-800',
-  'Diğer': 'bg-slate-100 text-slate-600',
+  'Diğer': 'bg-white/[0.06] text-slate-300',
 }
 
 export default function MalatyaPage({ userId }: Props) {
@@ -140,7 +140,7 @@ export default function MalatyaPage({ userId }: Props) {
       {/* Başlık */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Malatya Gider Takibi</h2>
+          <h2 className="text-lg font-semibold text-white">Malatya Gider Takibi</h2>
           <p className="text-xs text-slate-400 mt-0.5">{AY_LABELS[selectedAy]} {selectedYil}</p>
         </div>
         <button onClick={() => openModal()}
@@ -152,13 +152,13 @@ export default function MalatyaPage({ userId }: Props) {
       {/* Dönem seçici */}
       <div className="flex gap-2 mb-4 flex-wrap items-center">
         <select value={selectedYil} onChange={e => setSelectedYil(Number(e.target.value))}
-          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+          className="bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none">
           {yillar.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex gap-1 flex-wrap">
           {AY_LABELS.map((ay, i) => (
             <button key={i} onClick={() => setSelectedAy(i)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>
               {ay}
             </button>
           ))}
@@ -167,31 +167,31 @@ export default function MalatyaPage({ userId }: Props) {
 
       {/* Özet kartlar */}
       <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-white rounded-xl border border-slate-100 p-4">
-          <p className="text-xs text-slate-500 mb-1">Toplam Gider</p>
-          <p className="text-xl font-bold text-slate-800">{fmt(toplamTutar)}</p>
+        <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
+          <p className="text-xs text-slate-400 mb-1">Toplam Gider</p>
+          <p className="text-xl font-bold text-white">{fmt(toplamTutar)}</p>
           <p className="text-[10px] text-slate-400 mt-1">{filtered.length} kayıt</p>
         </div>
-        <div className="bg-white rounded-xl border border-red-100 p-4">
-          <p className="text-xs text-slate-500 mb-1">Bekleyen</p>
-          <p className="text-xl font-bold text-red-500">{fmt(bekleyenTutar)}</p>
+        <div className="bg-white/[0.02] rounded-xl border border-red-100 p-4">
+          <p className="text-xs text-slate-400 mb-1">Bekleyen</p>
+          <p className="text-xl font-bold text-red-400">{fmt(bekleyenTutar)}</p>
           <p className="text-[10px] text-slate-400 mt-1">{filtered.filter(g=>g.odeme_durumu==='beklemede').length} ödeme</p>
         </div>
-        <div className="bg-white rounded-xl border border-emerald-100 p-4">
-          <p className="text-xs text-slate-500 mb-1">Ödenen</p>
-          <p className="text-xl font-bold text-emerald-600">{fmt(odenenTutar)}</p>
+        <div className="bg-white/[0.02] rounded-xl border border-emerald-100 p-4">
+          <p className="text-xs text-slate-400 mb-1">Ödenen</p>
+          <p className="text-xl font-bold text-emerald-400">{fmt(odenenTutar)}</p>
           <p className="text-[10px] text-slate-400 mt-1">{filtered.filter(g=>g.odeme_durumu==='odendi').length} ödeme</p>
         </div>
       </div>
 
       {/* Kategori özeti */}
       {katOzet.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-100 p-4 mb-4">
-          <p className="text-xs font-medium text-slate-500 mb-3">Kategori Bazlı Özet</p>
+        <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4 mb-4">
+          <p className="text-xs font-medium text-slate-400 mb-3">Kategori Bazlı Özet</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {katOzet.map(k => (
               <div key={k.kategori} onClick={() => setFiltre(filtre === k.kategori ? 'hepsi' : k.kategori)}
-                className={`rounded-xl border p-3 cursor-pointer transition-all hover:shadow-sm ${filtre===k.kategori?'ring-2 ring-blue-400':''} ${KAT_COLORS[k.kategori]||'bg-slate-50 text-slate-600'}`}>
+                className={`rounded-xl border p-3 cursor-pointer transition-all hover:shadow-xl shadow-black/20-lg shadow-xl shadow-black/20-black/20 ${filtre===k.kategori?'ring-2 ring-blue-400':''} ${KAT_COLORS[k.kategori]||'bg-white/[0.04] text-slate-300'}`}>
                 <p className="text-[10px] font-semibold truncate mb-1">{k.kategori}</p>
                 <p className="text-sm font-bold">{fmt(k.toplam)}</p>
                 <p className="text-[10px] opacity-70">{k.adet} kayıt</p>
@@ -206,13 +206,13 @@ export default function MalatyaPage({ userId }: Props) {
         <div className="flex gap-1">
           {['hepsi', 'beklemede', 'odendi'].map(d => (
             <button key={d} onClick={() => setFiltreDurum(d)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${filtreDurum===d?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${filtreDurum===d?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>
               {d === 'hepsi' ? 'Tümü' : d === 'beklemede' ? 'Bekleyen' : 'Ödenen'}
             </button>
           ))}
         </div>
         {filtre !== 'hepsi' && (
-          <button onClick={() => setFiltre('hepsi')} className="text-xs text-blue-600 hover:underline">
+          <button onClick={() => setFiltre('hepsi')} className="text-xs text-blue-400 hover:underline">
             × {filtre} filtresini kaldır
           </button>
         )}
@@ -221,41 +221,41 @@ export default function MalatyaPage({ userId }: Props) {
       {/* Liste */}
       {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
         filtered.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-200">
+          <div className="text-center py-12 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
             <TrendingDown size={36} className="text-slate-200 mx-auto mb-2"/>
             <p className="text-slate-400 text-sm">Kayıt bulunamadı</p>
           </div>
         ) : (
           <div className="space-y-2">
             {filtered.map(g => (
-              <div key={g.id} className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 hover:border-slate-200 transition-all ${g.odeme_durumu==='odendi'?'border-emerald-100':'border-slate-100'}`}>
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-center leading-tight p-1 ${KAT_COLORS[g.kategori]||'bg-slate-100 text-slate-600'}`}>
+              <div key={g.id} className={`bg-white/[0.02] rounded-xl border p-3.5 flex items-center gap-3 hover:border-white/[0.08] transition-all ${g.odeme_durumu==='odendi'?'border-emerald-100':'border-white/[0.05]'}`}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-[9px] font-bold text-center leading-tight p-1 ${KAT_COLORS[g.kategori]||'bg-white/[0.06] text-slate-300'}`}>
                   {g.kategori.split(' ').map(w => w[0]).join('').slice(0,3)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                    <p className="text-sm font-medium text-slate-800">{g.kategori}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${g.odeme_durumu==='odendi'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
+                    <p className="text-sm font-medium text-white">{g.kategori}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${g.odeme_durumu==='odendi'?'bg-emerald-500/10 text-emerald-300':'bg-amber-500/10 text-amber-300'}`}>
                       {g.odeme_durumu === 'odendi' ? '✓ Ödendi' : 'Beklemede'}
                     </span>
                   </div>
                   <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
                     <span>{g.tarih}</span>
                     {g.belge_no && <span>Belge: {g.belge_no}</span>}
-                    {g.odeme_tarihi && <span className="text-emerald-600">Ödeme: {g.odeme_tarihi}</span>}
+                    {g.odeme_tarihi && <span className="text-emerald-400">Ödeme: {g.odeme_tarihi}</span>}
                     {g.aciklama && <span>{g.aciklama}</span>}
                   </div>
                 </div>
-                <p className="text-sm font-semibold text-red-500 flex-shrink-0">{fmt(g.tutar)}</p>
+                <p className="text-sm font-semibold text-red-400 flex-shrink-0">{fmt(g.tutar)}</p>
                 <div className="flex gap-1 flex-shrink-0">
                   {g.odeme_durumu === 'beklemede' && (
                     <button onClick={() => markOdendi(g)} title="Ödendi"
-                      className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-emerald-50 hover:border-emerald-200 flex items-center justify-center text-slate-400 hover:text-emerald-500">
+                      className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-emerald-500/10 hover:border-emerald-200 flex items-center justify-center text-slate-400 hover:text-emerald-500">
                       <CheckCircle size={12}/>
                     </button>
                   )}
-                  <button onClick={() => openModal(g)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
-                  <button onClick={() => handleDelete(g.id)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                  <button onClick={() => openModal(g)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-white/[0.04] flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
+                  <button onClick={() => handleDelete(g.id)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={12}/></button>
                 </div>
               </div>
             ))}

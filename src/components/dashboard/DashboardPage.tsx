@@ -5,6 +5,16 @@ import { Wallet, CreditCard, CheckSquare, TrendingUp, Clock, Receipt, AlertTrian
 
 interface Props { userId: string; firma: Firma; onNavigate: (page: string) => void }
 
+const MALATYA_GRUPLER: { id: string; label: string; renkBg: string; renkText: string }[] = [
+  { id: 'mal_hizmet', label: 'Mal Hizmet Alışları', renkBg: 'bg-blue-50', renkText: 'text-blue-700' },
+  { id: 'personel', label: 'Personel Giderleri', renkBg: 'bg-emerald-50', renkText: 'text-emerald-700' },
+  { id: 'cesitli', label: 'Çeşitli Giderler', renkBg: 'bg-violet-50', renkText: 'text-violet-700' },
+]
+
+type MalatyaRow = { ana_grup: string; alt_kategori: string; tutar: number }
+type MalatyaAnaToplam = { id: string; label: string; toplam: number; adet: number }
+type MalatyaAltToplam = { ana_grup: string; alt_kategori: string; toplam: number; adet: number }
+
 export default function DashboardPage({ userId, firma, onNavigate }: Props) {
   const [loading, setLoading] = useState(true)
   const [kasaBakiye, setKasaBakiye] = useState(0)
@@ -17,6 +27,9 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
   const [gorevToplam, setGorevToplam] = useState(0)
   const [gorevTamamlanan, setGorevTamamlanan] = useState(0)
   const [gorevGecikis, setGorevGecikis] = useState(0)
+  const [aktifProjeler, setAktifProjeler] = useState(0)
+  const [aktifEkip, setAktifEkip] = useState(0)
+  const [bankaBakiye, setBankaBakiye] = useState(0)
   const [maliyetGelir, setMaliyetGelir] = useState(0)
   const [maliyetGider, setMaliyetGider] = useState(0)
   const [maliyetFirmalar, setMaliyetFirmalar] = useState<{ad:string, gelir:number, gider:number}[]>([])
@@ -25,6 +38,9 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
   const [puantajMaas, setPuantajMaas] = useState(0)
   const [vergiYaklasan, setVergiYaklasan] = useState<any[]>([])
   const [odemeListesi, setOdemeListesi] = useState<any[]>([])
+  const [malatyaAnaToplamlar, setMalatyaAnaToplamlar] = useState<MalatyaAnaToplam[]>([])
+  const [malatyaAltToplamlar, setMalatyaAltToplamlar] = useState<MalatyaAltToplam[]>([])
+  const [sifirlendi, setSifirlendi] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
   const ay = new Date().getMonth() + 1
@@ -35,7 +51,7 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     const [
-      kasaRes, odemeRes, gorevRes, maliyetRes, puantajRes, vergiRes
+      kasaRes, odemeRes, gorevRes, maliyetRes, puantajRes, vergiRes, projelerRes, ekipRes, bankaRes, malatyaRes
     ] = await Promise.all([
       supabase.from('kasa').select('*').eq('firma_id', firma.id).order('tarih'),
       supabase.from('odeme_plani').select('*').eq('firma_id', firma.id).eq('durum', 'beklemede').order('vade_tarihi'),
@@ -43,6 +59,11 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
       supabase.from('maliyet').select('*, firmalar(ad)').eq('yil', aktifYil).lte('ay', aktifAy),
       supabase.from('puantaj').select('*').eq('user_id', userId).eq('yil', aktifYil).eq('ay', aktifAy),
       supabase.from('vergi_surecleri').select('*').eq('firma_id', firma.id).eq('yil', aktifYil).neq('durum', 'tamamlandi').order('son_tarih'),
+      supabase.from('projeler').select('*').eq('firma_id', firma.id),
+      supabase.from('ekipler').select('*').eq('firma_id', firma.id),
+      supabase.from('bankalar').select('*').eq('firma_id', firma.id),
+      // Tüm aylar + tüm yıllar toplamı (dashboard özetinde tarih filtresi yok)
+      supabase.from('malatya_maliyet').select('ana_grup, alt_kategori, tutar').eq('user_id', userId),
     ])
 
     // Kasa
@@ -93,10 +114,77 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
     const son7gunStr = son7gun.toISOString().split('T')[0]
     setVergiYaklasan((vergiRes.data || []).filter((v: any) => v.son_tarih <= son7gunStr).slice(0, 4))
 
+    // Malatya Proje Maliyet — ana/alt toplamlar (tüm aylar + tüm yıllar)
+    const malatyaRows = (malatyaRes.data || []) as MalatyaRow[]
+    const anaMap: Record<string, { toplam: number; adet: number }> = {}
+    const altMap: Record<string, Record<string, { toplam: number; adet: number }>> = {}
+
+    malatyaRows.forEach((r) => {
+      const ana = r.ana_grup
+      const alt = r.alt_kategori
+      const tutar = Number(r.tutar) || 0
+
+      if (!anaMap[ana]) anaMap[ana] = { toplam: 0, adet: 0 }
+      anaMap[ana].toplam += tutar
+      anaMap[ana].adet += 1
+
+      if (!altMap[ana]) altMap[ana] = {}
+      if (!altMap[ana][alt]) altMap[ana][alt] = { toplam: 0, adet: 0 }
+      altMap[ana][alt].toplam += tutar
+      altMap[ana][alt].adet += 1
+    })
+
+    setMalatyaAnaToplamlar(
+      MALATYA_GRUPLER.map(g => ({
+        id: g.id,
+        label: g.label,
+        toplam: anaMap[g.id]?.toplam || 0,
+        adet: anaMap[g.id]?.adet || 0,
+      }))
+    )
+
+    const altTotals: MalatyaAltToplam[] = []
+    MALATYA_GRUPLER.forEach(g => {
+      const alts = altMap[g.id] || {}
+      Object.entries(alts).forEach(([alt, v]) => {
+        altTotals.push({ ana_grup: g.id, alt_kategori: alt, toplam: v.toplam, adet: v.adet })
+      })
+    })
+    // Büyükten küçüğe sıralama (dashboard daha okunur olsun)
+    altTotals.sort((a, b) => b.toplam - a.toplam)
+    setMalatyaAltToplamlar(altTotals)
+
+    setAktifProjeler(projelerRes.data?.length || 0)
+    setAktifEkip((ekipRes.data || []).filter((e:any)=>e.durum !== 'pasif').length || 0)
+    setBankaBakiye((bankaRes.data || []).reduce((s:number,b:any)=>s + (b.bakiye || 0), 0))
+
     setLoading(false)
   }, [firma.id, today, aktifAy, aktifYil, userId])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  const clearAllData = async () => {
+    if (!confirm('Tüm kasa, banka, ödeme planı (çek/senet/gelir/gider/maliyet) verilerini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return
+    setLoading(true)
+    const tables = ['kasa', 'bankalar', 'odeme_plani', 'maliyet', 'projeler', 'ekipler', 'gorevler', 'puantaj', 'vergi_surecleri', 'malatya_maliyet', 'cekler', 'senetler', 'cari_hesap', 'cari_hareket']
+    for (const table of tables) {
+      await supabase.from(table).delete().eq('firma_id', firma.id)
+    }
+    setSifirlendi(true)
+    await fetchAll()
+    alert('Veriler temizlendi. Panel artık temiz bir başlangıç için hazır.')
+    setLoading(false)
+  }
+
+  const sifirlaGosterimi = () => {
+    setSifirlendi(true)
+    setKasaBakiye(0); setKasaGiris(0); setKasaCikis(0)
+    setBekleyenOdeme(0); setBekleyenOdemeSayi(0); setGecikmisSayi(0); setGecikmisToplam(0)
+    setGorevToplam(0); setGorevTamamlanan(0); setGorevGecikis(0)
+    setAktifProjeler(0); setAktifEkip(0); setBankaBakiye(0)
+    setMaliyetGelir(0); setMaliyetGider(0); setMaliyetFirmalar([])
+    setMalatyaAnaToplamlar([]); setMalatyaAltToplamlar([])
+  }
 
   function fmt(val: number) {
     return val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺'
@@ -156,54 +244,58 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
           <button onClick={fetchAll} className="w-8 h-8 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
             <RefreshCw size={14}/>
           </button>
+          <button onClick={clearAllData} className="px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-all">
+            Tüm Verileri Temizle
+          </button>
+          <button onClick={sifirlaGosterimi} className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition-all">
+            Panelde Sıfırla
+          </button>
         </div>
       </div>
 
       {/* Üst kartlar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Kasa */}
-        <div onClick={() => onNavigate('kasa')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all col-span-2 sm:col-span-1">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center"><Wallet size={15} className="text-blue-600"/></div>
-            <p className="text-xs text-slate-500 font-medium">Kasa Bakiyesi</p>
-          </div>
-          <p className={`text-2xl font-bold ${kasaBakiye >= 0 ? 'text-blue-600' : 'text-red-500'}`}>{fmt(kasaBakiye)}</p>
-          <div className="flex gap-3 mt-2">
-            <span className="text-[10px] text-emerald-500">↑ {fmt(kasaGiris)}</span>
-            <span className="text-[10px] text-red-400">↓ {fmt(kasaCikis)}</span>
-          </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <div onClick={() => onNavigate('projeler')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Aktif Proje</p>
+          <p className="text-2xl font-bold text-blue-600">{sifirlendi ? 0 : aktifProjeler}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Seçili firmaya ait tüm projeler</p>
         </div>
-
-        {/* Bekleyen Ödemeler */}
-        <div onClick={() => onNavigate('odeme')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-amber-200 hover:shadow-sm transition-all">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center"><CreditCard size={15} className="text-amber-600"/></div>
-            <p className="text-xs text-slate-500 font-medium">Bekleyen</p>
-          </div>
-          <p className="text-2xl font-bold text-amber-600">{fmt(bekleyenOdeme)}</p>
-          <p className="text-[10px] text-slate-400 mt-2">{bekleyenOdemeSayi} ödeme</p>
+        <div onClick={() => onNavigate('proje-ekipler')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-emerald-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Aktif Ekip</p>
+          <p className="text-2xl font-bold text-emerald-600">{aktifEkip}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Projeler üzerindeki ekip üye sayısı</p>
         </div>
-
-        {/* Gecikmiş */}
-        <div onClick={() => onNavigate('odeme')} className={`rounded-xl border p-4 cursor-pointer hover:shadow-sm transition-all ${gecikmisSayi > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-100'}`}>
-          <div className="flex items-center gap-2 mb-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${gecikmisSayi > 0 ? 'bg-red-100' : 'bg-slate-50'}`}>
-              <AlertTriangle size={15} className={gecikmisSayi > 0 ? 'text-red-600' : 'text-slate-400'}/>
-            </div>
-            <p className="text-xs text-slate-500 font-medium">Gecikmiş</p>
-          </div>
-          <p className={`text-2xl font-bold ${gecikmisSayi > 0 ? 'text-red-600' : 'text-slate-400'}`}>{gecikmisSayi}</p>
-          <p className="text-[10px] text-slate-400 mt-2">{gecikmisSayi > 0 ? fmt(gecikmisToplam) : 'Gecikme yok'}</p>
+        <div onClick={() => onNavigate('maliyet')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-violet-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Toplam Gelir</p>
+          <p className="text-2xl font-bold text-emerald-600">{fmt(maliyetGelir)}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Seçili yıl/aay toplam</p>
         </div>
-
-        {/* Görevler */}
-        <div onClick={() => onNavigate('gorevler')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-emerald-200 hover:shadow-sm transition-all">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center"><CheckSquare size={15} className="text-emerald-600"/></div>
-            <p className="text-xs text-slate-500 font-medium">Görevler</p>
-          </div>
-          <p className="text-2xl font-bold text-emerald-600">{gorevYuzde}%</p>
-          <p className="text-[10px] text-slate-400 mt-2">{gorevTamamlanan}/{gorevToplam} tamamlandı{gorevGecikis > 0 ? ` • ${gorevGecikis} gecikmiş` : ''}</p>
+        <div onClick={() => onNavigate('maliyet')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-rose-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Toplam Gider</p>
+          <p className="text-2xl font-bold text-rose-600">{fmt(maliyetGider)}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Seçili yıl/aay toplam</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white rounded-xl border border-slate-100 p-4">
+          <p className="text-xs text-slate-500 font-medium">Net Kar/Zarar</p>
+          <p className={`text-2xl font-bold ${karZarar>=0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(karZarar)}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Gelir - Gider</p>
+        </div>
+        <div onClick={() => onNavigate('puantaj')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-cyan-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Ödenmemiş Puantaj</p>
+          <p className="text-2xl font-bold text-cyan-600">{(puantajToplam - puantajMaas).toLocaleString('tr-TR')}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Maaş ödemesi bekleyen</p>
+        </div>
+        <div onClick={() => onNavigate('banka')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-indigo-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Banka Bakiyesi</p>
+          <p className="text-2xl font-bold text-indigo-600">{fmt(bankaBakiye)}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Tüm banka hesapları</p>
+        </div>
+        <div onClick={() => onNavigate('gorevler')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-amber-200 hover:shadow-sm transition-all">
+          <p className="text-xs text-slate-500 font-medium">Tamamlanan</p>
+          <p className="text-2xl font-bold text-amber-600">{gorevTamamlanan}</p>
+          <p className="text-[10px] text-slate-400 mt-2">Tamamlanan görev sayısı</p>
         </div>
       </div>
 
@@ -312,6 +404,75 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Malatya Proje Maliyet (Ana/Alt toplamlar) */}
+      {!sifirlendi && (
+        <div
+          onClick={() => onNavigate('malatya-maliyet')}
+          className="bg-white rounded-xl border border-slate-100 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all overflow-hidden"
+        >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <TrendingUp size={15} className="text-emerald-700" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-800">Malatya Maliyet</p>
+              <p className="text-[10px] text-slate-400">Tüm aylar & tüm yıllar — ana & alt toplamlar</p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-slate-300" />
+        </div>
+
+        {malatyaAnaToplamlar.length === 0 || malatyaAnaToplamlar.every(g => g.adet === 0) ? (
+          <div className="px-4 py-6">
+            <p className="text-xs text-slate-400">Kayıt yok</p>
+          </div>
+        ) : (
+          <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {malatyaAnaToplamlar.map((g) => (
+                <div key={g.id} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                  <p className={`text-[11px] font-semibold ${MALATYA_GRUPLER.find(x => x.id === g.id)?.renkText || 'text-slate-700'} truncate`}>
+                    {g.label}
+                  </p>
+                  <p className="text-base font-bold text-slate-800 mt-1">{fmt(g.toplam)}</p>
+                  <p className="text-[10px] text-slate-400 mt-1">{g.adet} kayıt</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              {MALATYA_GRUPLER.map((g) => {
+                const alts = malatyaAltToplamlar.filter(a => a.ana_grup === g.id)
+                return (
+                  <div key={g.id} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className={`text-[11px] font-semibold ${g.renkText}`}>{g.label}</p>
+                      <p className="text-[10px] text-slate-400">{alts.length} alt</p>
+                    </div>
+                    {alts.length === 0 ? (
+                      <p className="text-[10px] text-slate-400 italic">Kayıt yok</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {alts.slice(0, 6).map((a) => (
+                          <div key={a.alt_kategori} className="flex items-center justify-between gap-3">
+                            <p className="text-[11px] text-slate-600 truncate">{a.alt_kategori}</p>
+                            <p className="text-[11px] font-semibold text-slate-800 shrink-0">{fmt(a.toplam)}</p>
+                          </div>
+                        ))}
+                        {alts.length > 6 && (
+                          <p className="text-[10px] text-slate-400 pt-1">+{alts.length - 6} diğer</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Yaklaşan ödemeler */}

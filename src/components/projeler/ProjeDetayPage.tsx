@@ -22,9 +22,9 @@ const TITLES: Record<string,string> = {
 }
 
 const DURUM_COLORS: Record<string,string> = {
-  beklemede:'bg-amber-50 text-amber-700', onaylandi:'bg-blue-50 text-blue-700',
-  odendi:'bg-emerald-50 text-emerald-700', aktif:'bg-emerald-50 text-emerald-700',
-  iade_edildi:'bg-slate-100 text-slate-600', nakde_donusturuldu:'bg-red-50 text-red-600'
+  beklemede:'bg-amber-500/10 text-amber-300', onaylandi:'bg-blue-500/10 text-blue-300',
+  odendi:'bg-emerald-500/10 text-emerald-300', aktif:'bg-emerald-500/10 text-emerald-300',
+  iade_edildi:'bg-white/[0.06] text-slate-300', nakde_donusturuldu:'bg-red-500/10 text-red-400'
 }
 
 const DURUM_LABELS: Record<string,string> = {
@@ -205,59 +205,59 @@ export default function ProjeDetayPage({ userId, firma, proje, subPage }: Props)
       case 'hakedis': return (
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <p className="text-sm font-medium text-slate-800">{row.no||'No belirtilmedi'}</p>
+            <p className="text-sm font-medium text-white">{row.no||'No belirtilmedi'}</p>
             {row.durum && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DURUM_COLORS[row.durum]}`}>{DURUM_LABELS[row.durum]}</span>}
           </div>
           <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
             {row.tarih && <span>{row.tarih}</span>}
-            {row.toplam > 0 && <span className="text-emerald-600 font-medium">{row.toplam.toLocaleString('tr-TR')} ₺</span>}
+            {row.toplam > 0 && <span className="text-emerald-400 font-medium">{row.toplam.toLocaleString('tr-TR')} ₺</span>}
             {row.aciklama && <span>{row.aciklama}</span>}
           </div>
         </div>
       )
       case 'sozlesme': return (
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-800">{row.no||'No belirtilmedi'}</p>
+          <p className="text-sm font-medium text-white">{row.no||'No belirtilmedi'}</p>
           <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
             {row.taraf && <span>{row.taraf}</span>}
             {row.tarih && <span>{row.tarih}</span>}
-            {row.tutar > 0 && <span className="text-blue-600 font-medium">{row.tutar.toLocaleString('tr-TR')} ₺</span>}
+            {row.tutar > 0 && <span className="text-blue-400 font-medium">{row.tutar.toLocaleString('tr-TR')} ₺</span>}
           </div>
         </div>
       )
       case 'fatura': return (
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <p className="text-sm font-medium text-slate-800">{row.fatura_no||'No belirtilmedi'}</p>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${row.tip==='alis'?'bg-red-50 text-red-600':'bg-emerald-50 text-emerald-600'}`}>{row.tip==='alis'?'Alış':'Satış'}</span>
+            <p className="text-sm font-medium text-white">{row.fatura_no||'No belirtilmedi'}</p>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${row.tip==='alis'?'bg-red-500/10 text-red-400':'bg-emerald-500/10 text-emerald-400'}`}>{row.tip==='alis'?'Alış':'Satış'}</span>
           </div>
           <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
             {row.tedarikci && <span>{row.tedarikci}</span>}
             {row.tarih && <span>{row.tarih}</span>}
-            {row.toplam > 0 && <span className="font-medium text-slate-600">{row.toplam.toLocaleString('tr-TR')} ₺</span>}
+            {row.toplam > 0 && <span className="font-medium text-slate-300">{row.toplam.toLocaleString('tr-TR')} ₺</span>}
           </div>
         </div>
       )
       case 'teminat': return (
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <p className="text-sm font-medium text-slate-800">{row.no||'No belirtilmedi'}</p>
+            <p className="text-sm font-medium text-white">{row.no||'No belirtilmedi'}</p>
             {row.durum && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DURUM_COLORS[row.durum]}`}>{DURUM_LABELS[row.durum]}</span>}
           </div>
           <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
             {row.banka && <span>{row.banka}</span>}
-            {row.tutar > 0 && <span className="text-amber-600 font-medium">{row.tutar.toLocaleString('tr-TR')} ₺</span>}
+            {row.tutar > 0 && <span className="text-amber-400 font-medium">{row.tutar.toLocaleString('tr-TR')} ₺</span>}
             {row.bitis_tarihi && <span>Bitiş: {row.bitis_tarihi}</span>}
           </div>
         </div>
       )
       case 'yansitma': return (
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-800">{row.fatura_no||'No belirtilmedi'}</p>
+          <p className="text-sm font-medium text-white">{row.fatura_no||'No belirtilmedi'}</p>
           <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
             {row.alici && <span>{row.alici}</span>}
             {row.tarih && <span>{row.tarih}</span>}
-            {row.toplam > 0 && <span className="text-purple-600 font-medium">{row.toplam.toLocaleString('tr-TR')} ₺</span>}
+            {row.toplam > 0 && <span className="text-purple-400 font-medium">{row.toplam.toLocaleString('tr-TR')} ₺</span>}
           </div>
         </div>
       )
@@ -268,7 +268,7 @@ export default function ProjeDetayPage({ userId, firma, proje, subPage }: Props)
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-800">{TITLES[subPage]}</h2>
+          <h2 className="text-base font-semibold text-white">{TITLES[subPage]}</h2>
           <p className="text-xs text-slate-400 mt-0.5">{proje.ad} • {rows.length} kayıt</p>
         </div>
         <button onClick={() => openModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium transition-colors">
@@ -278,18 +278,18 @@ export default function ProjeDetayPage({ userId, firma, proje, subPage }: Props)
 
       {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
         rows.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-200">
+          <div className="text-center py-12 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
             <p className="text-slate-400 text-sm mb-2">{TITLES[subPage]} kaydı yok</p>
-            <button onClick={() => openModal()} className="text-blue-600 text-sm hover:underline">İlk kaydı ekle</button>
+            <button onClick={() => openModal()} className="text-blue-400 text-sm hover:underline">İlk kaydı ekle</button>
           </div>
         ) : (
           <div className="space-y-2">
             {rows.map(row => (
-              <div key={row.id} className="bg-white rounded-xl border border-slate-100 p-3.5 flex items-center gap-3 hover:border-slate-200 transition-all">
+              <div key={row.id} className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3.5 flex items-center gap-3 hover:border-white/[0.08] transition-all">
                 {renderRow(row)}
                 <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => openModal(row)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
-                  <button onClick={() => handleDelete(row.id)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                  <button onClick={() => openModal(row)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-white/[0.04] flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
+                  <button onClick={() => handleDelete(row.id)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={12}/></button>
                 </div>
               </div>
             ))}

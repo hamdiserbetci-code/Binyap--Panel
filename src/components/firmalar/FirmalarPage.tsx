@@ -51,7 +51,7 @@ export default function FirmalarPage({ userId, onFirmaSelect, selectedFirmaId }:
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Firmalar</h2>
+          <h2 className="text-lg font-semibold text-white">Firmalar</h2>
           <p className="text-xs text-slate-400 mt-0.5">{firmalar.length} firma tanımlı</p>
         </div>
         <button onClick={() => openModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium transition-colors">
@@ -64,30 +64,30 @@ export default function FirmalarPage({ userId, onFirmaSelect, selectedFirmaId }:
           <div className="text-center py-16">
             <Building2 size={40} className="text-slate-200 mx-auto mb-3" />
             <p className="text-slate-400 text-sm">Henüz firma eklenmedi</p>
-            <button onClick={() => openModal()} className="mt-3 text-blue-600 text-sm hover:underline">İlk firmayı ekle</button>
+            <button onClick={() => openModal()} className="mt-3 text-blue-400 text-sm hover:underline">İlk firmayı ekle</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {firmalar.map(f => (
-              <div key={f.id} className={`bg-white rounded-xl border p-4 cursor-pointer hover:border-blue-300 transition-all ${selectedFirmaId === f.id ? 'border-blue-400 ring-2 ring-blue-50' : 'border-slate-100'}`}
+              <div key={f.id} className={`bg-white/[0.02] rounded-xl border p-4 cursor-pointer hover:border-blue-300 transition-all ${selectedFirmaId === f.id ? 'border-blue-400 ring-2 ring-blue-50' : 'border-white/[0.05]'}`}
                 onClick={() => onFirmaSelect(f)}>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <Building2 size={18} className="text-blue-600" />
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                      <Building2 size={18} className="text-blue-400" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-800 text-sm">{f.ad}</p>
+                      <p className="font-semibold text-white text-sm">{f.ad}</p>
                       {f.vergi_no && <p className="text-xs text-slate-400 mt-0.5">VKN: {f.vergi_no}</p>}
                       {f.yetkili && <p className="text-xs text-slate-400">{f.yetkili}</p>}
                     </div>
                   </div>
                   <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openModal(f)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600"><Pencil size={12}/></button>
-                    <button onClick={() => handleDelete(f)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                    <button onClick={() => openModal(f)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-slate-300"><Pencil size={12}/></button>
+                    <button onClick={() => handleDelete(f)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={12}/></button>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50">
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/[0.02]">
                   {f.telefon && <span className="text-xs text-slate-400">{f.telefon}</span>}
                   {f.email && <span className="text-xs text-slate-400">{f.email}</span>}
                   <span className="ml-auto text-blue-500 text-xs flex items-center gap-1">Detaylar <ChevronRight size={12}/></span>
@@ -130,7 +130,7 @@ export default function FirmalarPage({ userId, onFirmaSelect, selectedFirmaId }:
             <FormField label="Notlar">
               <textarea className={inputCls} rows={2} value={form.notlar} onChange={e=>setForm({...form,notlar:e.target.value})} placeholder="Opsiyonel not" />
             </FormField>
-            {error && <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+            {error && <p className="text-xs text-red-400 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>}
           </div>
         </Modal>
       )}

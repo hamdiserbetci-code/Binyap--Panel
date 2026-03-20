@@ -7,7 +7,8 @@ import EkiplerPage from '@/components/ekipler/EkiplerPage'
 import PuantajPage from '@/components/puantaj/PuantajPage'
 import DokumanlarPage from '@/components/dokumanlar/DokumanlarPage'
 import VergiPage from '@/components/vergi/VergiPage'
-import MaliyetPage from '@/components/maliyet/MaliyetPage'
+import GelirTakibiPage from '@/components/gelir/GelirTakibiPage'
+import GiderTakibiPage from '@/components/gider/GiderTakibiPage'
 import OdemePlaniPage from '@/components/odeme/OdemePlaniPage'
 import KasaPage from '@/components/kasa/KasaPage'
 import GorevlerPage from '@/components/gorevler/GorevlerPage'
@@ -15,7 +16,6 @@ import RaporlamaPage from '@/components/raporlama/RaporlamaPage'
 import CariHesaplarPage from '@/components/cari/CariHesaplarPage'
 import BankalarPage from '@/components/banka/BankalarPage'
 import SirketEvraklariPage from '@/components/sirket/SirketEvraklariPage'
-import MalatyaMaliyetPage from '@/components/malatya/MalatyaMaliyetPage'
 import BildirimSistemi from '@/components/ui/BildirimSistemi'
 import DashboardPage from '@/components/dashboard/DashboardPage'
 import PasswordDegistirModal from '@/components/ui/PasswordDegistirModal'
@@ -23,7 +23,7 @@ import { FolderOpen, Clock, Receipt, TrendingUp, TrendingDown, CreditCard, Check
 
 type SubPage = 'hakedis' | 'sozlesme' | 'fatura' | 'teminat' | 'yansitma'
 type DokKat = 'sozlesmeler' | 'hakedisler' | 'satis_faturalari' | 'maas_dekontlari' | 'arabulucu_evraklari' | 'alis_faturalari'
-type Page = 'dashboard' | 'projeler' | 'proje-ekipler' | 'proje-puantaj' | 'proje-detay' | 'proje-dokuman' | 'vergi' | 'maliyet' | 'odeme' | 'kasa' | 'cari' | 'banka' | 'sirket' | 'malatya-maliyet' | 'gorevler' | 'raporlama'
+type Page = 'dashboard' | 'projeler' | 'proje-ekipler' | 'proje-puantaj' | 'proje-detay' | 'proje-dokuman' | 'vergi' | 'gelir' | 'gider' | 'odeme' | 'kasa' | 'cari' | 'banka' | 'sirket' | 'gorevler' | 'raporlama'
 
 const VERGI_TURLERI = [
   { id:'kdv', label:'KDV' },
@@ -76,10 +76,18 @@ export default function App() {
     })
   }, [])
 
-  const fetchFirma = useCallback(async () => {
-    const { data } = await supabase.from('firmalar').select('*').limit(1).single()
-    if (data) setFirma(data)
-  }, [])
+  const fetchFirmalar = useCallback(async () => {
+    let { data } = await supabase.from('firmalar').select('*').order('ad')
+    if ((!data || data.length === 0) && user) {
+      await supabase.from('firmalar').insert([{ ad: 'Binyapı' }, { ad: 'ETM' }])
+      const res = await supabase.from('firmalar').select('*').order('ad')
+      data = res.data
+    }
+    if (data) {
+      setTumFirmalar(data)
+      setFirma(prev => prev || data[0] || null)
+    }
+  }, [user])
 
   const fetchProjeler = useCallback(async () => {
     if (!firma) return
@@ -87,7 +95,7 @@ export default function App() {
     setProjeler(data || [])
   }, [firma])
 
-  useEffect(() => { if (user) fetchFirma() }, [user, fetchFirma])
+  useEffect(() => { if (user) fetchFirmalar() }, [user, fetchFirmalar])
   useEffect(() => { if (firma) fetchProjeler() }, [firma, fetchProjeler])
 
   useEffect(() => {
@@ -120,109 +128,99 @@ export default function App() {
   const PAGE_TITLES: Record<Page, string> = {
     dashboard:'Dashboard', projeler:'Projeler', 'proje-ekipler':'Ekipler',
     'proje-puantaj':'Puantaj', 'proje-detay':'Proje Detay', 'proje-dokuman':'Dökümanlar',
-    vergi:'Vergi Süreçleri', maliyet:'Maliyet Kontrolü', odeme:'Ödeme Planı',
-    kasa:'Kasa Takibi', cari:'Cari Hesaplar', banka:'Banka Hesapları', sirket:'Şirket Evrakları', 'malatya-maliyet':'Malatya Proje Maliyet', gorevler:'Yapılacak İşler', raporlama:'Excel Raporlama'
+    vergi:'Vergi Süreçleri', gelir:'Gelir Takibi', gider:'Gider Takibi', odeme:'Ödeme Planı',
+    kasa:'Kasa Takibi', cari:'Cari Hesaplar', banka:'Banka Hesapları', sirket:'Şirket Evrakları', gorevler:'Yapılacak İşler', raporlama:'Excel Raporlama'
   }
 
-  const navBtn = (id: Page, label: string, icon: React.ReactNode) => {
-    const isActive = activePage === id;
+  const navBtn = (id: Page, label: string, icon: React.ReactNode, color = 'blue') => {
+    const colorMap: Record<string, string> = {
+      blue: 'bg-blue-600 text-white shadow-blue-900/40',
+      emerald: 'bg-emerald-600 text-white shadow-emerald-900/40',
+      violet: 'bg-violet-600 text-white shadow-violet-900/40',
+      amber: 'bg-amber-500 text-white shadow-amber-900/40',
+      rose: 'bg-rose-600 text-white shadow-rose-900/40',
+      cyan: 'bg-cyan-600 text-white shadow-cyan-900/40',
+    }
+    const active = colorMap[color] || colorMap.blue
     return (
       <button key={id} onClick={() => navToPage(id)}
-        className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-300 mb-1 group
-          ${isActive 
-            ? 'bg-gradient-to-r from-indigo-500/15 to-blue-500/10 text-indigo-400 shadow-[inset_0px_1px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(0,0,0,0.2)] border border-indigo-500/20' 
-            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'}`}>
-        <div className={`flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
-          {icon}
-        </div>
-        <span className="flex-1 text-left tracking-wide">{label}</span>
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-0.5 ${activePage===id?`${active} shadow-lg`:'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+        {icon}<span>{label}</span>
       </button>
     )
   }
 
   const Sidebar = () => (
-    <div className="flex flex-col h-full bg-[#0B1120] border-r border-[#1E293B] shadow-2xl relative">
-      <div className="absolute top-0 left-0 right-0 h-32 bg-indigo-500/10 blur-[50px] pointer-events-none" />
-
-      <div className="px-6 py-6 border-b border-white/5 relative z-10">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/20 border border-white/10" style={{background:'linear-gradient(135deg,#4F46E5,#2563EB)'}}>
-            <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h9" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+    <div className="flex flex-col h-full" style={{background:'linear-gradient(180deg,#0f1729 0%,#0d1524 100%)'}}>
+      <div className="px-5 py-5 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:'linear-gradient(135deg,#2563eb,#1d4ed8)'}}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M2 4h14M2 9h14M2 14h9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </div>
           <div>
-            <p className="text-white font-bold text-[15px] tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-200">BİNYAPI</p>
-            <p className="text-indigo-400/80 font-medium text-[11px] uppercase tracking-wider mt-0.5">Yönetim Paneli</p>
+            <p className="text-white font-bold text-sm tracking-wide">BİNYAPI</p>
+            <p className="text-slate-500 text-[11px]">Yönetim Paneli</p>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-5 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/5 hover:[&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full relative z-10">
-        {navBtn('dashboard', 'Dashboard', <LayoutDashboard size={18}/>)}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        {navBtn('dashboard', 'Dashboard', <LayoutDashboard size={16}/>, 'blue')}
 
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mt-6 mb-3">Projeler</p>
+        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-4 mb-2">Projeler</p>
 
         <button onClick={() => { setProjelerAcik(!projelerAcik); navToPage('projeler') }}
-          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-300 mb-1 group
-            ${activePage === 'projeler' 
-              ? 'bg-gradient-to-r from-indigo-500/15 to-blue-500/10 text-indigo-400 shadow-[inset_0px_1px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(0,0,0,0.2)] border border-indigo-500/20' 
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'}`}>
-          <div className={`transition-transform duration-300 group-hover:scale-110 ${activePage === 'projeler' ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
-            <FolderOpen size={18}/>
-          </div>
-          <span className="flex-1 text-left tracking-wide">Projeler</span>
-          {projelerAcik ? <ChevronDown size={14} className="opacity-70"/> : <ChevronRight size={14} className="opacity-50 group-hover:opacity-100"/>}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1 ${activePage==='projeler'?'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40':'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+          <FolderOpen size={16}/><span className="flex-1 text-left">Projeler</span>
+          {projelerAcik ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
         </button>
 
         {projelerAcik && (
-          <div className="space-y-1 mb-2 mt-1 relative before:absolute before:inset-y-0 before:left-[21px] before:w-px before:bg-white/5">
+          <div className="space-y-0.5 mb-1">
           {projeler.map(p => (
-            <div key={p.id} className="relative">
-               <div className="absolute left-[21px] top-[18px] w-3 h-px bg-white/10" />
+            <div key={p.id}>
               <button onClick={() => setExpandedProje(expandedProje===p.id ? null : p.id)}
-                className={`w-full flex items-center gap-2.5 pl-10 pr-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-200 ${expandedProje===p.id?'text-white bg-white/5':'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${expandedProje===p.id?'bg-white/10 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                <FolderOpen size={13} className="flex-shrink-0"/>
                 <span className="flex-1 text-left truncate">{p.ad}</span>
-                {expandedProje===p.id ? <ChevronDown size={12} className="opacity-70"/> : <ChevronRight size={12} className="opacity-50"/>}
+                {expandedProje===p.id ? <ChevronDown size={11}/> : <ChevronRight size={11}/>}
               </button>
 
               {expandedProje===p.id && (
-                <div className="ml-[42px] mt-1 mb-2 space-y-1 relative before:absolute before:inset-y-0 before:-left-3 before:w-px before:bg-white/5">
-                  <div className="absolute -left-3 top-[14px] w-2 h-px bg-white/10" />
+                <div className="ml-3 mt-0.5 border-l border-white/10 pl-2 space-y-0.5">
+                  {/* Ekipler */}
                   <button onClick={() => navToPage('proje-ekipler', p)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${activePage==='proje-ekipler'&&selectedProje?.id===p.id?'text-indigo-400 bg-indigo-500/10 font-semibold':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                    <Users size={12}/><span>Ekipler</span>
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='proje-ekipler'&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                    <Users size={11}/><span>Ekipler</span>
                   </button>
-                  <div className="absolute -left-3 top-[42px] w-2 h-px bg-white/10" />
+                  {/* Puantaj */}
                   <button onClick={() => navToPage('proje-puantaj', p)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${activePage==='proje-puantaj'&&selectedProje?.id===p.id?'text-indigo-400 bg-indigo-500/10 font-semibold':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                    <Clock size={12}/><span>Puantaj</span>
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='proje-puantaj'&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                    <Clock size={11}/><span>Puantaj</span>
                   </button>
-                  {PROJE_SUBS.map((sub, i) => (
-                    <div key={sub.id} className="relative">
-                      <div className="absolute -left-3 top-[14px] w-2 h-px bg-white/10" />
-                      <button onClick={() => navToProjeSub(p, sub.id)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${activePage==='proje-detay'&&activeSubPage===sub.id&&selectedProje?.id===p.id?'text-indigo-400 bg-indigo-500/10 font-semibold':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                        <span className="flex-shrink-0 opacity-70">{sub.icon}</span><span>{sub.label}</span>
-                      </button>
-                    </div>
-                  ))}
-                  
-                  <div className="relative">
-                    <div className="absolute -left-3 top-[14px] w-2 h-px bg-white/10" />
-                    <button onClick={() => setExpandedDok(expandedDok===p.id ? null : p.id)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${expandedDok===p.id?'text-indigo-400 bg-white/5':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                      <Folder size={12} className="flex-shrink-0 opacity-70"/>
-                      <span className="flex-1 text-left">Dökümanlar</span>
-                      {expandedDok===p.id ? <ChevronDown size={11} className="opacity-70"/> : <ChevronRight size={11} className="opacity-50"/>}
+                  {/* Detay sayfaları */}
+                  {PROJE_SUBS.map(sub => (
+                    <button key={sub.id} onClick={() => navToProjeSub(p, sub.id)}
+                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='proje-detay'&&activeSubPage===sub.id&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                      <span className="flex-shrink-0">{sub.icon}</span><span>{sub.label}</span>
                     </button>
-                  </div>
+                  ))}
+                  {/* Dökümanlar ana başlık */}
+                  <button onClick={() => setExpandedDok(expandedDok===p.id ? null : p.id)}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${expandedDok===p.id?'text-white bg-white/10':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                    <Folder size={11} className="flex-shrink-0"/>
+                    <span className="flex-1 text-left">Dökümanlar</span>
+                    {expandedDok===p.id ? <ChevronDown size={10}/> : <ChevronRight size={10}/>}
+                  </button>
+                  {/* Döküman kategorileri */}
                   {expandedDok===p.id && (
-                    <div className="ml-2 mt-1 space-y-0.5">
+                    <div className="ml-3 border-l border-white/5 pl-2 space-y-0.5">
                       {DOK_CATS.map(kat => (
                         <button key={kat.id} onClick={() => navToDokKat(p, kat.id)}
-                          className={`w-full flex items-center gap-2.5 pl-3 pr-2 py-1.5 rounded-lg text-[10px] font-medium transition-all duration-200 ${activePage==='proje-dokuman'&&activeDokKat===kat.id&&selectedProje?.id===p.id?'text-indigo-400 bg-indigo-500/5':'text-slate-600 hover:text-slate-400 hover:bg-white/5'}`}>
-                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${activePage==='proje-dokuman'&&activeDokKat===kat.id?'bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]':'bg-slate-600'}`}/>
+                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all ${activePage==='proje-dokuman'&&activeDokKat===kat.id&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-600 hover:text-slate-300 hover:bg-white/5'}`}>
+                          <span className="w-1 h-1 rounded-full bg-current flex-shrink-0"/>
                           <span className="truncate">{kat.label}</span>
                         </button>
                       ))}
@@ -235,40 +233,31 @@ export default function App() {
           </div>
         )}
 
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mt-6 mb-3">Vergi</p>
+        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Vergi</p>
         <button onClick={() => { setVergiAcik(!vergiAcik); navToPage('vergi') }}
-          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-300 mb-1 group
-            ${activePage === 'vergi' && !selectedVergiFirma 
-              ? 'bg-gradient-to-r from-indigo-500/15 to-blue-500/10 text-indigo-400 shadow-[inset_0px_1px_1px_rgba(255,255,255,0.05),0_4px_12px_rgba(0,0,0,0.2)] border border-indigo-500/20' 
-              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'}`}>
-          <div className={`transition-transform duration-300 group-hover:scale-110 ${activePage === 'vergi' && !selectedVergiFirma ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'}`}>
-            <Receipt size={18}/>
-          </div>
-          <span className="flex-1 text-left tracking-wide">Vergi Süreçleri</span>
-          {vergiAcik ? <ChevronDown size={14} className="opacity-70"/> : <ChevronRight size={14} className="opacity-50 group-hover:opacity-100"/>}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1 ${activePage==='vergi'&&!selectedVergiFirma?'bg-blue-600 text-white shadow-lg shadow-blue-900/30':'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+          <Receipt size={16}/><span className="flex-1 text-left">Vergi Süreçleri</span>
+          {vergiAcik ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
         </button>
 
         {vergiAcik && (
-          <div className="space-y-1 mb-2 mt-1 relative before:absolute before:inset-y-0 before:left-[21px] before:w-px before:bg-white/5">
+          <div className="space-y-0.5 mb-1">
             {tumFirmalar.map(f => (
-              <div key={f.id} className="relative">
-                <div className="absolute left-[21px] top-[18px] w-3 h-px bg-white/10" />
+              <div key={f.id}>
                 <button onClick={() => setExpandedVergi(expandedVergi===f.id ? null : f.id)}
-                  className={`w-full flex items-center gap-2.5 pl-10 pr-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-200 ${expandedVergi===f.id?'text-white bg-white/5':'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}>
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${expandedVergi===f.id?'bg-white/10 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                  <Receipt size={13} className="flex-shrink-0"/>
                   <span className="flex-1 text-left truncate">{f.ad}</span>
-                  {expandedVergi===f.id ? <ChevronDown size={12} className="opacity-70"/> : <ChevronRight size={12} className="opacity-50"/>}
+                  {expandedVergi===f.id ? <ChevronDown size={11}/> : <ChevronRight size={11}/>}
                 </button>
                 {expandedVergi===f.id && (
-                  <div className="ml-[42px] mt-1 mb-2 space-y-1 relative before:absolute before:inset-y-0 before:-left-3 before:w-px before:bg-white/5">
+                  <div className="ml-3 border-l border-white/10 pl-2 space-y-0.5 mt-0.5">
                     {VERGI_TURLERI.map(vt => (
-                      <div key={vt.id} className="relative">
-                        <div className="absolute -left-3 top-[14px] w-2 h-px bg-white/10" />
-                        <button onClick={() => { setSelectedVergiFirma(f); setSelectedVergiTur(vt.id); setActivePage('vergi'); setSidebarOpen(false) }}
-                          className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 ${activePage==='vergi'&&selectedVergiFirma?.id===f.id&&selectedVergiTur===vt.id?'text-indigo-400 bg-indigo-500/10 font-semibold':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${activePage==='vergi'&&selectedVergiFirma?.id===f.id&&selectedVergiTur===vt.id?'bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]':'bg-slate-600'}`}/>
-                          <span className="truncate tracking-wide">{vt.label}</span>
-                        </button>
-                      </div>
+                      <button key={vt.id} onClick={() => { setSelectedVergiFirma(f); setSelectedVergiTur(vt.id); setActivePage('vergi'); setSidebarOpen(false) }}
+                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='vergi'&&selectedVergiFirma?.id===f.id&&selectedVergiTur===vt.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
+                        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0"/>
+                        <span className="truncate">{vt.label}</span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -277,52 +266,39 @@ export default function App() {
           </div>
         )}
 
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mt-6 mb-3">Finans</p>
-        <div className="space-y-1">
-          {navBtn('maliyet', 'Maliyet Kontrolü', <TrendingUp size={18}/>)}
-          {navBtn('odeme', 'Ödeme Planı', <CreditCard size={18}/>)}
-          {navBtn('kasa', 'Kasa', <Wallet size={18}/>)}
-          {navBtn('sirket', 'Şirket Evrakları', <FileText size={18}/>)}
-          {navBtn('malatya-maliyet', 'Malatya Proje Maliyet', <TrendingUp size={18}/>)}
-        </div>
+        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Finans</p>
+        {navBtn('gelir', 'Gelir Takibi', <TrendingUp size={16}/>, 'emerald')}
+        {navBtn('gider', 'Gider Takibi', <TrendingDown size={16}/>, 'rose')}
+        {navBtn('odeme', 'Ödeme Planı', <CreditCard size={16}/>, 'violet')}
+        {navBtn('kasa', 'Kasa', <Wallet size={16}/>, 'amber')}
+        {navBtn('sirket', 'Şirket Evrakları', <FileText size={16}/>, 'cyan')}
 
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mt-6 mb-3">Görevler</p>
-        <div className="space-y-1">
-          {navBtn('gorevler', 'Yapılacak İşler', <CheckSquare size={18}/>)}
-        </div>
+        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Görevler</p>
+        {navBtn('gorevler', 'Yapılacak İşler', <CheckSquare size={16}/>, 'rose')}
 
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-4 mt-6 mb-3">Raporlar</p>
-        <div className="space-y-1 pb-4">
-          {navBtn('raporlama', 'Excel Raporlama', <BarChart2 size={18}/>)}
-        </div>
+        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Raporlar</p>
+        {navBtn('raporlama', 'Excel Raporlama', <BarChart2 size={16}/>, 'cyan')}
       </nav>
 
-      <div className="px-5 py-4 border-t border-white/5 bg-[#0B1120] relative z-20">
-        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all duration-300">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-[13px] font-bold text-white flex-shrink-0 shadow-[0_0_15px_rgba(79,70,229,0.3)] border border-white/10">
+      <div className="px-3 py-3 border-t border-white/5">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-all">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
             {user?.email?.[0]?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-[13px] font-semibold truncate leading-tight tracking-wide">{user?.email?.split('@')[0]}</p>
-            <p className="text-indigo-300/60 text-[10px] truncate leading-tight mt-0.5">{user?.email}</p>
+            <p className="text-white text-xs font-medium truncate">{user?.email?.split('@')[0]}</p>
+            <p className="text-slate-500 text-[10px] truncate">{user?.email}</p>
           </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setPasswordModalOpen(true)}
-              className="p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-white/10 rounded-lg transition-all flex-shrink-0"
-              title="Şifre Değiştir"
-              type="button"
-            >
-              <Shield size={14} />
-            </button>
-            <button 
-              onClick={signOut} 
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-white/10 rounded-lg transition-all flex-shrink-0"
-              title="Çıkış Yap"
-            >
-              <LogOut size={14}/>
-            </button>
-          </div>
+          <button
+            onClick={() => setPasswordModalOpen(true)}
+            className="text-[11px] text-slate-500 hover:text-slate-900 transition-colors flex-shrink-0"
+            type="button"
+          >
+            Şifre
+          </button>
+          <button onClick={signOut} className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0">
+            <LogOut size={14}/>
+          </button>
         </div>
       </div>
     </div>
@@ -338,7 +314,7 @@ export default function App() {
     return (
       <div className="h-full overflow-y-auto p-4">
         {activePage === 'dashboard' && <DashboardPage userId={user.id} firma={firma} onNavigate={(p) => setActivePage(p as Page)}/>}
-        {activePage === 'projeler' && <ProjelerPage userId={user.id} firma={firma} onProjeSelect={(p) => { if(p) { setSelectedProje(p); setExpandedProje(p.id) } }} selectedProjeId={selectedProje?.id}/>}
+        {activePage === 'projeler' && <ProjelerPage userId={user.id} firma={firma} onProjeSelect={(p) => { if(p) { setSelectedProje(p); setExpandedProje(p.id) } }} onProjelerUpdate={(list) => setProjeler(list)} selectedProjeId={selectedProje?.id}/>}
         {activePage === 'proje-ekipler' && selectedProje && <EkiplerPage userId={user.id} firma={firma} proje={selectedProje}/>}
         {activePage === 'proje-puantaj' && <PuantajPage userId={user.id} firma={firma}/>}
         {activePage === 'proje-detay' && selectedProje && <ProjeDetayPage userId={user.id} firma={firma} proje={selectedProje} subPage={activeSubPage}/>}
@@ -346,11 +322,11 @@ export default function App() {
         {activePage === 'vergi' && (selectedVergiFirma 
           ? <VergiPage userId={user.id} firma={selectedVergiFirma} vergiTur={selectedVergiTur}/> 
           : <VergiPage userId={user.id} firma={firma} vergiTur={selectedVergiTur}/>)}
-        {activePage === 'maliyet' && <MaliyetPage userId={user.id} firma={firma}/>}
-        {activePage === 'odeme' && <OdemePlaniPage userId={user.id} firma={firma}/>}
-        {activePage === 'kasa' && <KasaPage userId={user.id} firma={firma}/>}
+        {activePage === 'gelir' && <GelirTakibiPage userId={user.id} firma={firma}/>}
+        {activePage === 'gider' && <GiderTakibiPage userId={user.id} firma={firma}/>}
+        {activePage === 'odeme' && <OdemePlaniPage userId={user.id} firma={firma}/>} 
+        {activePage === 'kasa' && <KasaPage userId={user.id} firma={firma}/>} 
         {activePage === 'sirket' && <SirketEvraklariPage userId={user.id} firma={firma}/>}
-        {activePage === 'malatya-maliyet' && <MalatyaMaliyetPage userId={user.id}/>}
         {activePage === 'cari' && <CariHesaplarPage userId={user.id} firma={firma}/>}
         {activePage === 'banka' && <BankalarPage userId={user.id} firma={firma}/>}
         {activePage === 'gorevler' && <GorevlerPage userId={user.id} firmalar={[firma]}/>}
@@ -370,26 +346,21 @@ export default function App() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#0A0F1C]">
-        <div className="bg-white/[0.02] border-b border-white/[0.05] shadow-[0_4px_30px_rgba(0,0,0,0.1)] backdrop-blur-md px-5 h-16 flex items-center gap-4 flex-shrink-0 relative z-30">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-white transition-colors"><Menu size={20}/></button>
-          <div className="flex items-center gap-2 flex-1 min-w-0 text-[15px]">
-            <span className="font-semibold text-white tracking-wide">{PAGE_TITLES[activePage]}</span>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white border-b border-slate-100 px-4 h-14 flex items-center gap-3 flex-shrink-0">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-slate-600"><Menu size={20}/></button>
+          <div className="flex items-center gap-2 flex-1 min-w-0 text-sm">
+            <span className="font-semibold text-slate-800">{PAGE_TITLES[activePage]}</span>
             {selectedProje && ['proje-ekipler','proje-puantaj','proje-detay','proje-dokuman'].includes(activePage) && (
-              <div className="flex items-center gap-2">
-                <ChevronRight size={14} className="text-slate-500 flex-shrink-0"/>
-                <span className="text-indigo-300 font-medium truncate">{selectedProje.ad}</span>
-              </div>
+              <><ChevronRight size={14} className="text-slate-300 flex-shrink-0"/>
+              <span className="text-slate-500 truncate">{selectedProje.ad}</span></>
             )}
+
           </div>
-          {user && <span className="bg-white/[0.03] p-1 rounded-xl border border-white/[0.05]"><BildirimSistemi userId={user.id}/></span>}
+          {user && <BildirimSistemi userId={user.id}/>}
         </div>
-        <div className="flex-1 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
-          <div className="h-full overflow-y-auto p-4 lg:p-6 relative z-10 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-            {renderContent()}
-          </div>
+        <div className="flex-1 overflow-hidden bg-slate-50">
+          {renderContent()}
         </div>
       </div>
 

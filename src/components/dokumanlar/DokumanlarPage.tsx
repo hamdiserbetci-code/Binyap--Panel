@@ -119,7 +119,7 @@ export default function DokumanlarPage({ userId, firma, proje, kategori }: Props
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-800">{baslik}</h2>
+          <h2 className="text-base font-semibold text-white">{baslik}</h2>
           <p className="text-xs text-slate-400 mt-0.5">{proje?.ad || firma.ad} • {dokumanlar.length} dosya</p>
         </div>
         <button onClick={() => fileRef.current?.click()}
@@ -136,28 +136,28 @@ export default function DokumanlarPage({ userId, firma, proje, kategori }: Props
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f) }}
         onClick={() => fileRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-5 mb-4 text-center cursor-pointer transition-all ${dragOver?'border-blue-400 bg-blue-50':'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}>
+        className={`border-2 border-dashed rounded-xl p-5 mb-4 text-center cursor-pointer transition-all ${dragOver?'border-blue-400 bg-blue-500/10':'border-white/[0.08] hover:border-blue-300 hover:bg-white/[0.04]'}`}>
         <Upload size={24} className={`mx-auto mb-1.5 ${dragOver?'text-blue-500':'text-slate-300'}`}/>
-        <p className="text-sm text-slate-500">PDF dosyasını sürükleyin veya tıklayın</p>
+        <p className="text-sm text-slate-400">PDF dosyasını sürükleyin veya tıklayın</p>
         <p className="text-xs text-slate-400 mt-0.5">Maks. 10MB</p>
       </div>
 
       {/* Liste */}
       {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
         dokumanlar.length === 0 ? (
-          <div className="text-center py-10 bg-white rounded-xl border border-dashed border-slate-200">
+          <div className="text-center py-10 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
             <FolderOpen size={32} className="text-slate-200 mx-auto mb-2"/>
             <p className="text-slate-400 text-sm">Henüz döküman yüklenmedi</p>
           </div>
         ) : (
           <div className="space-y-2">
             {dokumanlar.map(d => (
-              <div key={d.id} className="bg-white rounded-xl border border-slate-100 p-3.5 flex items-center gap-3 hover:border-slate-200 transition-all">
-                <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
+              <div key={d.id} className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3.5 flex items-center gap-3 hover:border-white/[0.08] transition-all">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-100 flex items-center justify-center flex-shrink-0">
                   <FileText size={18} className="text-red-400"/>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{d.dosya_adi}</p>
+                  <p className="text-sm font-medium text-white truncate">{d.dosya_adi}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-[10px] text-slate-400">{KAT_LABELS[d.kategori]||d.kategori}</span>
                     {d.dosya_boyut && <span className="text-[10px] text-slate-400">{formatBytes(d.dosya_boyut)}</span>}
@@ -167,11 +167,11 @@ export default function DokumanlarPage({ userId, firma, proje, kategori }: Props
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <button onClick={() => handleDownload(d)} title="İndir/Görüntüle"
-                    className="w-8 h-8 rounded-lg border border-slate-100 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center text-slate-400 hover:text-blue-500 transition-all">
+                    className="w-8 h-8 rounded-lg border border-white/[0.05] hover:bg-blue-500/10 hover:border-blue-200 flex items-center justify-center text-slate-400 hover:text-blue-500 transition-all">
                     <Download size={13}/>
                   </button>
                   <button onClick={() => handleDelete(d)}
-                    className="w-8 h-8 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all">
+                    className="w-8 h-8 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400 transition-all">
                     <Trash2 size={13}/>
                   </button>
                 </div>
@@ -190,12 +190,12 @@ export default function DokumanlarPage({ userId, firma, proje, kategori }: Props
             </button>
           </>}>
           <div className="space-y-3">
-            <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
+            <div className="bg-white/[0.04] rounded-xl border border-white/[0.08] p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-100 flex items-center justify-center flex-shrink-0">
                 <FileText size={18} className="text-red-400"/>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800 truncate">{selectedFile.name}</p>
+                <p className="text-sm font-medium text-white truncate">{selectedFile.name}</p>
                 <p className="text-xs text-slate-400">{formatBytes(selectedFile.size)}</p>
               </div>
             </div>

@@ -18,8 +18,7 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<any>(null)
-  const [filtre, setFiltre] = useState('hepsi')
-  const [ozetAcik, setOzetAcik] = useState(false)
+  const [filtre, setFiltre] = useState<string | null>(null)
   const today = new Date().toISOString().split('T')[0]
 
   const emptyForm = { baslik:'', tur:'vergi', tutar:'', vade_tarihi:'', durum:'beklemede', aciklama:'', cari_id:'', banka_id:'', cek_no:'', hatirlama_tarihi:'', hatirlama_saati:'', odeme_tarihi:'' }
@@ -93,7 +92,7 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
   const genelToplam = odemeler.filter(o => o.durum === 'beklemede').reduce((s, o) => s + o.tutar, 0)
   const genelOdenen = odemeler.filter(o => o.durum === 'odendi').reduce((s, o) => s + o.tutar, 0)
   const gecikmisSayi = odemeler.filter(o => o.durum === 'beklemede' && o.vade_tarihi < today).length
-  const filtered = odemeler.filter(o => filtre === 'hepsi' ? true : o.tur === filtre)
+  const filtered = filtre ? odemeler.filter(o => o.tur === filtre) : []
 
   return (
     <div>
@@ -132,49 +131,40 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
       </div>
 
       {turToplamlari.length > 0 && (
-        <div className="bg-[#0B1120]/60 backdrop-blur-sm rounded-2xl border border-white/10 mb-6 overflow-hidden transition-all duration-500 shadow-lg">
-          <button 
-            onClick={() => setOzetAcik(!ozetAcik)}
-            className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                <PieChart size={16} />
-              </div>
-              <span className="text-[14px] font-semibold text-white tracking-wide">Tür Bazlı Özet</span>
-              <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full ml-1">
-                {turToplamlari.length} Tür
-              </span>
+        <div className="bg-[#0B1120]/60 backdrop-blur-sm rounded-2xl border border-white/10 mb-6 shadow-lg p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+              <PieChart size={16} />
             </div>
-            <div className={`text-slate-400 transition-transform duration-300 ${ozetAcik ? 'rotate-180' : ''}`}>
-              <ChevronDown size={18}/>
-            </div>
-          </button>
+            <span className="text-[14px] font-semibold text-white tracking-wide">Tür Bazlı Özet</span>
+            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full ml-1">
+              {turToplamlari.length} Tür
+            </span>
+          </div>
           
-          <div className={`transition-all duration-500 ease-in-out ${ozetAcik ? 'max-h-[1000px] opacity-100 p-5 pt-1 border-t border-white/5' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {turToplamlari.map(t => (
-                <div key={t.tur} onClick={() => setFiltre(filtre === t.tur ? 'hepsi' : t.tur)}
-                  className={`rounded-xl border p-4 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${filtre === t.tur ? 'bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'bg-white/[0.02] border-white/10 hover:border-white/20'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[13px] font-bold text-white flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: TUR_BG[t.tur]}} />
-                      {TUR_LABELS[t.tur]}
-                    </span>
-                    {t.gecikmisSayi > 0 && <span className="text-[10px] bg-red-500/10 border border-red-500/20 text-red-400 px-2 py-0.5 rounded-md font-semibold">{t.gecikmisSayi} geç</span>}
-                  </div>
-                  <p className={`text-lg font-bold tracking-tight ${TUR_COLORS[t.tur].includes('text-red') ? 'text-red-400' : TUR_COLORS[t.tur].includes('text-purple') ? 'text-purple-400' : TUR_COLORS[t.tur].includes('text-orange') ? 'text-orange-400' : TUR_COLORS[t.tur].includes('text-teal') ? 'text-teal-400' : TUR_COLORS[t.tur].includes('text-blue') ? 'text-blue-400' : 'text-slate-300'}`}>{t.bekleyen.toLocaleString('tr-TR')} ₺</p>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium">{t.adet} kayıt bekliyor</p>
-                  {t.odenen > 0 && <p className="text-[10px] text-emerald-400/80 mt-2 font-medium flex items-center gap-1.5"><CheckCircle size={12}/>{t.odenen.toLocaleString('tr-TR')} ₺ ödendi</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {turToplamlari.map(t => (
+              <div key={t.tur} onClick={() => setFiltre(filtre === t.tur ? null : t.tur)}
+                className={`rounded-xl border p-4 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${filtre === t.tur ? 'bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'bg-white/[0.02] border-white/10 hover:border-white/20'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[13px] font-bold text-white flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: TUR_BG[t.tur]}} />
+                    {TUR_LABELS[t.tur]}
+                  </span>
+                  {t.gecikmisSayi > 0 && <span className="text-[10px] bg-red-500/10 border border-red-500/20 text-red-400 px-2 py-0.5 rounded-md font-semibold">{t.gecikmisSayi} geç</span>}
                 </div>
-              ))}
-            </div>
+                <p className={`text-lg font-bold tracking-tight ${TUR_COLORS[t.tur].includes('text-red') ? 'text-red-400' : TUR_COLORS[t.tur].includes('text-purple') ? 'text-purple-400' : TUR_COLORS[t.tur].includes('text-orange') ? 'text-orange-400' : TUR_COLORS[t.tur].includes('text-teal') ? 'text-teal-400' : TUR_COLORS[t.tur].includes('text-blue') ? 'text-blue-400' : 'text-slate-300'}`}>{t.bekleyen.toLocaleString('tr-TR')} ₺</p>
+                <p className="text-[11px] text-slate-400 mt-1 font-medium">{t.adet} kayıt bekliyor</p>
+                {t.odenen > 0 && <p className="text-[10px] text-emerald-400/80 mt-2 font-medium flex items-center gap-1.5"><CheckCircle size={12}/>{t.odenen.toLocaleString('tr-TR')} ₺ ödendi</p>}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
-        filtered.length === 0 ? <p className="text-center text-slate-400 py-8 text-sm">Kayıt bulunamadı</p> :
+        !filtre ? <p className="text-center text-slate-400 py-8 text-sm bg-white/[0.02] border border-white/5 rounded-xl border-dashed">Ayrıntıları görmek için yukarıdan bir tür kartına tıklayın.</p> :
+        filtered.length === 0 ? <p className="text-center text-slate-400 py-8 text-sm bg-white/[0.02] border border-white/5 rounded-xl border-dashed">Bu türe ait kayıt bulunamadı.</p> :
         <div className="space-y-2">
           {filtered.map(o => {
             const gecikti = o.durum==='beklemede' && o.vade_tarihi<today

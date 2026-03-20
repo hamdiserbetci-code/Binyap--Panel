@@ -48,7 +48,7 @@ export default function EkiplerPage({ userId, firma, proje }: Props) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">Ekip Üyeleri</h2>
+          <h2 className="text-lg font-semibold text-white">Ekip Üyeleri</h2>
           <p className="text-xs text-slate-400 mt-0.5">{proje.ad} — {ekipler.length} kişi</p>
         </div>
         <button onClick={() => openModal()} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium">
@@ -57,8 +57,8 @@ export default function EkiplerPage({ userId, firma, proje }: Props) {
       </div>
 
       {toplamGunlukUcret > 0 && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4">
-          <p className="text-xs text-blue-600">Toplam günlük işçilik: <span className="font-semibold">{toplamGunlukUcret.toLocaleString('tr-TR')} ₺</span></p>
+        <div className="bg-blue-500/10 border border-blue-100 rounded-xl px-4 py-3 mb-4">
+          <p className="text-xs text-blue-400">Toplam günlük işçilik: <span className="font-semibold">{toplamGunlukUcret.toLocaleString('tr-TR')} ₺</span></p>
         </div>
       )}
 
@@ -71,14 +71,14 @@ export default function EkiplerPage({ userId, firma, proje }: Props) {
         ) : (
           <div className="space-y-2">
             {ekipler.map(e => (
-              <div key={e.id} className="bg-white rounded-xl border border-slate-100 p-3.5 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-semibold text-slate-600 text-sm flex-shrink-0">
+              <div key={e.id} className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/[0.06] flex items-center justify-center font-semibold text-slate-300 text-sm flex-shrink-0">
                   {e.ad_soyad.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-medium text-slate-800">{e.ad_soyad}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${e.durum==='aktif'?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500'}`}>{e.durum==='aktif'?'Aktif':'Pasif'}</span>
+                    <p className="text-sm font-medium text-white">{e.ad_soyad}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${e.durum==='aktif'?'bg-emerald-500/10 text-emerald-300':'bg-white/[0.06] text-slate-400'}`}>{e.durum==='aktif'?'Aktif':'Pasif'}</span>
                   </div>
                   <div className="flex gap-3 text-[11px] text-slate-400 flex-wrap">
                     {e.pozisyon && <span>{e.pozisyon}</span>}
@@ -89,8 +89,8 @@ export default function EkiplerPage({ userId, firma, proje }: Props) {
                   {e.iban && <p className="text-[11px] text-slate-400 mt-0.5">IBAN: {e.iban}</p>}
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={()=>openModal(e)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
-                  <button onClick={()=>handleDelete(e)} className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                  <button onClick={()=>openModal(e)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-white/[0.04] flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
+                  <button onClick={()=>handleDelete(e)} className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={12}/></button>
                 </div>
               </div>
             ))}

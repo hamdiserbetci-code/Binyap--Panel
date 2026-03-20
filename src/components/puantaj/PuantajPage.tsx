@@ -15,7 +15,7 @@ interface PuantajDok { id:string; dosya_adi:string; dosya_url:string; dosya_boyu
 
 interface Props { userId: string; firma: Firma }
 
-const DC: Record<string,string> = { aktif:'bg-emerald-50 text-emerald-700', tamamlandi:'bg-blue-50 text-blue-700', durduruldu:'bg-red-50 text-red-600' }
+const DC: Record<string,string> = { aktif:'bg-emerald-500/10 text-emerald-300', tamamlandi:'bg-blue-500/10 text-blue-300', durduruldu:'bg-red-500/10 text-red-400' }
 const DL: Record<string,string> = { aktif:'Aktif', tamamlandi:'Tamamlandı', durduruldu:'Durduruldu' }
 
 export default function PuantajPage({ userId, firma }: Props) {
@@ -172,27 +172,27 @@ export default function PuantajPage({ userId, firma }: Props) {
   return (
     <div className="flex gap-0 h-full overflow-hidden">
       {/* SOL: Proje Seçim Paneli */}
-      <div className="w-64 flex-shrink-0 border-r border-slate-200 p-4 overflow-y-auto bg-white">
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">Proje Filtrele</h3>
+      <div className="w-64 flex-shrink-0 border-r border-white/[0.08] p-4 overflow-y-auto bg-white/[0.02]">
+        <h3 className="text-sm font-semibold text-slate-200 mb-3">Proje Filtrele</h3>
         <div className="space-y-1.5">
           {/* Tüm projeler seçeneği */}
           <div onClick={() => setSelectedProje(null)}
-            className={`rounded-xl border p-3 cursor-pointer hover:border-blue-300 transition-all flex items-center gap-2.5 ${!selectedProje?'border-blue-400 bg-blue-50':'border-slate-100'}`}>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${!selectedProje?'bg-blue-600':'bg-slate-100'}`}>
-              <FolderOpen size={14} className={!selectedProje?'text-white':'text-slate-500'}/>
+            className={`rounded-xl border p-3 cursor-pointer hover:border-blue-300 transition-all flex items-center gap-2.5 ${!selectedProje?'border-blue-400 bg-blue-500/10':'border-white/[0.05]'}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${!selectedProje?'bg-blue-600':'bg-white/[0.06]'}`}>
+              <FolderOpen size={14} className={!selectedProje?'text-white':'text-slate-400'}/>
             </div>
-            <p className={`text-sm font-medium ${!selectedProje?'text-blue-700':'text-slate-800'}`}>Tüm Projeler</p>
+            <p className={`text-sm font-medium ${!selectedProje?'text-blue-300':'text-white'}`}>Tüm Projeler</p>
             {!selectedProje && <ChevronRight size={13} className="text-blue-400 ml-auto flex-shrink-0"/>}
           </div>
 
           {projeler.map(p => (
             <div key={p.id} onClick={() => setSelectedProje(p)}
-              className={`rounded-xl border p-3 cursor-pointer hover:border-blue-300 transition-all flex items-center gap-2.5 ${selectedProje?.id===p.id?'border-blue-400 bg-blue-50':'border-slate-100'}`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${selectedProje?.id===p.id?'bg-blue-600':'bg-slate-100'}`}>
-                <FolderOpen size={14} className={selectedProje?.id===p.id?'text-white':'text-slate-500'}/>
+              className={`rounded-xl border p-3 cursor-pointer hover:border-blue-300 transition-all flex items-center gap-2.5 ${selectedProje?.id===p.id?'border-blue-400 bg-blue-500/10':'border-white/[0.05]'}`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${selectedProje?.id===p.id?'bg-blue-600':'bg-white/[0.06]'}`}>
+                <FolderOpen size={14} className={selectedProje?.id===p.id?'text-white':'text-slate-400'}/>
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium truncate ${selectedProje?.id===p.id?'text-blue-700':'text-slate-800'}`}>{p.ad}</p>
+                <p className={`text-sm font-medium truncate ${selectedProje?.id===p.id?'text-blue-300':'text-white'}`}>{p.ad}</p>
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${DC[p.durum]}`}>{DL[p.durum]}</span>
               </div>
               {selectedProje?.id===p.id && <ChevronRight size={13} className="text-blue-400 flex-shrink-0"/>}
@@ -205,7 +205,7 @@ export default function PuantajPage({ userId, firma }: Props) {
       <div className="flex-1 min-w-0 overflow-y-auto p-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-800">
+            <h2 className="text-base font-semibold text-white">
               {selectedProje ? selectedProje.ad : 'Tüm Projeler'} — Puantaj
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">{AY_LABELS[selectedAy]} {selectedYil}</p>
@@ -217,40 +217,40 @@ export default function PuantajPage({ userId, firma }: Props) {
 
         {/* Ay/Yıl seçimi */}
         <div className="flex gap-2 mb-4 flex-wrap items-center">
-          <select value={selectedYil} onChange={e=>setSelectedYil(Number(e.target.value))} className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none">
+          <select value={selectedYil} onChange={e=>setSelectedYil(Number(e.target.value))} className="bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 py-2 text-sm outline-none">
             {yillar.map(y=><option key={y} value={y}>{y}</option>)}
           </select>
           <div className="flex gap-1 flex-wrap">
             {AY_LABELS.slice(1).map((ay,i) => (
-              <button key={i+1} onClick={()=>setSelectedAy(i+1)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white border border-slate-200 text-slate-600'}`}>{ay}</button>
+              <button key={i+1} onClick={()=>setSelectedAy(i+1)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${selectedAy===i+1?'bg-blue-600 text-white':'bg-white/[0.02] border border-white/[0.08] text-slate-300'}`}>{ay}</button>
             ))}
           </div>
         </div>
 
         {/* İstatistikler */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="bg-white rounded-xl border border-slate-100 p-3">
-            <p className="text-xs text-slate-500 mb-1">Onaylanan</p>
-            <p className="text-xl font-semibold text-emerald-600">{onaylananlar}/{puantajlar.length}</p>
+          <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3">
+            <p className="text-xs text-slate-400 mb-1">Onaylanan</p>
+            <p className="text-xl font-semibold text-emerald-400">{onaylananlar}/{puantajlar.length}</p>
           </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-3">
-            <p className="text-xs text-slate-500 mb-1">Teyit Edilen</p>
-            <p className="text-xl font-semibold text-purple-600">{teyitEdilenler}/{puantajlar.length}</p>
+          <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3">
+            <p className="text-xs text-slate-400 mb-1">Teyit Edilen</p>
+            <p className="text-xl font-semibold text-purple-400">{teyitEdilenler}/{puantajlar.length}</p>
           </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-3">
-            <p className="text-xs text-slate-500 mb-1">Maaş Ödendi</p>
-            <p className="text-xl font-semibold text-blue-600">{maasOdenenler}/{puantajlar.length}</p>
+          <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3">
+            <p className="text-xs text-slate-400 mb-1">Maaş Ödendi</p>
+            <p className="text-xl font-semibold text-blue-400">{maasOdenenler}/{puantajlar.length}</p>
           </div>
-          <div className="bg-white rounded-xl border border-slate-100 p-3">
-            <p className="text-xs text-slate-500 mb-1">Toplam Kayıt</p>
-            <p className="text-xl font-semibold text-slate-800">{puantajlar.length}</p>
+          <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3">
+            <p className="text-xs text-slate-400 mb-1">Toplam Kayıt</p>
+            <p className="text-xl font-semibold text-white">{puantajlar.length}</p>
           </div>
         </div>
 
         {/* Liste */}
         {loading ? <p className="text-center text-slate-400 py-8 text-sm">Yükleniyor...</p> :
           puantajlar.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-200">
+            <div className="text-center py-12 bg-white/[0.02] rounded-xl border border-dashed border-white/[0.08]">
               <Clock size={36} className="text-slate-200 mx-auto mb-3"/>
               <p className="text-slate-400 text-sm">Bu dönem için puantaj kaydı yok</p>
             </div>
@@ -259,14 +259,14 @@ export default function PuantajPage({ userId, firma }: Props) {
               {puantajlar.map(p => {
                 const ekip = getEkip(p.ekip_id)
                 return (
-                  <div key={p.id} className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 ${p.maas_odendi?'border-blue-200':p.teyit_edildi?'border-purple-200':p.onaylandi?'border-emerald-200':'border-slate-100'}`}>
-                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 flex-shrink-0">
+                  <div key={p.id} className={`bg-white/[0.02] rounded-xl border p-3.5 flex items-center gap-3 ${p.maas_odendi?'border-blue-200':p.teyit_edildi?'border-purple-200':p.onaylandi?'border-emerald-200':'border-white/[0.05]'}`}>
+                    <div className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-xs font-semibold text-slate-300 flex-shrink-0">
                       {(ekip?.ad_soyad||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800">{ekip?.ad_soyad||'Bilinmiyor'}</p>
+                      <p className="text-sm font-medium text-white">{ekip?.ad_soyad||'Bilinmiyor'}</p>
                       <div className="flex gap-3 text-[11px] text-slate-400 mt-0.5 flex-wrap">
-                        <span className="font-semibold text-slate-700">{p.gun_sayisi} gün</span>
+                        <span className="font-semibold text-slate-200">{p.gun_sayisi} gün</span>
                         {p.onaylandi && <span className="text-emerald-500">✓ Onaylandı</span>}
                         {p.teyit_edildi && <span className="text-purple-500">✓ Teyit</span>}
                         {p.maas_odendi && <span className="text-blue-500">✓ Maaş Ödendi</span>}
@@ -275,15 +275,15 @@ export default function PuantajPage({ userId, firma }: Props) {
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={()=>toggleOnayla(p)} title="Puantajlar Geldi"
-                        className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all text-xs font-bold ${p.onaylandi?'bg-emerald-50 border-emerald-200 text-emerald-600':'border-slate-200 text-slate-400 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-500'}`}>✓</button>
+                        className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all text-xs font-bold ${p.onaylandi?'bg-emerald-500/10 border-emerald-200 text-emerald-400':'border-white/[0.08] text-slate-400 hover:bg-emerald-500/10 hover:border-emerald-200 hover:text-emerald-500'}`}>✓</button>
                       <button onClick={()=>toggleTeyit(p)} title="Teyit Edildi"
-                        className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${p.teyit_edildi?'bg-purple-50 border-purple-200 text-purple-600':'border-slate-200 text-slate-400 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-500'}`}>
+                        className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${p.teyit_edildi?'bg-purple-500/10 border-purple-200 text-purple-400':'border-white/[0.08] text-slate-400 hover:bg-purple-500/10 hover:border-purple-200 hover:text-purple-500'}`}>
                         <CheckCircle size={12}/>
                       </button>
                       <button onClick={()=>toggleMaasOdendi(p)} title="Maaş Ödendi"
-                        className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all text-xs font-bold ${p.maas_odendi?'bg-blue-50 border-blue-200 text-blue-600':'border-slate-200 text-slate-400 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-500'}`}>₺</button>
-                      <button onClick={()=>openModal(p)} className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
-                      <button onClick={()=>handleDelete(p.id)} className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                        className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-all text-xs font-bold ${p.maas_odendi?'bg-blue-500/10 border-blue-200 text-blue-400':'border-white/[0.08] text-slate-400 hover:bg-blue-500/10 hover:border-blue-200 hover:text-blue-500'}`}>₺</button>
+                      <button onClick={()=>openModal(p)} className="w-7 h-7 rounded-lg border border-white/[0.08] hover:bg-white/[0.04] flex items-center justify-center text-slate-400"><Pencil size={12}/></button>
+                      <button onClick={()=>handleDelete(p.id)} className="w-7 h-7 rounded-lg border border-white/[0.08] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400"><Trash2 size={12}/></button>
                     </div>
                   </div>
                 )
@@ -295,11 +295,11 @@ export default function PuantajPage({ userId, firma }: Props) {
 
       {/* Döküman Yükleme Bölümü */}
       {selectedProje && (
-        <div className="mt-4 bg-white rounded-xl border border-slate-100 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
-            <p className="text-sm font-medium text-slate-700">📎 Puantaj Dökümanları</p>
+        <div className="mt-4 bg-white/[0.02] rounded-xl border border-white/[0.05] overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.02]">
+            <p className="text-sm font-medium text-slate-200">📎 Puantaj Dökümanları</p>
             <button onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg text-xs font-medium">
+              className="flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/[0.08] text-slate-300 px-2.5 py-1.5 rounded-lg text-xs font-medium">
               <Upload size={12}/> Dosya Yükle
             </button>
             <input ref={fileRef} type="file" className="hidden"
@@ -310,7 +310,7 @@ export default function PuantajPage({ userId, firma }: Props) {
             onDragLeave={() => setDragOver(false)}
             onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if(f) handleFileUpload(f) }}
             onClick={() => fileRef.current?.click()}
-            className={`mx-4 my-3 border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all ${dragOver?'border-blue-400 bg-blue-50':'border-slate-200 hover:border-blue-300 hover:bg-slate-50'}`}>
+            className={`mx-4 my-3 border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all ${dragOver?'border-blue-400 bg-blue-500/10':'border-white/[0.08] hover:border-blue-300 hover:bg-white/[0.04]'}`}>
             {uploading ? <p className="text-xs text-blue-500">Yükleniyor...</p> : (
               <><Upload size={16} className={`mx-auto mb-1 ${dragOver?'text-blue-400':'text-slate-300'}`}/>
               <p className="text-xs text-slate-400">Dosya sürükleyin veya tıklayın (PDF, JPEG, PNG vb.)</p></>
@@ -321,21 +321,21 @@ export default function PuantajPage({ userId, firma }: Props) {
           ) : (
             <div className="divide-y divide-slate-50 pb-2">
               {dokumanlar.map(d => (
-                <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/50">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
+                <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04]/50">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-100 flex items-center justify-center flex-shrink-0">
                     <FileText size={14} className="text-blue-400"/>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-slate-700 truncate">{d.dosya_adi}</p>
+                    <p className="text-xs font-medium text-slate-200 truncate">{d.dosya_adi}</p>
                     <p className="text-[10px] text-slate-400">{formatBytes(d.dosya_boyut)} • {d.olusturulma?.split('T')[0]}</p>
                   </div>
                   <div className="flex gap-1 flex-shrink-0">
                     <button onClick={() => handleDokDownload(d)}
-                      className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-blue-50 hover:border-blue-200 flex items-center justify-center text-slate-400 hover:text-blue-500">
+                      className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-blue-500/10 hover:border-blue-200 flex items-center justify-center text-slate-400 hover:text-blue-500">
                       <Download size={12}/>
                     </button>
                     <button onClick={() => handleDokDelete(d)}
-                      className="w-7 h-7 rounded-lg border border-slate-100 hover:bg-red-50 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-500">
+                      className="w-7 h-7 rounded-lg border border-white/[0.05] hover:bg-red-500/10 hover:border-red-200 flex items-center justify-center text-slate-400 hover:text-red-400">
                       <X size={12}/>
                     </button>
                   </div>
@@ -377,15 +377,15 @@ export default function PuantajPage({ userId, firma }: Props) {
             <div className="flex gap-4 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.onaylandi} onChange={e=>setForm({...form,onaylandi:e.target.checked})} className="w-4 h-4 accent-emerald-600"/>
-                <span className="text-sm text-slate-700">Puantajlar Geldi</span>
+                <span className="text-sm text-slate-200">Puantajlar Geldi</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.teyit_edildi} onChange={e=>setForm({...form,teyit_edildi:e.target.checked})} className="w-4 h-4 accent-purple-600"/>
-                <span className="text-sm text-slate-700">Teyit Edildi</span>
+                <span className="text-sm text-slate-200">Teyit Edildi</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={form.maas_odendi} onChange={e=>setForm({...form,maas_odendi:e.target.checked})} className="w-4 h-4 accent-blue-600"/>
-                <span className="text-sm text-slate-700">Maaş Ödendi</span>
+                <span className="text-sm text-slate-200">Maaş Ödendi</span>
               </label>
             </div>
           </div>
