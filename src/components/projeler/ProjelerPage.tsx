@@ -45,7 +45,15 @@ export default function ProjelerPage({ userId, firma, onProjeSelect, onProjelerU
       return
     }
     try {
-      const data = { ...form, firma_id:firma.id, user_id:userId }
+      const data = {
+        ad: form.ad,
+        aciklama: form.aciklama || null,
+        baslangic_tarihi: form.baslangic_tarihi || null,
+        bitis_tarihi: form.bitis_tarihi || null,
+        durum: form.durum,
+        firma_id: firma.id,
+        user_id: userId
+      }
       if (editing) {
         const { error } = await supabase.from('projeler').update(data).eq('id', editing.id)
         if (error) throw error
