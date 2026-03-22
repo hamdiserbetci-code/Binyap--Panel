@@ -531,8 +531,8 @@ export default function CariHesapModule({ firma, role }: Props) {
   const [lucaLoading, setLucaLoading] = useState(false)
   const [lucaHata, setLucaHata] = useState('')
   const [lucaSonuc, setLucaSonuc] = useState({ eklenen: 0, atlanan: 0 })
-  const [borcTuru, setBorcTuru] = useState('alis_fatura')
-  const [alacakTuru, setAlacakTuru] = useState('satis_fatura')
+  const [borcTuru, setBorcTuru] = useState('satis_fatura')
+  const [alacakTuru, setAlacakTuru] = useState('alis_fatura')
 
   function lucaDosyaOku(file: File) {
     setLucaHata('')
