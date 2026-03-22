@@ -1,372 +1,452 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, Firma, Proje } from '@/lib/supabase'
-import ProjelerPage from '@/components/projeler/ProjelerPage'
-import ProjeDetayPage from '@/components/projeler/ProjeDetayPage'
-import EkiplerPage from '@/components/ekipler/EkiplerPage'
-import PuantajPage from '@/components/puantaj/PuantajPage'
-import DokumanlarPage from '@/components/dokumanlar/DokumanlarPage'
-import VergiPage from '@/components/vergi/VergiPage'
-import GelirTakibiPage from '@/components/gelir/GelirTakibiPage'
-import GiderTakibiPage from '@/components/gider/GiderTakibiPage'
-import OdemePlaniPage from '@/components/odeme/OdemePlaniPage'
-import KasaPage from '@/components/kasa/KasaPage'
-import GorevlerPage from '@/components/gorevler/GorevlerPage'
-import RaporlamaPage from '@/components/raporlama/RaporlamaPage'
-import CariHesaplarPage from '@/components/cari/CariHesaplarPage'
-import BankalarPage from '@/components/banka/BankalarPage'
-import SirketEvraklariPage from '@/components/sirket/SirketEvraklariPage'
-import BildirimSistemi from '@/components/ui/BildirimSistemi'
-import DashboardPage from '@/components/dashboard/DashboardPage'
-import PasswordDegistirModal from '@/components/ui/PasswordDegistirModal'
-import { FolderOpen, Clock, Receipt, TrendingUp, TrendingDown, CreditCard, CheckSquare, LogOut, Menu, BarChart2, Wallet, FileText, LayoutDashboard, ChevronDown, ChevronRight, Users, DollarSign, Shield, RefreshCw, Folder } from 'lucide-react'
 
-type SubPage = 'hakedis' | 'sozlesme' | 'fatura' | 'teminat' | 'yansitma'
-type DokKat = 'sozlesmeler' | 'hakedisler' | 'satis_faturalari' | 'maas_dekontlari' | 'arabulucu_evraklari' | 'alis_faturalari'
-type Page = 'dashboard' | 'projeler' | 'proje-ekipler' | 'proje-puantaj' | 'proje-detay' | 'proje-dokuman' | 'vergi' | 'gelir' | 'gider' | 'odeme' | 'kasa' | 'cari' | 'banka' | 'sirket' | 'gorevler' | 'raporlama'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Briefcase,
+  BookUser,
+  FileArchive,
+  FileSpreadsheet,
+  FolderKanban,
+  History,
+  KeyRound,
+  LayoutGrid,
+  ListTodo,
+  LogOut,
+  ShieldCheck,
+  TrendingUp,
+  Users,
+  Wallet,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import ProjectsModule, { type FirmaRecord } from '@/components/newpanel/ProjectsModule'
+import FinanceModule from '@/components/newpanel/FinanceModule'
+import TimesheetModule from '@/components/newpanel/TimesheetModule'
+import CashModule from '@/components/newpanel/CashModule'
+import TaxModule from '@/components/newpanel/TaxModule'
+import DocumentsModule from '@/components/newpanel/DocumentsModule'
+import ReportsModule from '@/components/newpanel/ReportsModule'
+import TasksModule from '@/components/newpanel/TasksModule'
+import OverviewModule from '@/components/newpanel/OverviewModule'
+import NotificationCenter from '@/components/newpanel/NotificationCenter'
+import ActivityLogModule from '@/components/newpanel/ActivityLogModule'
+import UsersModule, { type UserProfileRecord } from '@/components/newpanel/UsersModule'
+import CariHesapModule from '@/components/newpanel/CariHesapModule'
+import { logActivity } from '@/lib/activityLog'
 
-const VERGI_TURLERI = [
-  { id:'kdv', label:'KDV' },
-  { id:'muhtasar_sgk', label:'Muhtasar-SGK' },
-  { id:'gecici_vergi', label:'Geçici Vergi' },
-  { id:'kurumlar_vergisi', label:'Kurumlar Vergisi' },
-  { id:'edefter_berat', label:'E-Defter Berat Gönderme' },
+type ModuleId =
+  | 'genel-bakis'
+  | 'projeler'
+  | 'gelir-gider'
+  | 'puantaj'
+  | 'cari'
+  | 'kasa'
+  | 'vergi-sgk'
+  | 'dokuman'
+  | 'raporlar'
+  | 'gorevler'
+  | 'kullanicilar'
+  | 'aktivite'
+
+type ModuleConfig = {
+  id: ModuleId
+  label: string
+  shortLabel: string
+  icon: LucideIcon
+  accent: string
+  title: string
+  description: string
+  allowedRoles: string[]
+}
+
+const iconRegistry: Record<string, LucideIcon> = {
+  LayoutGrid, FolderKanban, TrendingUp, Users, BookUser, Wallet, ShieldCheck, FileArchive, FileSpreadsheet, ListTodo, KeyRound, History
+}
+
+const defaultModules: ModuleConfig[] = [
+  { id: 'genel-bakis', label: 'Genel Bakis', shortLabel: 'Panel', icon: LayoutGrid, accent: 'from-sky-500 to-cyan-400', title: 'Merkezi Operasyon Paneli', description: 'Sistemdeki aktif görevlerin, finansal yükümlülüklerin ve resmi süreçlerin konsolide özetini sunar.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
+  { id: 'projeler', label: 'Projeler', shortLabel: 'Projeler', icon: FolderKanban, accent: 'from-blue-500 to-indigo-400', title: 'Proje Yönetimi', description: 'Kurum bünyesindeki tüm projelerin bütçe, lokasyon ve operasyonel yaşam döngülerinin yönetildiği merkez.', allowedRoles: ['yonetici', 'santiye', 'izleme'] },
+  { id: 'gelir-gider', label: 'Gelir / Gider', shortLabel: 'Finans', icon: TrendingUp, accent: 'from-emerald-500 to-lime-400', title: 'Finansal Operasyonlar', description: 'Proje ve cari bazlı tüm gelir-gider kalemlerinin işlendiği ve finansal analizlerin yapıldığı sistem.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'puantaj', label: 'Puantaj', shortLabel: 'Puantaj', icon: Users, accent: 'from-orange-500 to-amber-400', title: 'Personel Mesai Takibi', description: 'Saha ve ofis personeline ait mesai, izin ve günlük çalışma verilerinin proje bazlı izlendiği modül.', allowedRoles: ['yonetici', 'santiye'] },
+  { id: 'cari', label: 'Cari Hesap', shortLabel: 'Cari', icon: BookUser, accent: 'from-cyan-500 to-teal-400', title: 'Cari Hesap Takibi', description: 'Alış/satış faturaları, tahsilat, ödeme ve çek hareketlerinin cari bazlı izlendiği modül.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'kasa', label: 'Kasa', shortLabel: 'Kasa', icon: Wallet, accent: 'from-teal-500 to-cyan-400', title: 'Nakit Yonetimi', description: 'Nakit ve banka hesaplarındaki tüm finansal hareketlerin ve güncel likidite durumunun izlendiği kasa modülü.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'vergi-sgk', label: 'Vergi / SGK', shortLabel: 'Vergi', icon: ShieldCheck, accent: 'from-rose-500 to-orange-400', title: 'Resmi Surecler', description: 'Resmi kurumlarla yürütülen periyodik vergi ve SGK yükümlülüklerinin tahakkuk ve ödeme takibi.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'dokuman', label: 'Dokumanlar', shortLabel: 'Arsiv', icon: FileArchive, accent: 'from-slate-700 to-slate-500', title: 'Kurumsal Arsiv', description: 'Sisteme yüklenen tüm sözleşme, fatura ve resmi evrakların merkezi olarak arşivlendiği ve yönetildiği alan.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
+  { id: 'raporlar', label: 'Raporlar', shortLabel: 'Raporlar', icon: FileSpreadsheet, accent: 'from-indigo-500 to-blue-400', title: 'Raporlama ve Analiz', description: 'Tüm veri kaynaklarından derlenen operasyonel ve finansal metriklerin detaylı analiz ve dışa aktarım aracı.', allowedRoles: ['yonetici', 'muhasebe', 'izleme'] },
+  { id: 'gorevler', label: 'Yapilacak Isler', shortLabel: 'Gorevler', icon: ListTodo, accent: 'from-amber-500 to-orange-400', title: 'Gorev Yonetimi', description: 'Kurum içi iş süreçlerinin, önceliklendirme ve hatırlatma algoritmalarıyla takip edildiği operasyonel görev merkezi.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
+  { id: 'kullanicilar', label: 'Kullanicilar', shortLabel: 'Yetkiler', icon: KeyRound, accent: 'from-slate-600 to-slate-400', title: 'Sistem Erisimi', description: 'Sistem erişim yetkilerinin, kullanıcı rollerinin ve kurumsal profil ayarlarının yapılandırıldığı güvenlik modülü.', allowedRoles: ['yonetici'] },
+  { id: 'aktivite', label: 'Aktivite Logu', shortLabel: 'Log', icon: History, accent: 'from-cyan-500 to-sky-400', title: 'Sistem Gunlugu', description: 'Platform üzerindeki tüm kritik kullanıcı hareketlerinin ve veri değişikliklerinin denetim amacıyla kaydedildiği izleme günlüğü.', allowedRoles: ['yonetici', 'muhasebe'] },
 ]
 
-const PROJE_SUBS: { id: SubPage; label: string; icon: React.ReactNode }[] = [
-  { id:'hakedis', label:'Hakediş', icon:<DollarSign size={12}/> },
-  { id:'sozlesme', label:'Sözleşme', icon:<FileText size={12}/> },
-  { id:'fatura', label:'Faturalar', icon:<Receipt size={12}/> },
-  { id:'teminat', label:'Teminatlar', icon:<Shield size={12}/> },
-  { id:'yansitma', label:'Yansıtma Faturaları', icon:<RefreshCw size={12}/> },
-]
+const roleLabels: Record<string, string> = {
+  yonetici: 'Yonetici',
+  muhasebe: 'Muhasebe',
+  santiye: 'Santiye',
+  izleme: 'Izleme',
+}
 
-const DOK_CATS: { id: DokKat; label: string }[] = [
-  { id:'sozlesmeler', label:'Sözleşmeler' },
-  { id:'hakedisler', label:'Hakedişler' },
-  { id:'satis_faturalari', label:'Satış Faturaları' },
-  { id:'maas_dekontlari', label:'Maaş Ödeme Dekontları' },
-  { id:'arabulucu_evraklari', label:'Arabulucu Evrakları' },
-  { id:'alis_faturalari', label:'Alış Faturaları' },
-]
+function isMissingProfilesTable(message?: string) {
+  const value = (message || '').toLowerCase()
+  return value.includes('kullanici_profilleri') && (value.includes('schema cache') || value.includes('does not exist') || value.includes('could not find the table'))
+}
 
-export default function App() {
+export default function Page() {
   const [user, setUser] = useState<any>(null)
-  const [activePage, setActivePage] = useState<Page>('dashboard')
-  const [activeSubPage, setActiveSubPage] = useState<SubPage>('hakedis')
-  const [activeDokKat, setActiveDokKat] = useState<DokKat>('sozlesmeler')
-  const [firma, setFirma] = useState<Firma | null>(null)
-  const [projeler, setProjeler] = useState<Proje[]>([])
-  const [selectedProje, setSelectedProje] = useState<Proje | null>(null)
-  const [expandedProje, setExpandedProje] = useState<string | null>(null)
-  const [expandedDok, setExpandedDok] = useState<string | null>(null)
-  const [projelerAcik, setProjelerAcik] = useState(false)
-  const [expandedVergi, setExpandedVergi] = useState<string | null>(null)
-  const [vergiAcik, setVergiAcik] = useState(false)
-  const [selectedVergiFirma, setSelectedVergiFirma] = useState<Firma | null>(null)
-  const [selectedVergiTur, setSelectedVergiTur] = useState<string>('kdv')
-  const [tumFirmalar, setTumFirmalar] = useState<Firma[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [firma, setFirma] = useState<FirmaRecord | null>(null)
+  const [profile, setProfile] = useState<UserProfileRecord | null>(null)
+  const [modules, setModules] = useState<ModuleConfig[]>([])
+  const [activeModule, setActiveModule] = useState<ModuleId>('genel-bakis')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { window.location.href = '/login'; return }
-      setUser(data.user)
-    })
+    let mounted = true
+
+    async function bootstrap() {
+      try {
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError) throw authError
+        if (!authData.user) {
+          window.location.href = '/login'
+          return
+        }
+        if (!mounted) return
+        setUser(authData.user)
+
+        const firmaRes = await supabase.from('firmalar').select('*').limit(1)
+        if (firmaRes.error) {
+          throw new Error(`Firmalar tablosuna erişilemedi: ${firmaRes.error.message}`)
+        }
+
+        let activeFirma: FirmaRecord | null = null
+        if (!firmaRes.data || firmaRes.data.length === 0) {
+          const insertRes = await supabase.from('firmalar').insert({ ad: 'ETM' }).select('*').single()
+          if (insertRes.error) {
+            throw new Error(`Varsayılan firma oluşturulamadı: ${insertRes.error.message}`)
+          }
+          activeFirma = insertRes.data as FirmaRecord
+        } else {
+          activeFirma = firmaRes.data[0] as FirmaRecord
+        }
+        if (!mounted) return
+        setFirma(activeFirma)
+
+        let activeProfile: UserProfileRecord | null = null
+        const profileRes = await supabase.from('kullanici_profilleri').select('*').eq('auth_user_id', authData.user.id).maybeSingle()
+
+        if (profileRes.error) {
+          if (isMissingProfilesTable(profileRes.error.message)) {
+            activeProfile = {
+              id: 'local-admin',
+              auth_user_id: authData.user.id,
+              firma_id: activeFirma.id,
+              ad_soyad: authData.user.user_metadata?.full_name || null,
+              email: authData.user.email || 'kullanici@etm.local',
+              rol: 'yonetici',
+              aktif: true,
+              son_giris_at: new Date().toISOString(),
+            }
+            if (mounted) {
+              setError('kullanici_profilleri tablosu bulunamadi. Panel gecici yonetici modu ile acildi.')
+            }
+          } else {
+            throw profileRes.error
+          }
+        } else {
+          activeProfile = profileRes.data as UserProfileRecord | null
+          if (!activeProfile) {
+            const insertProfile = await supabase
+              .from('kullanici_profilleri')
+              .insert({
+                auth_user_id: authData.user.id,
+                firma_id: activeFirma.id,
+                email: authData.user.email || 'kullanici@etm.local',
+                ad_soyad: authData.user.user_metadata?.full_name || null,
+                aktif: true,
+                son_giris_at: new Date().toISOString(),
+              })
+              .select('*')
+              .single()
+
+            if (insertProfile.error) throw insertProfile.error
+            activeProfile = insertProfile.data as UserProfileRecord
+          } else {
+            const updateRes = await supabase
+              .from('kullanici_profilleri')
+              .update({ son_giris_at: new Date().toISOString() })
+              .eq('id', activeProfile.id)
+              .select('*')
+              .single()
+
+            if (!updateRes.error && updateRes.data) {
+              activeProfile = updateRes.data as UserProfileRecord
+            }
+          }
+        }
+
+        if (activeProfile && !activeProfile.aktif) {
+          if (mounted) {
+            setError('Bu hesap pasif durumdadir. Lutfen yonetici ile iletisime gecin.')
+            setLoading(false)
+          }
+          await supabase.auth.signOut()
+          window.location.href = '/login'
+          return
+        }
+
+        if (!mounted) return
+        setProfile(activeProfile)
+
+        // Dinamik menu yapisini veritabanindan cek (Eger veritabaninda yoksa default listeyi kullan)
+        let loadedModules = defaultModules
+        const modRes = await supabase.from('sistem_modulleri').select('*').eq('aktif', true).order('sira', { ascending: true })
+        if (!modRes.error && modRes.data && modRes.data.length > 0) {
+          loadedModules = modRes.data.map((m: any) => ({
+            id: m.id as ModuleId,
+            label: m.label,
+            shortLabel: m.short_label,
+            icon: iconRegistry[m.icon] || LayoutGrid,
+            accent: m.accent,
+            title: m.title,
+            description: m.description,
+            allowedRoles: m.izin_verilen_roller || ['yonetici']
+          }))
+        }
+        
+        if (!mounted) return
+        setModules(loadedModules)
+        setLoading(false)
+
+        if (activeProfile?.id !== 'local-admin') {
+          void logActivity({
+            firmaId: activeFirma.id,
+            authUserId: authData.user.id,
+            kullaniciProfilId: activeProfile?.id || null,
+            modul: 'oturum',
+            islemTuru: 'oturum_acildi',
+            kayitTuru: 'kullanici_profili',
+            kayitId: activeProfile?.id || null,
+            aciklama: `${authData.user.email || 'Kullanici'} panel oturumu acti.`,
+          })
+        }
+      } catch (err: any) {
+        if (!mounted) return
+        setError(err?.message || 'Panel baslatilirken bir hata olustu.')
+        setLoading(false)
+      }
+    }
+
+    bootstrap()
+    return () => {
+      mounted = false
+    }
   }, [])
 
-  const fetchFirmalar = useCallback(async () => {
-    let { data } = await supabase.from('firmalar').select('*').order('ad')
-    if ((!data || data.length === 0) && user) {
-      await supabase.from('firmalar').insert([{ ad: 'Binyapı' }, { ad: 'ETM' }])
-      const res = await supabase.from('firmalar').select('*').order('ad')
-      data = res.data
-    }
-    if (data) {
-      setTumFirmalar(data)
-      setFirma(prev => prev || data[0] || null)
-    }
-  }, [user])
-
-  const fetchProjeler = useCallback(async () => {
-    if (!firma) return
-    const { data } = await supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad')
-    setProjeler(data || [])
-  }, [firma])
-
-  useEffect(() => { if (user) fetchFirmalar() }, [user, fetchFirmalar])
-  useEffect(() => { if (firma) fetchProjeler() }, [firma, fetchProjeler])
+  const visibleModules = useMemo(() => {
+    const currentRole = profile?.rol || 'izleme'
+    return modules.filter((item) => item.allowedRoles.includes(currentRole))
+  }, [modules, profile?.rol])
 
   useEffect(() => {
-    async function fetchTumFirmalar() {
-      const { data } = await supabase.from('firmalar').select('*').order('ad')
-      setTumFirmalar(data || [])
+    if (!visibleModules.length) return
+    if (!visibleModules.some((item) => item.id === activeModule)) {
+      setActiveModule(visibleModules[0].id)
     }
-    if (user) fetchTumFirmalar()
-  }, [user])
+  }, [activeModule, visibleModules])
+
+  const activeItem = useMemo(() => visibleModules.find((item) => item.id === activeModule) ?? visibleModules[0], [activeModule, visibleModules])
 
   async function signOut() {
+    if (firma && user && profile?.id !== 'local-admin') {
+      void logActivity({
+        firmaId: firma.id,
+        authUserId: user.id,
+        kullaniciProfilId: profile?.id || null,
+        modul: 'oturum',
+        islemTuru: 'oturum_kapandi',
+        kayitTuru: 'kullanici_profili',
+        kayitId: profile?.id || null,
+        aciklama: `${user.email || 'Kullanici'} panel oturumunu kapatti.`,
+      })
+    }
     await supabase.auth.signOut()
     window.location.href = '/login'
   }
 
-  function navToPage(page: Page, proje?: Proje) {
-    if (proje) setSelectedProje(proje)
-    setActivePage(page)
-    setSidebarOpen(false)
-  }
-
-  function navToProjeSub(proje: Proje, sub: SubPage) {
-    setSelectedProje(proje); setActiveSubPage(sub); setActivePage('proje-detay'); setSidebarOpen(false)
-  }
-
-  function navToDokKat(proje: Proje, kat: DokKat) {
-    setSelectedProje(proje); setActiveDokKat(kat); setActivePage('proje-dokuman'); setSidebarOpen(false)
-  }
-
-  const PAGE_TITLES: Record<Page, string> = {
-    dashboard:'Dashboard', projeler:'Projeler', 'proje-ekipler':'Ekipler',
-    'proje-puantaj':'Puantaj', 'proje-detay':'Proje Detay', 'proje-dokuman':'Dökümanlar',
-    vergi:'Vergi Süreçleri', gelir:'Gelir Takibi', gider:'Gider Takibi', odeme:'Ödeme Planı',
-    kasa:'Kasa Takibi', cari:'Cari Hesaplar', banka:'Banka Hesapları', sirket:'Şirket Evrakları', gorevler:'Yapılacak İşler', raporlama:'Excel Raporlama'
-  }
-
-  const navBtn = (id: Page, label: string, icon: React.ReactNode, color = 'blue') => {
-    const colorMap: Record<string, string> = {
-      blue: 'bg-blue-600 text-white shadow-blue-900/40',
-      emerald: 'bg-emerald-600 text-white shadow-emerald-900/40',
-      violet: 'bg-violet-600 text-white shadow-violet-900/40',
-      amber: 'bg-amber-500 text-white shadow-amber-900/40',
-      rose: 'bg-rose-600 text-white shadow-rose-900/40',
-      cyan: 'bg-cyan-600 text-white shadow-cyan-900/40',
-    }
-    const active = colorMap[color] || colorMap.blue
+  if (loading) {
     return (
-      <button key={id} onClick={() => navToPage(id)}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-0.5 ${activePage===id?`${active} shadow-lg`:'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-        {icon}<span>{label}</span>
-      </button>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-slate-100">
+        <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-5 text-sm text-slate-300 backdrop-blur">
+          Panel yukleniyor...
+        </div>
+      </div>
     )
   }
 
-  const Sidebar = () => (
-    <div className="flex flex-col h-full" style={{background:'linear-gradient(180deg,#0f1729 0%,#0d1524 100%)'}}>
-      <div className="px-5 py-5 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:'linear-gradient(135deg,#2563eb,#1d4ed8)'}}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <div>
-            <p className="text-white font-bold text-sm tracking-wide">BİNYAPI</p>
-            <p className="text-slate-500 text-[11px]">Yönetim Paneli</p>
-          </div>
+  if (error && (!user || !activeItem || !firma)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] px-4 text-slate-100">
+        <div className="w-full max-w-xl rounded-3xl border border-rose-300/20 bg-slate-950/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.35)]">
+          <p className="text-xs uppercase tracking-[0.24em] text-rose-300">Panel Hatasi</p>
+          <h1 className="mt-3 text-2xl font-semibold text-white">Panel acilamadi</h1>
+          <p className="mt-4 text-sm leading-7 text-slate-300">{error}</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-2xl bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-100">Sayfayi yenile</button>
         </div>
-      </div>
-
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {navBtn('dashboard', 'Dashboard', <LayoutDashboard size={16}/>, 'blue')}
-
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-4 mb-2">Projeler</p>
-
-        <button onClick={() => { setProjelerAcik(!projelerAcik); navToPage('projeler') }}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1 ${activePage==='projeler'?'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40':'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-          <FolderOpen size={16}/><span className="flex-1 text-left">Projeler</span>
-          {projelerAcik ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
-        </button>
-
-        {projelerAcik && (
-          <div className="space-y-0.5 mb-1">
-          {projeler.map(p => (
-            <div key={p.id}>
-              <button onClick={() => setExpandedProje(expandedProje===p.id ? null : p.id)}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${expandedProje===p.id?'bg-white/10 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                <FolderOpen size={13} className="flex-shrink-0"/>
-                <span className="flex-1 text-left truncate">{p.ad}</span>
-                {expandedProje===p.id ? <ChevronDown size={11}/> : <ChevronRight size={11}/>}
-              </button>
-
-              {expandedProje===p.id && (
-                <div className="ml-3 mt-0.5 border-l border-white/10 pl-2 space-y-0.5">
-                  {/* Ekipler */}
-                  <button onClick={() => navToPage('proje-ekipler', p)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='proje-ekipler'&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                    <Users size={11}/><span>Ekipler</span>
-                  </button>
-                  {/* Puantaj */}
-                  <button onClick={() => navToPage('proje-puantaj', p)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='proje-puantaj'&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                    <Clock size={11}/><span>Puantaj</span>
-                  </button>
-                  {/* Detay sayfaları */}
-                  {PROJE_SUBS.map(sub => (
-                    <button key={sub.id} onClick={() => navToProjeSub(p, sub.id)}
-                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='proje-detay'&&activeSubPage===sub.id&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                      <span className="flex-shrink-0">{sub.icon}</span><span>{sub.label}</span>
-                    </button>
-                  ))}
-                  {/* Dökümanlar ana başlık */}
-                  <button onClick={() => setExpandedDok(expandedDok===p.id ? null : p.id)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${expandedDok===p.id?'text-white bg-white/10':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                    <Folder size={11} className="flex-shrink-0"/>
-                    <span className="flex-1 text-left">Dökümanlar</span>
-                    {expandedDok===p.id ? <ChevronDown size={10}/> : <ChevronRight size={10}/>}
-                  </button>
-                  {/* Döküman kategorileri */}
-                  {expandedDok===p.id && (
-                    <div className="ml-3 border-l border-white/5 pl-2 space-y-0.5">
-                      {DOK_CATS.map(kat => (
-                        <button key={kat.id} onClick={() => navToDokKat(p, kat.id)}
-                          className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all ${activePage==='proje-dokuman'&&activeDokKat===kat.id&&selectedProje?.id===p.id?'bg-blue-600 text-white':'text-slate-600 hover:text-slate-300 hover:bg-white/5'}`}>
-                          <span className="w-1 h-1 rounded-full bg-current flex-shrink-0"/>
-                          <span className="truncate">{kat.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-          </div>
-        )}
-
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Vergi</p>
-        <button onClick={() => { setVergiAcik(!vergiAcik); navToPage('vergi') }}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all mb-1 ${activePage==='vergi'&&!selectedVergiFirma?'bg-blue-600 text-white shadow-lg shadow-blue-900/30':'text-slate-400 hover:text-white hover:bg-white/5'}`}>
-          <Receipt size={16}/><span className="flex-1 text-left">Vergi Süreçleri</span>
-          {vergiAcik ? <ChevronDown size={13}/> : <ChevronRight size={13}/>}
-        </button>
-
-        {vergiAcik && (
-          <div className="space-y-0.5 mb-1">
-            {tumFirmalar.map(f => (
-              <div key={f.id}>
-                <button onClick={() => setExpandedVergi(expandedVergi===f.id ? null : f.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${expandedVergi===f.id?'bg-white/10 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                  <Receipt size={13} className="flex-shrink-0"/>
-                  <span className="flex-1 text-left truncate">{f.ad}</span>
-                  {expandedVergi===f.id ? <ChevronDown size={11}/> : <ChevronRight size={11}/>}
-                </button>
-                {expandedVergi===f.id && (
-                  <div className="ml-3 border-l border-white/10 pl-2 space-y-0.5 mt-0.5">
-                    {VERGI_TURLERI.map(vt => (
-                      <button key={vt.id} onClick={() => { setSelectedVergiFirma(f); setSelectedVergiTur(vt.id); setActivePage('vergi'); setSidebarOpen(false) }}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage==='vergi'&&selectedVergiFirma?.id===f.id&&selectedVergiTur===vt.id?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}>
-                        <span className="w-1 h-1 rounded-full bg-current flex-shrink-0"/>
-                        <span className="truncate">{vt.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Finans</p>
-        {navBtn('gelir', 'Gelir Takibi', <TrendingUp size={16}/>, 'emerald')}
-        {navBtn('gider', 'Gider Takibi', <TrendingDown size={16}/>, 'rose')}
-        {navBtn('odeme', 'Ödeme Planı', <CreditCard size={16}/>, 'violet')}
-        {navBtn('kasa', 'Kasa', <Wallet size={16}/>, 'amber')}
-        {navBtn('sirket', 'Şirket Evrakları', <FileText size={16}/>, 'cyan')}
-
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Görevler</p>
-        {navBtn('gorevler', 'Yapılacak İşler', <CheckSquare size={16}/>, 'rose')}
-
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-3 mt-3 mb-2">Raporlar</p>
-        {navBtn('raporlama', 'Excel Raporlama', <BarChart2 size={16}/>, 'cyan')}
-      </nav>
-
-      <div className="px-3 py-3 border-t border-white/5">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-all">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-            {user?.email?.[0]?.toUpperCase() || 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">{user?.email?.split('@')[0]}</p>
-            <p className="text-slate-500 text-[10px] truncate">{user?.email}</p>
-          </div>
-          <button
-            onClick={() => setPasswordModalOpen(true)}
-            className="text-[11px] text-slate-500 hover:text-slate-900 transition-colors flex-shrink-0"
-            type="button"
-          >
-            Şifre
-          </button>
-          <button onClick={signOut} className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0">
-            <LogOut size={14}/>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  const renderContent = () => {
-    if (!user || !firma) return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-slate-400 text-sm">Yükleniyor...</p>
       </div>
     )
+  }
 
+  if (!user || !activeItem) {
     return (
-      <div className="h-full overflow-y-auto p-4">
-        {activePage === 'dashboard' && <DashboardPage userId={user.id} firma={firma} onNavigate={(p) => setActivePage(p as Page)}/>}
-        {activePage === 'projeler' && <ProjelerPage userId={user.id} firma={firma} onProjeSelect={(p) => { if(p) { setSelectedProje(p); setExpandedProje(p.id) } }} onProjelerUpdate={(list) => setProjeler(list)} selectedProjeId={selectedProje?.id}/>}
-        {activePage === 'proje-ekipler' && selectedProje && <EkiplerPage userId={user.id} firma={firma} proje={selectedProje}/>}
-        {activePage === 'proje-puantaj' && <PuantajPage userId={user.id} firma={firma}/>}
-        {activePage === 'proje-detay' && selectedProje && <ProjeDetayPage userId={user.id} firma={firma} proje={selectedProje} subPage={activeSubPage}/>}
-        {activePage === 'proje-dokuman' && selectedProje && <DokumanlarPage userId={user.id} firma={firma} proje={selectedProje} kategori={activeDokKat}/>}
-        {activePage === 'vergi' && (selectedVergiFirma 
-          ? <VergiPage userId={user.id} firma={selectedVergiFirma} vergiTur={selectedVergiTur}/> 
-          : <VergiPage userId={user.id} firma={firma} vergiTur={selectedVergiTur}/>)}
-        {activePage === 'gelir' && <GelirTakibiPage userId={user.id} firma={firma}/>}
-        {activePage === 'gider' && <GiderTakibiPage userId={user.id} firma={firma}/>}
-        {activePage === 'odeme' && <OdemePlaniPage userId={user.id} firma={firma}/>} 
-        {activePage === 'kasa' && <KasaPage userId={user.id} firma={firma}/>} 
-        {activePage === 'sirket' && <SirketEvraklariPage userId={user.id} firma={firma}/>}
-        {activePage === 'cari' && <CariHesaplarPage userId={user.id} firma={firma}/>}
-        {activePage === 'banka' && <BankalarPage userId={user.id} firma={firma}/>}
-        {activePage === 'gorevler' && <GorevlerPage userId={user.id} firmalar={[firma]}/>}
-        {activePage === 'raporlama' && <RaporlamaPage userId={user.id} firmalar={[firma]}/>}
+      <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)] text-slate-100">
+        <div className="rounded-3xl border border-white/10 bg-white/5 px-6 py-5 text-sm text-slate-300 backdrop-blur">
+          Kullanici bilgisi bekleniyor...
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <div className="hidden lg:flex w-60 flex-shrink-0 flex-col"><Sidebar/></div>
-
-      {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)}/>
-          <div className="absolute left-0 top-0 bottom-0 w-64 z-50"><Sidebar/></div>
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white border-b border-slate-100 px-4 h-14 flex items-center gap-3 flex-shrink-0">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-slate-600"><Menu size={20}/></button>
-          <div className="flex items-center gap-2 flex-1 min-w-0 text-sm">
-            <span className="font-semibold text-slate-800">{PAGE_TITLES[activePage]}</span>
-            {selectedProje && ['proje-ekipler','proje-puantaj','proje-detay','proje-dokuman'].includes(activePage) && (
-              <><ChevronRight size={14} className="text-slate-300 flex-shrink-0"/>
-              <span className="text-slate-500 truncate">{selectedProje.ad}</span></>
-            )}
-
-          </div>
-          {user && <BildirimSistemi userId={user.id}/>}
-        </div>
-        <div className="flex-1 overflow-hidden bg-slate-50">
-          {renderContent()}
-        </div>
+    <div className="min-h-screen bg-[var(--page-bg)] text-slate-100">
+      <div className="fixed inset-0 -z-10 bg-[#020617]">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:32px_40px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute top-0 right-0 -mr-[10%] -mt-[10%] h-[60%] w-[60%] rounded-full bg-indigo-500/10 blur-[120px]"></div>
+        <div className="absolute bottom-0 left-0 -ml-[10%] -mb-[10%] h-[60%] w-[60%] rounded-full bg-sky-500/10 blur-[120px]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[40%] w-[40%] rounded-full bg-blue-500/5 blur-[150px]"></div>
       </div>
 
-      {passwordModalOpen && (
-        <PasswordDegistirModal onClose={() => setPasswordModalOpen(false)} />
-      )}
+      <div className="mx-auto flex min-h-screen w-full flex-col gap-4 px-4 py-4 lg:gap-6 lg:px-6 lg:py-6 2xl:px-12">
+        <header className="flex flex-col md:flex-row items-center w-full rounded-2xl border border-white/[0.05] bg-slate-900/50 p-2 backdrop-blur-xl sticky top-4 lg:top-6 z-40 shadow-lg ring-1 ring-white/5 transition-all duration-300 gap-2">
+          <div className="flex items-center justify-between w-full md:w-auto md:border-r border-white/5 md:pr-4 shrink-0">
+            <div className="flex items-center gap-3 pl-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm ring-1 ring-white/10">
+                <Briefcase size={18} strokeWidth={2.5} />
+              </div>
+              <div>
+                <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-blue-400/80">ETM-BİNYAPI</p>
+                <h1 className="text-xs font-bold tracking-tight text-slate-100">ERP Sistemi</h1>
+              </div>
+            </div>
+            <button type="button" onClick={signOut} className="md:hidden flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20">
+              <LogOut size={14} />
+            </button>
+          </div>
+
+          <nav className="flex-1 flex items-center justify-start gap-1 overflow-x-auto w-full px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {visibleModules.map((item) => {
+              const Icon = item.icon
+              const isActive = item.id === activeModule
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveModule(item.id)}
+                  title={item.label}
+                  className={`group relative flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all shrink-0 ${
+                    isActive
+                      ? 'text-white bg-white/10 shadow-sm ring-1 ring-white/5'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+                >
+                  <Icon size={16} className={isActive ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-slate-500 group-hover:text-slate-300'} />
+                  {item.shortLabel}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-t-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+
+          <div className="hidden md:flex items-center gap-3 shrink-0 border-l border-white/5 pl-4 pr-2">
+            <div className="flex flex-col items-end">
+              <p className="truncate text-[11px] font-medium text-slate-200 max-w-[120px]">{user.email}</p>
+              <button
+                type="button"
+                onClick={signOut}
+                className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500 transition hover:text-rose-400"
+              >
+                <LogOut size={10} />
+                Güvenli Çıkış
+              </button>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300 ring-1 ring-white/10 shrink-0">
+              {user.email?.charAt(0).toUpperCase() || 'U'}
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 flex flex-col min-w-0">
+          <div className="flex justify-end mb-4">
+            {firma && <NotificationCenter firma={firma} />}
+          </div>
+          {error && <p className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-200">{error}</p>}
+
+          <section className="flex-1">
+            {firma ? renderModule(activeModule, firma, profile, setFirma) : (
+              <div className="rounded-[32px] border border-white/[0.08] bg-white/[0.04] p-6 text-slate-200 shadow-2xl backdrop-blur-3xl ring-1 ring-white/10">
+                Firma bulunamadi.
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function renderModule(moduleId: ModuleId, firma: FirmaRecord, profile: UserProfileRecord | null, onFirmaUpdated: (firma: FirmaRecord) => void) {
+  switch (moduleId) {
+    case 'projeler':
+      return <ProjectsModule firma={firma} role={profile?.rol} />
+    case 'gelir-gider':
+      return <FinanceModule firma={firma} role={profile?.rol} />
+    case 'puantaj':
+      return <TimesheetModule firma={firma} role={profile?.rol} />
+    case 'cari':
+      return <CariHesapModule firma={firma} role={profile?.rol} />
+    case 'kasa':
+      return <CashModule firma={firma} role={profile?.rol} />
+    case 'vergi-sgk':
+      return <TaxModule firma={firma} role={profile?.rol} />
+    case 'dokuman':
+      return <DocumentsModule firma={firma} role={profile?.rol} />
+    case 'raporlar':
+      return <ReportsModule firma={firma} role={profile?.rol} />
+    case 'gorevler':
+      return <TasksModule firma={firma} role={profile?.rol} />
+    case 'kullanicilar':
+      return <UsersModule firma={firma} currentProfile={profile} role={profile?.rol} onFirmaUpdated={onFirmaUpdated} />
+    case 'aktivite':
+      return <ActivityLogModule firma={firma} role={profile?.rol} />
+    case 'genel-bakis':
+      return <OverviewModule firma={firma} />
+    default:
+      return <PlaceholderModule moduleId={moduleId} />
+  }
+}
+
+function PlaceholderModule({ moduleId }: { moduleId: Exclude<ModuleId, 'projeler' | 'gelir-gider' | 'puantaj'> }) {
+  const items: Record<string, string[]> = {
+    'genel-bakis': ['Yeni SQL semasi hazir', 'Projeler modulu baglandi', 'Finans modulu baglandi', 'Puantaj modulu baglandi'],
+    kasa: ['Kasa ve banka hareket formu', 'Bagli islem kaydi mantigi', 'Gunluk bakiye ve hareket dokumu'],
+    'vergi-sgk': ['Beyan donemi listesi', 'Durum ve sorumlu takibi', 'Tahakkuk ve dekont yukleme'],
+    dokuman: ['Merkezi yukleme alani', 'Modul ve kategori filtreleri', 'Kayit bazli dokuman baglama'],
+    raporlar: ['PDF ve Excel cikti sablonlari', 'Modul bazli filtreleme', 'Kaydedilebilir rapor yapisi'],
+    gorevler: ['Gorev listesi ve durum akisi', 'Hatirlatma tarih ve saat alanlari', 'Erteleme dakikasi ve yeni hatirlatma zamani'],
+    kullanicilar: ['Rol bazli menu gorunurlugu', 'Aktif pasif kullanici kontrolu', 'Firma bazli profil kayitlari'],
+    aktivite: ['Oturum hareketlerini kaydet', 'Rol degisikliklerini izleme alani', 'Modul bazli filtrelenebilir log akisi'],
+  }
+
+  return (
+    <div className="rounded-[32px] border border-white/[0.08] bg-white/[0.04] p-6 text-slate-200 shadow-2xl backdrop-blur-3xl ring-1 ring-white/10">
+      <h3 className="text-2xl font-semibold text-white">Siradaki modul</h3>
+      <p className="mt-3 text-sm leading-6 text-slate-400">Bu alan bir sonraki adimda ayni desenle calisan module donusecek. Hazirlanan kapsam:</p>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        {items[moduleId].map((item) => (
+          <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-sm text-slate-300">{item}</div>
+        ))}
+      </div>
     </div>
   )
 }

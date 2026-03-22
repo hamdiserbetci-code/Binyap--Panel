@@ -1,0 +1,81 @@
+﻿﻿'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Clock3, Plus, Trash2, Users } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { can } from '@/lib/permissions'
+import Modal, { FormField, btnPrimary, btnSecondary, inputCls } from '@/components/ui/Modal'
+import { logActivity } from '@/lib/activityLog'
+import type { FirmaRecord, ProjectRecord } from '@/components/newpanel/ProjectsModule'
+
+interface TeamRecord { id: string; proje_id: string | null; ad: string; sorumlu_kisi: string | null }
+interface EmployeeRecord { id: string; ekip_id: string; ad_soyad: string }
+interface TimesheetRecord { id: string; proje_id: string; ekip_id: string; calisan_id: string | null; tarih: string; durum: string; mesai_saati: number; yevmiye: number; aciklama: string | null }
+interface Props { firma: FirmaRecord; role?: string | null }
+
+const teamFormInitial = { proje_id: '', ad: '', sorumlu_kisi: '', calisan_ad_soyad: '' }
+const timesheetFormInitial = { proje_id: '', ekip_id: '', calisan_id: '', tarih: '', durum: 'tam_gun', mesai_saati: '', yevmiye: '', aciklama: '' }
+
+export default function TimesheetModule({ firma, role }: Props) {
+  const [projects, setProjects] = useState<ProjectRecord[]>([])
+  const [teams, setTeams] = useState<TeamRecord[]>([])
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([])
+  const [timesheets, setTimesheets] = useState<TimesheetRecord[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [teamModal, setTeamModal] = useState(false)
+  const [timesheetModal, setTimesheetModal] = useState(false)
+  const [teamForm, setTeamForm] = useState(teamFormInitial)
+  const [timesheetForm, setTimesheetForm] = useState(timesheetFormInitial)
+
+  const fetchProjects = useCallback(async () => { const { data, error } = await supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad'); if (error) { setError(error.message); return }; setProjects((data as ProjectRecord[]) || []) }, [firma.id])
+  const fetchTeams = useCallback(async () => { let query = supabase.from('ekipler').select('*').eq('firma_id', firma.id).order('created_at', { ascending: false }); if (selectedProjectId) query = query.eq('proje_id', selectedProjectId); const { data, error } = await query; if (error) { setError(error.message); return }; setTeams((data as TeamRecord[]) || []) }, [firma.id, selectedProjectId])
+  const fetchEmployees = useCallback(async () => { const teamIds = teams.map((team) => team.id); if (teamIds.length === 0) { setEmployees([]); return }; const { data, error } = await supabase.from('ekip_calisanlari').select('*').in('ekip_id', teamIds); if (error) { setError(error.message); return }; setEmployees((data as EmployeeRecord[]) || []) }, [teams])
+  const fetchTimesheets = useCallback(async () => { setLoading(true); let query = supabase.from('puantaj_kayitlari').select('*').eq('firma_id', firma.id).order('tarih', { ascending: false }); if (selectedProjectId) query = query.eq('proje_id', selectedProjectId); const { data, error } = await query; if (error) { setError(error.message); setTimesheets([]); setLoading(false); return }; setTimesheets((data as TimesheetRecord[]) || []); setLoading(false) }, [firma.id, selectedProjectId])
+
+  useEffect(() => { fetchProjects() }, [fetchProjects])
+  useEffect(() => { fetchTeams(); fetchTimesheets() }, [fetchTeams, fetchTimesheets])
+  useEffect(() => { fetchEmployees() }, [fetchEmployees])
+
+  async function saveTeam() {
+    if (!can(role, 'edit')) return
+    if (!teamForm.proje_id || !teamForm.ad.trim()) { setError('Ekip icin proje ve ekip adi zorunludur.'); return }
+    const teamRes = await supabase.from('ekipler').insert({ firma_id: firma.id, proje_id: teamForm.proje_id, ad: teamForm.ad, sorumlu_kisi: teamForm.sorumlu_kisi || null, aktif: true }).select().single()
+    if (teamRes.error) { setError(teamRes.error.message); return }
+    if (teamForm.calisan_ad_soyad.trim()) {
+      const employeeRes = await supabase.from('ekip_calisanlari').insert({ ekip_id: teamRes.data.id, ad_soyad: teamForm.calisan_ad_soyad, aktif: true })
+      if (employeeRes.error) { setError(employeeRes.error.message); return }
+    }
+    await logActivity({ firmaId: firma.id, modul: 'puantaj', islemTuru: 'ekip_olusturuldu', kayitTuru: 'ekip', kayitId: teamRes.data.id, aciklama: teamForm.ad + ' ekip kaydi olusturuldu.', meta: { projeId: teamForm.proje_id, sorumlu: teamForm.sorumlu_kisi || null } }); setTeamModal(false); setTeamForm({ ...teamFormInitial, proje_id: selectedProjectId }); fetchTeams()
+  }
+
+  async function saveTimesheet() {
+    if (!can(role, 'edit')) return
+    if (!timesheetForm.proje_id || !timesheetForm.ekip_id || !timesheetForm.tarih) { setError('Puantaj icin proje, ekip ve tarih zorunludur.'); return }
+    const { error } = await supabase.from('puantaj_kayitlari').insert({ firma_id: firma.id, proje_id: timesheetForm.proje_id, ekip_id: timesheetForm.ekip_id, calisan_id: timesheetForm.calisan_id || null, tarih: timesheetForm.tarih, durum: timesheetForm.durum, mesai_saati: timesheetForm.mesai_saati ? Number(timesheetForm.mesai_saati) : 0, yevmiye: timesheetForm.yevmiye ? Number(timesheetForm.yevmiye) : 0, aciklama: timesheetForm.aciklama || null })
+    if (error) { setError(error.message); return }
+    await logActivity({ firmaId: firma.id, modul: 'puantaj', islemTuru: 'puantaj_olusturuldu', kayitTuru: 'puantaj', aciklama: timesheetForm.tarih + ' tarihli puantaj kaydi olusturuldu.', meta: { projeId: timesheetForm.proje_id, ekipId: timesheetForm.ekip_id, yevmiye: timesheetForm.yevmiye || 0 } }); setTimesheetModal(false); setTimesheetForm({ ...timesheetFormInitial, proje_id: selectedProjectId }); fetchTimesheets()
+  }
+
+  async function deleteTimesheet(id: string) {
+    if (!can(role, 'delete')) return
+    if (!confirm('Bu puantaj kaydini silmek istediginize emin misiniz?')) return
+    const { error } = await supabase.from('puantaj_kayitlari').delete().eq('id', id)
+    if (error) { setError(error.message); return }
+    await logActivity({ firmaId: firma.id, modul: 'puantaj', islemTuru: 'puantaj_silindi', kayitTuru: 'puantaj', kayitId: id, aciklama: id + ' puantaj kaydi silindi.' }); fetchTimesheets()
+  }
+
+  const totalDaily = useMemo(() => timesheets.reduce((sum, item) => sum + Number(item.yevmiye || 0), 0), [timesheets])
+  const totalOvertime = useMemo(() => timesheets.reduce((sum, item) => sum + Number(item.mesai_saati || 0), 0), [timesheets])
+  const teamName = (id: string) => teams.find((team) => team.id === id)?.ad || 'Ekip'
+  const employeeName = (id?: string | null) => employees.find((employee) => employee.id === id)?.ad_soyad || 'Genel ekip kaydi'
+  const projectName = (id: string) => projects.find((project) => project.id === id)?.ad || 'Proje'
+  const employeeOptions = employees.filter((employee) => employee.ekip_id === timesheetForm.ekip_id)
+
+  return <div className="space-y-5"><div className="grid gap-4 md:grid-cols-4"><SummaryCard label="Toplam Ekip" value={String(teams.length)} /><SummaryCard label="Calisan Kaydi" value={String(employees.length)} /><SummaryCard label="Puantaj" value={String(timesheets.length)} /><SummaryCard label="Toplam Yevmiye" value={`${totalDaily.toLocaleString('tr-TR')} TL`} /></div><div className="rounded-[32px] border border-white/[0.04] bg-white/[0.02] p-6 text-slate-200 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-400/80">Insan Kaynaklari</p><h3 className="mt-2 text-2xl font-bold tracking-tight text-white">Personel Puantaj ve Ekip Yonetimi</h3><p className="mt-2 text-sm text-slate-400">Santiye ve ofis kadrolarinin gunluk operasyonel mesai ve hakedis izlemeleri.</p></div><div className="flex flex-wrap items-center gap-2"><select className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-200 outline-none" value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}><option value="">Tum projeler</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.ad}</option>)}</select><button type="button" onClick={() => { setTeamForm({ ...teamFormInitial, proje_id: selectedProjectId }); setTeamModal(true) }} disabled={!can(role, 'edit')} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50"><Users size={16} />Ekip ekle</button><button type="button" onClick={() => { setTimesheetForm({ ...timesheetFormInitial, proje_id: selectedProjectId }); setTimesheetModal(true) }} disabled={!can(role, 'edit')} className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={16} />Puantaj ekle</button></div></div>{error && <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}<div className="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]"><div className="rounded-3xl border border-white/[0.05] bg-white/[0.01] shadow-inner p-5"><h4 className="text-sm font-semibold text-white">Aktif Kadrolar</h4><div className="mt-4 space-y-3">{teams.length === 0 ? <p className="text-sm text-slate-500">Bu filtrede ekip kaydi yok.</p> : teams.map((team) => <div key={team.id} className="rounded-2xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4"><p className="text-sm font-semibold text-slate-100">{team.ad}</p><p className="mt-1 text-xs text-slate-400">{projectName(team.proje_id || '')}</p><p className="mt-2 text-[11px] font-medium text-slate-500">Sorumlu: <span className="text-slate-300">{team.sorumlu_kisi || 'Belirtilmedi'}</span></p></div>)}</div></div><div className="rounded-3xl border border-white/[0.05] bg-white/[0.01] shadow-inner p-5"><div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-white">Mesai Hareketleri</h4><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Mesai {totalOvertime} saat</p></div><div className="mt-4 space-y-3">{loading ? <p className="text-sm text-slate-500">Puantaj kayitlari yukleniyor...</p> : timesheets.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center"><Clock3 size={28} className="mx-auto text-slate-400" /><p className="mt-3 text-sm text-slate-400">Henuz puantaj kaydi yok.</p></div> : timesheets.map((record) => <div key={record.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4"><div><p className="text-sm font-semibold text-slate-100">{teamName(record.ekip_id)} • <span className="text-slate-300 font-medium">{employeeName(record.calisan_id)}</span></p><p className="mt-1 text-xs text-slate-400">{projectName(record.proje_id)} • {record.tarih}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">{record.durum} • {record.mesai_saati} saat mesai</p></div><div className="flex items-center gap-3"><div className="text-right"><p className="text-sm font-bold text-slate-200">{record.yevmiye.toLocaleString('tr-TR')} TL</p>{record.aciklama && <p className="mt-1 text-[11px] font-medium text-slate-500 max-w-[150px] truncate">{record.aciklama}</p>}</div>{can(role, 'delete') && <button type="button" onClick={() => deleteTimesheet(record.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/20"><Trash2 size={14} />Sil</button>}</div></div>)}</div></div></div></div>{teamModal && can(role, 'edit') && <Modal title="Yeni ekip olustur" onClose={() => setTeamModal(false)} footer={<><button className={btnSecondary} onClick={() => setTeamModal(false)}>Iptal</button><button className={btnPrimary} onClick={saveTeam}>Kaydet</button></>}><div className="space-y-4"><FormField label="Proje" required><select className={inputCls} value={teamForm.proje_id} onChange={(e) => setTeamForm({ ...teamForm, proje_id: e.target.value })}><option value="">Proje secin</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.ad}</option>)}</select></FormField><FormField label="Ekip Adi" required><input className={inputCls} value={teamForm.ad} onChange={(e) => setTeamForm({ ...teamForm, ad: e.target.value })} /></FormField><FormField label="Sorumlu Kisi"><input className={inputCls} value={teamForm.sorumlu_kisi} onChange={(e) => setTeamForm({ ...teamForm, sorumlu_kisi: e.target.value })} /></FormField><FormField label="Ilk Calisan (opsiyonel)"><input className={inputCls} value={teamForm.calisan_ad_soyad} onChange={(e) => setTeamForm({ ...teamForm, calisan_ad_soyad: e.target.value })} /></FormField></div></Modal>}{timesheetModal && can(role, 'edit') && <Modal title="Yeni puantaj kaydi" onClose={() => setTimesheetModal(false)} footer={<><button className={btnSecondary} onClick={() => setTimesheetModal(false)}>Iptal</button><button className={btnPrimary} onClick={saveTimesheet}>Kaydet</button></>}><div className="space-y-4"><div className="grid grid-cols-2 gap-4"><FormField label="Proje" required><select className={inputCls} value={timesheetForm.proje_id} onChange={(e) => setTimesheetForm({ ...timesheetForm, proje_id: e.target.value, ekip_id: '', calisan_id: '' })}><option value="">Proje secin</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.ad}</option>)}</select></FormField><FormField label="Ekip" required><select className={inputCls} value={timesheetForm.ekip_id} onChange={(e) => setTimesheetForm({ ...timesheetForm, ekip_id: e.target.value, calisan_id: '' })}><option value="">Ekip secin</option>{teams.filter((team) => !timesheetForm.proje_id || team.proje_id === timesheetForm.proje_id).map((team) => <option key={team.id} value={team.id}>{team.ad}</option>)}</select></FormField></div><div className="grid grid-cols-2 gap-4"><FormField label="Calisan"><select className={inputCls} value={timesheetForm.calisan_id} onChange={(e) => setTimesheetForm({ ...timesheetForm, calisan_id: e.target.value })}><option value="">Genel ekip kaydi</option>{employeeOptions.map((employee) => <option key={employee.id} value={employee.id}>{employee.ad_soyad}</option>)}</select></FormField><FormField label="Tarih" required><input type="date" className={inputCls} value={timesheetForm.tarih} onChange={(e) => setTimesheetForm({ ...timesheetForm, tarih: e.target.value })} /></FormField></div><div className="grid grid-cols-3 gap-4"><FormField label="Durum"><select className={inputCls} value={timesheetForm.durum} onChange={(e) => setTimesheetForm({ ...timesheetForm, durum: e.target.value })}><option value="tam_gun">Tam gun</option><option value="yarim_gun">Yarim gun</option><option value="izinli">Izinli</option><option value="eksik">Eksik</option></select></FormField><FormField label="Mesai Saati"><input type="number" className={inputCls} value={timesheetForm.mesai_saati} onChange={(e) => setTimesheetForm({ ...timesheetForm, mesai_saati: e.target.value })} /></FormField><FormField label="Yevmiye"><input type="number" className={inputCls} value={timesheetForm.yevmiye} onChange={(e) => setTimesheetForm({ ...timesheetForm, yevmiye: e.target.value })} /></FormField></div><FormField label="Aciklama"><textarea className={inputCls} rows={3} value={timesheetForm.aciklama} onChange={(e) => setTimesheetForm({ ...timesheetForm, aciklama: e.target.value })} /></FormField></div></Modal>}</div>
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-[28px] border border-white/10 bg-slate-950/85 p-5 text-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]"><p className="text-xs uppercase tracking-[0.24em] text-slate-400">{label}</p><p className="mt-3 text-2xl font-semibold text-sky-300">{value}</p></div>
+}
