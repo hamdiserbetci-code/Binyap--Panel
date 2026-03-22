@@ -63,6 +63,7 @@ export default function FinanceModule({ firma, role }: Props) {
   const [expenseRecords, setExpenseRecords] = useState<ExpenseRecord[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedCompany, setSelectedCompany] = useState('ETM')
+  const [selectedCari, setSelectedCari] = useState('')
   const [activeTab, setActiveTab] = useState<FinanceTab>('gelir')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -211,9 +212,16 @@ export default function FinanceModule({ firma, role }: Props) {
 
   const projectName = (id: string) => projects.find((project) => project.id === id)?.ad || 'Bagli proje'
   const formatMoney = (value: number) => value.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL'
-  const visibleRecords = activeTab === 'gelir' ? incomeRecords : expenseRecords
   const filteredCari = useMemo(() => cariHesaplar.filter(c => !incomeForm.sirket || c.sirket === incomeForm.sirket), [cariHesaplar, incomeForm.sirket])
   const filteredCariExp = useMemo(() => cariHesaplar.filter(c => !expenseForm.sirket || c.sirket === expenseForm.sirket), [cariHesaplar, expenseForm.sirket])
+  const cariForFilter = useMemo(() => cariHesaplar.filter(c => !selectedCompany || c.sirket === selectedCompany), [cariHesaplar, selectedCompany])
+  const displayedIncome = useMemo(() =>
+    selectedCari ? incomeRecords.filter(r => (r.cari_unvan || '') === selectedCari) : incomeRecords,
+    [incomeRecords, selectedCari])
+  const displayedExpense = useMemo(() =>
+    selectedCari ? expenseRecords.filter(r => (r.tedarikci || '') === selectedCari) : expenseRecords,
+    [expenseRecords, selectedCari])
+  const visibleRecords = activeTab === 'gelir' ? displayedIncome : displayedExpense
 
   return (
     <div className="space-y-5">
@@ -221,8 +229,12 @@ export default function FinanceModule({ firma, role }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-xs uppercase tracking-[0.28em] text-slate-500">Finansal Operasyonlar</p><h3 className="mt-2 text-2xl font-semibold">Gelir ve Gider Kayitlari</h3></div>
           <div className="flex flex-wrap items-center gap-2">
-            <select className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none" value={selectedCompany} onChange={(e) => setSelectedCompany(e.target.value)}><option value="ETM">ETM</option><option value="BİNYAPI">BİNYAPI</option></select>
+            <select className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none" value={selectedCompany} onChange={(e) => { setSelectedCompany(e.target.value); setSelectedCari('') }}><option value="ETM">ETM</option><option value="BİNYAPI">BİNYAPI</option></select>
             <select className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none" value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}><option value="">Tum projeler</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.ad}</option>)}</select>
+            <select className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none" value={selectedCari} onChange={(e) => setSelectedCari(e.target.value)}>
+              <option value="">Tüm cari hesaplar</option>
+              {cariForFilter.map(c => <option key={c.id} value={c.ad}>{c.ad}</option>)}
+            </select>
             <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
             <button type="button" onClick={() => setActiveTab('gelir')} className={`rounded-2xl px-4 py-2 text-sm font-medium ${activeTab === 'gelir' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>Gelir</button>
             <button type="button" onClick={() => setActiveTab('gider')} className={`rounded-2xl px-4 py-2 text-sm font-medium ${activeTab === 'gider' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700'}`}>Gider</button>
@@ -232,7 +244,36 @@ export default function FinanceModule({ firma, role }: Props) {
 
         {error && <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
 
-        {loading ? <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">Finans kayitlari yukleniyor...</div> : visibleRecords.length === 0 ? <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center"><Receipt size={28} className="mx-auto text-slate-400" /><p className="mt-3 text-sm text-slate-600">Bu filtrede kayit bulunmuyor.</p></div> : <div className="mt-6 space-y-3">{activeTab === 'gelir' ? incomeRecords.map((record) => <FinanceRow key={record.id} title={record.cari_unvan || (record.kayit_turu === 'hakedis' ? 'Hakediş' : 'Diğer')} subtitle={`${projectName(record.proje_id)} • ${record.tarih}${record.evrak_no ? ` • No: ${record.evrak_no}` : ''}`} amount={formatMoney(Number(record.tutar || 0))} status={record.tahsilat_durumu} icon={<ArrowUpRight size={16} className="text-emerald-600" />} onEdit={() => openIncomeModal(record)} onDelete={() => deleteIncome(record.id)} canEdit={can(role, 'edit')} canDelete={can(role, 'delete')} companyBadge={record.sirket} />) : expenseRecords.map((record) => <FinanceRow key={record.id} title={record.tedarikci || record.kategori} subtitle={`${projectName(record.proje_id)} • ${record.tarih}${record.belge_no ? ` • No: ${record.belge_no}` : ''}`} amount={formatMoney(Number(record.tutar || 0))} status={record.odeme_durumu} icon={<ArrowDownRight size={16} className="text-rose-600" />} onEdit={() => openExpenseModal(record)} onDelete={() => deleteExpense(record.id)} canEdit={can(role, 'edit')} canDelete={can(role, 'delete')} companyBadge={record.sirket} />)}</div>}
+        {loading ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">Finans kayitlari yukleniyor...</div>
+        ) : visibleRecords.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center"><Receipt size={28} className="mx-auto text-slate-400" /><p className="mt-3 text-sm text-slate-600">Bu filtrede kayit bulunmuyor.</p></div>
+        ) : (
+          <div className="mt-6 space-y-3">
+            {activeTab === 'gelir'
+              ? displayedIncome.map((record) => (
+                  <FinanceRow key={record.id}
+                    cari={record.cari_unvan || ''}
+                    subtitle={`${projectName(record.proje_id)} • ${record.tarih}${record.evrak_no ? ` • No: ${record.evrak_no}` : ''} • ${record.kayit_turu === 'hakedis' ? 'Hakediş' : 'Diğer'}`}
+                    amount={formatMoney(Number(record.tutar || 0))}
+                    status={record.tahsilat_durumu}
+                    icon={<ArrowUpRight size={16} className="text-emerald-600" />}
+                    onEdit={() => openIncomeModal(record)} onDelete={() => deleteIncome(record.id)}
+                    canEdit={can(role, 'edit')} canDelete={can(role, 'delete')} companyBadge={record.sirket} />
+                ))
+              : displayedExpense.map((record) => (
+                  <FinanceRow key={record.id}
+                    cari={record.tedarikci || ''}
+                    subtitle={`${projectName(record.proje_id)} • ${record.tarih}${record.belge_no ? ` • No: ${record.belge_no}` : ''} • ${record.kategori}`}
+                    amount={formatMoney(Number(record.tutar || 0))}
+                    status={record.odeme_durumu}
+                    icon={<ArrowDownRight size={16} className="text-rose-600" />}
+                    onEdit={() => openExpenseModal(record)} onDelete={() => deleteExpense(record.id)}
+                    canEdit={can(role, 'edit')} canDelete={can(role, 'delete')} companyBadge={record.sirket} />
+                ))
+            }
+          </div>
+        )}
       </div>
 
       {incomeModal && can(role, 'edit') && (
@@ -272,9 +313,15 @@ export default function FinanceModule({ firma, role }: Props) {
               <FormField label="Vade"><input type="date" className={inputCls} value={incomeForm.vade_tarihi} onChange={(e) => setIncomeForm({ ...incomeForm, vade_tarihi: e.target.value })} /></FormField>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Cari Unvan">
-                <input list="cari-list-income" className={inputCls} value={incomeForm.cari_unvan} onChange={(e) => setIncomeForm({ ...incomeForm, cari_unvan: e.target.value })} placeholder="Seçin veya yazın..." />
-                <datalist id="cari-list-income">{filteredCari.map(c => <option key={c.id} value={c.ad} />)}</datalist>
+              <FormField label="Cari Hesap">
+                <select className={inputCls} value={incomeForm.cari_unvan} onChange={(e) => setIncomeForm({ ...incomeForm, cari_unvan: e.target.value })}>
+                  <option value="" className="bg-slate-900 text-white">-- Seçin --</option>
+                  {filteredCari.map(c => <option key={c.id} value={c.ad} className="bg-slate-900 text-white">{c.ad}</option>)}
+                  <option value={incomeForm.cari_unvan && !filteredCari.some(c => c.ad === incomeForm.cari_unvan) ? incomeForm.cari_unvan : '__other__'} className="bg-slate-900 text-slate-400">Diğer (manuel)...</option>
+                </select>
+                {incomeForm.cari_unvan === '__other__' || (incomeForm.cari_unvan && !filteredCari.some(c => c.ad === incomeForm.cari_unvan)) ? (
+                  <input className={inputCls + ' mt-2'} placeholder="Cari unvan yazın..." value={incomeForm.cari_unvan === '__other__' ? '' : incomeForm.cari_unvan} onChange={(e) => setIncomeForm({ ...incomeForm, cari_unvan: e.target.value })} />
+                ) : null}
               </FormField>
               <FormField label="Evrak No"><input className={inputCls} value={incomeForm.evrak_no} onChange={(e) => setIncomeForm({ ...incomeForm, evrak_no: e.target.value })} /></FormField>
             </div>
@@ -321,9 +368,15 @@ export default function FinanceModule({ firma, role }: Props) {
               <FormField label="Vade"><input type="date" className={inputCls} value={expenseForm.vade_tarihi} onChange={(e) => setExpenseForm({ ...expenseForm, vade_tarihi: e.target.value })} /></FormField>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Tedarikci / Cari Unvan">
-                <input list="cari-list-expense" className={inputCls} value={expenseForm.tedarikci} onChange={(e) => setExpenseForm({ ...expenseForm, tedarikci: e.target.value })} placeholder="Seçin veya yazın..." />
-                <datalist id="cari-list-expense">{filteredCariExp.map(c => <option key={c.id} value={c.ad} />)}</datalist>
+              <FormField label="Cari Hesap / Tedarikci">
+                <select className={inputCls} value={expenseForm.tedarikci} onChange={(e) => setExpenseForm({ ...expenseForm, tedarikci: e.target.value })}>
+                  <option value="" className="bg-slate-900 text-white">-- Seçin --</option>
+                  {filteredCariExp.map(c => <option key={c.id} value={c.ad} className="bg-slate-900 text-white">{c.ad}</option>)}
+                  <option value={expenseForm.tedarikci && !filteredCariExp.some(c => c.ad === expenseForm.tedarikci) ? expenseForm.tedarikci : '__other__'} className="bg-slate-900 text-slate-400">Diğer (manuel)...</option>
+                </select>
+                {expenseForm.tedarikci === '__other__' || (expenseForm.tedarikci && !filteredCariExp.some(c => c.ad === expenseForm.tedarikci)) ? (
+                  <input className={inputCls + ' mt-2'} placeholder="Tedarikci adı yazın..." value={expenseForm.tedarikci === '__other__' ? '' : expenseForm.tedarikci} onChange={(e) => setExpenseForm({ ...expenseForm, tedarikci: e.target.value })} />
+                ) : null}
               </FormField>
               <FormField label="Belge No"><input className={inputCls} value={expenseForm.belge_no} onChange={(e) => setExpenseForm({ ...expenseForm, belge_no: e.target.value })} /></FormField>
             </div>
@@ -336,6 +389,31 @@ export default function FinanceModule({ firma, role }: Props) {
   )
 }
 
-function FinanceRow({ title, subtitle, amount, status, icon, onEdit, onDelete, canEdit, canDelete, companyBadge }: { title: string; subtitle: string; amount: string; status: string; icon: ReactNode; onEdit: () => void; onDelete: () => void; canEdit: boolean; canDelete: boolean; companyBadge?: string | null }) {
-  return <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-5"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white">{icon}</div><div className="min-w-0"><div className="flex items-center gap-2"><p className="text-sm font-semibold text-slate-900">{title}</p>{companyBadge && <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${companyBadge === 'ETM' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'}`}>{companyBadge}</span>}</div><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div></div><div className="flex flex-wrap items-center gap-3"><div className="text-right"><p className="text-sm font-semibold text-slate-900">{amount}</p><p className="mt-1 text-xs uppercase tracking-[0.22em] text-slate-500">{status}</p></div>{canEdit && <button type="button" onClick={onEdit} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">Duzenle</button>}{canDelete && <button type="button" onClick={onDelete} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-rose-700"><Trash2 size={14} />Sil</button>}</div></div>
+function FinanceRow({ cari, subtitle, amount, status, icon, onEdit, onDelete, canEdit, canDelete, companyBadge }: { cari: string; subtitle: string; amount: string; status: string; icon: ReactNode; onEdit: () => void; onDelete: () => void; canEdit: boolean; canDelete: boolean; companyBadge?: string | null }) {
+  const cariLabel = cari && cari !== '—' ? cari : null
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white shrink-0">{icon}</div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {cariLabel
+              ? <p className="text-sm font-semibold text-slate-900">{cariLabel}</p>
+              : <p className="text-sm font-medium text-slate-400 italic">Cari belirtilmemiş</p>
+            }
+            {companyBadge && <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest ${companyBadge === 'ETM' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'}`}>{companyBadge}</span>}
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="text-right">
+          <p className="text-sm font-semibold text-slate-900">{amount}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.22em] text-slate-500">{status}</p>
+        </div>
+        {canEdit && <button type="button" onClick={onEdit} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">Duzenle</button>}
+        {canDelete && <button type="button" onClick={onDelete} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-rose-700"><Trash2 size={14} />Sil</button>}
+      </div>
+    </div>
+  )
 }
