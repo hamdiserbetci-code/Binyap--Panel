@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ArrowDownRight, ArrowUpRight, Plus, Receipt, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
@@ -42,6 +42,12 @@ interface ExpenseRecord {
   aciklama: string | null
 }
 
+interface CariHesap {
+  id: string
+  ad: string
+  sirket: string
+}
+
 interface Props {
   firma: FirmaRecord
   role?: string | null
@@ -52,6 +58,7 @@ const expenseFormInitial = { proje_id: '', sirket: 'ETM', kategori: 'malzeme', t
 
 export default function FinanceModule({ firma, role }: Props) {
   const [projects, setProjects] = useState<ProjectRecord[]>([])
+  const [cariHesaplar, setCariHesaplar] = useState<CariHesap[]>([])
   const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([])
   const [expenseRecords, setExpenseRecords] = useState<ExpenseRecord[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
@@ -73,6 +80,11 @@ export default function FinanceModule({ firma, role }: Props) {
       return
     }
     setProjects((data as ProjectRecord[]) || [])
+  }, [firma.id])
+
+  const fetchCariHesaplar = useCallback(async () => {
+    const { data } = await supabase.from('cari_hesaplar').select('id, ad, sirket').eq('firma_id', firma.id).order('ad')
+    setCariHesaplar((data as CariHesap[]) || [])
   }, [firma.id])
 
   const fetchFinanceData = useCallback(async () => {
@@ -107,6 +119,7 @@ export default function FinanceModule({ firma, role }: Props) {
   }, [firma.id, selectedProjectId, selectedCompany])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
+  useEffect(() => { fetchCariHesaplar() }, [fetchCariHesaplar])
   useEffect(() => { fetchFinanceData() }, [fetchFinanceData])
 
   function openIncomeModal(record?: IncomeRecord) {
@@ -199,6 +212,8 @@ export default function FinanceModule({ firma, role }: Props) {
   const projectName = (id: string) => projects.find((project) => project.id === id)?.ad || 'Bagli proje'
   const formatMoney = (value: number) => value.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL'
   const visibleRecords = activeTab === 'gelir' ? incomeRecords : expenseRecords
+  const filteredCari = useMemo(() => cariHesaplar.filter(c => !incomeForm.sirket || c.sirket === incomeForm.sirket), [cariHesaplar, incomeForm.sirket])
+  const filteredCariExp = useMemo(() => cariHesaplar.filter(c => !expenseForm.sirket || c.sirket === expenseForm.sirket), [cariHesaplar, expenseForm.sirket])
 
   return (
     <div className="space-y-5">
@@ -257,7 +272,10 @@ export default function FinanceModule({ firma, role }: Props) {
               <FormField label="Vade"><input type="date" className={inputCls} value={incomeForm.vade_tarihi} onChange={(e) => setIncomeForm({ ...incomeForm, vade_tarihi: e.target.value })} /></FormField>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Cari Unvan"><input className={inputCls} value={incomeForm.cari_unvan} onChange={(e) => setIncomeForm({ ...incomeForm, cari_unvan: e.target.value })} /></FormField>
+              <FormField label="Cari Unvan">
+                <input list="cari-list-income" className={inputCls} value={incomeForm.cari_unvan} onChange={(e) => setIncomeForm({ ...incomeForm, cari_unvan: e.target.value })} placeholder="Seçin veya yazın..." />
+                <datalist id="cari-list-income">{filteredCari.map(c => <option key={c.id} value={c.ad} />)}</datalist>
+              </FormField>
               <FormField label="Evrak No"><input className={inputCls} value={incomeForm.evrak_no} onChange={(e) => setIncomeForm({ ...incomeForm, evrak_no: e.target.value })} /></FormField>
             </div>
             <FormField label="Tahsilat Durumu"><select className={inputCls} value={incomeForm.tahsilat_durumu} onChange={(e) => setIncomeForm({ ...incomeForm, tahsilat_durumu: e.target.value })}><option value="bekleniyor" className="bg-slate-900 text-white">Bekleniyor</option><option value="kismi" className="bg-slate-900 text-white">Kismi</option><option value="tahsil_edildi" className="bg-slate-900 text-white">Tahsil edildi</option></select></FormField>
@@ -303,7 +321,10 @@ export default function FinanceModule({ firma, role }: Props) {
               <FormField label="Vade"><input type="date" className={inputCls} value={expenseForm.vade_tarihi} onChange={(e) => setExpenseForm({ ...expenseForm, vade_tarihi: e.target.value })} /></FormField>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Tedarikci"><input className={inputCls} value={expenseForm.tedarikci} onChange={(e) => setExpenseForm({ ...expenseForm, tedarikci: e.target.value })} /></FormField>
+              <FormField label="Tedarikci / Cari Unvan">
+                <input list="cari-list-expense" className={inputCls} value={expenseForm.tedarikci} onChange={(e) => setExpenseForm({ ...expenseForm, tedarikci: e.target.value })} placeholder="Seçin veya yazın..." />
+                <datalist id="cari-list-expense">{filteredCariExp.map(c => <option key={c.id} value={c.ad} />)}</datalist>
+              </FormField>
               <FormField label="Belge No"><input className={inputCls} value={expenseForm.belge_no} onChange={(e) => setExpenseForm({ ...expenseForm, belge_no: e.target.value })} /></FormField>
             </div>
             <FormField label="Odeme Durumu"><select className={inputCls} value={expenseForm.odeme_durumu} onChange={(e) => setExpenseForm({ ...expenseForm, odeme_durumu: e.target.value })}><option value="bekleniyor" className="bg-slate-900 text-white">Bekleniyor</option><option value="kismi" className="bg-slate-900 text-white">Kismi</option><option value="odendi" className="bg-slate-900 text-white">Odendi</option></select></FormField>

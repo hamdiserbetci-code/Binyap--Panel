@@ -307,88 +307,100 @@ export default function Page() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--page-bg)] text-slate-100">
-      <div className="fixed inset-0 -z-10 bg-[#020617]">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:32px_40px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-        <div className="absolute top-0 right-0 -mr-[10%] -mt-[10%] h-[60%] w-[60%] rounded-full bg-indigo-500/10 blur-[120px]"></div>
-        <div className="absolute bottom-0 left-0 -ml-[10%] -mb-[10%] h-[60%] w-[60%] rounded-full bg-sky-500/10 blur-[120px]"></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[40%] w-[40%] rounded-full bg-blue-500/5 blur-[150px]"></div>
+    <div className="flex h-screen overflow-hidden text-slate-100" style={{ background: '#020617', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif' }}>
+
+      {/* ── Arka plan efektleri ── */}
+      <div className="fixed inset-0 -z-10" style={{ background: '#020617' }}>
+        <div className="absolute top-0 right-0 w-1/2 h-1/2 rounded-full opacity-10 blur-[120px]" style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
+        <div className="absolute bottom-0 left-0 w-1/2 h-1/2 rounded-full opacity-10 blur-[120px]" style={{ background: 'radial-gradient(circle, #0ea5e9, transparent)' }} />
       </div>
 
-      <div className="mx-auto flex min-h-screen w-full flex-col gap-4 px-4 py-4 lg:gap-6 lg:px-6 lg:py-6 2xl:px-12">
-        <header className="flex flex-col md:flex-row items-center w-full rounded-2xl border border-white/[0.05] bg-slate-900/50 p-2 backdrop-blur-xl sticky top-4 lg:top-6 z-40 shadow-lg ring-1 ring-white/5 transition-all duration-300 gap-2">
-          <div className="flex items-center justify-between w-full md:w-auto md:border-r border-white/5 md:pr-4 shrink-0">
-            <div className="flex items-center gap-3 pl-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm ring-1 ring-white/10">
-                <Briefcase size={18} strokeWidth={2.5} />
-              </div>
-              <div>
-                <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-blue-400/80">ETM-BİNYAPI</p>
-                <h1 className="text-xs font-bold tracking-tight text-slate-100">ERP Sistemi</h1>
-              </div>
-            </div>
-            <button type="button" onClick={signOut} className="md:hidden flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20">
-              <LogOut size={14} />
-            </button>
+      {/* ══ SOL SIDEBAR ════════════════════════════════════════════════════════ */}
+      <aside className="w-[220px] shrink-0 flex flex-col h-screen z-30" style={{ background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+
+        {/* Logo */}
+        <div className="px-4 py-5 flex items-center gap-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)' }}>
+            <Briefcase size={15} strokeWidth={2.5} className="text-white" />
           </div>
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: '#5B9FFF' }}>ETM · BİNYAPI</p>
+            <p className="text-[12px] font-semibold leading-tight" style={{ color: '#E8EAED' }}>ERP Sistemi</p>
+          </div>
+        </div>
 
-          <nav className="flex-1 flex items-center justify-start gap-1 overflow-x-auto w-full px-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {visibleModules.map((item) => {
-              const Icon = item.icon
-              const isActive = item.id === activeModule
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveModule(item.id)}
-                  title={item.label}
-                  className={`group relative flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[13px] font-medium transition-all shrink-0 ${
-                    isActive
-                      ? 'text-white bg-white/10 shadow-sm ring-1 ring-white/5'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                  }`}
-                >
-                  <Icon size={16} className={isActive ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-slate-500 group-hover:text-slate-300'} />
-                  {item.shortLabel}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-t-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-                  )}
-                </button>
-              )
-            })}
-          </nav>
-
-          <div className="hidden md:flex items-center gap-3 shrink-0 border-l border-white/5 pl-4 pr-2">
-            <div className="flex flex-col items-end">
-              <p className="truncate text-[11px] font-medium text-slate-200 max-w-[120px]">{user.email}</p>
+        {/* Navigasyon */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 [&::-webkit-scrollbar]:hidden">
+          {visibleModules.map((item) => {
+            const Icon = item.icon
+            const isActive = item.id === activeModule
+            return (
               <button
+                key={item.id}
                 type="button"
-                onClick={signOut}
-                className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500 transition hover:text-rose-400"
+                onClick={() => setActiveModule(item.id)}
+                title={item.label}
+                className="w-full flex items-center gap-3 rounded-xl transition-all duration-150 text-left"
+                style={isActive
+                  ? { background: 'rgba(91,159,255,0.12)', borderLeft: '2px solid #5B9FFF', padding: '9px 12px 9px 10px' }
+                  : { borderLeft: '2px solid transparent', padding: '9px 12px' }}
               >
-                <LogOut size={10} />
-                Güvenli Çıkış
+                <Icon size={15} style={{ color: isActive ? '#5B9FFF' : '#5F6368', flexShrink: 0 }} />
+                <span className="text-[13px] font-medium" style={{ color: isActive ? '#E8EAED' : '#9AA0A6' }}>
+                  {item.shortLabel}
+                </span>
               </button>
-            </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300 ring-1 ring-white/10 shrink-0">
+            )
+          })}
+        </nav>
+
+        {/* Kullanıcı + Çıkış */}
+        <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: '#1A2535', color: '#9AA0A6', border: '1px solid rgba(255,255,255,0.08)' }}>
               {user.email?.charAt(0).toUpperCase() || 'U'}
             </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-medium truncate" style={{ color: '#9AA0A6' }}>{user.email}</p>
+              {profile?.rol && <p className="text-[9px] capitalize" style={{ color: '#5F6368' }}>{roleLabels[profile.rol] ?? profile.rol}</p>}
+            </div>
           </div>
-        </header>
+          <button
+            type="button"
+            onClick={signOut}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium transition-all duration-150 group"
+            style={{ color: '#5F6368' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#EA4335'; e.currentTarget.style.background = 'rgba(234,67,53,0.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#5F6368'; e.currentTarget.style.background = 'transparent' }}
+          >
+            <LogOut size={12} />Güvenli Çıkış
+          </button>
+        </div>
+      </aside>
 
-        <main className="flex-1 flex flex-col min-w-0">
-          <div className="flex justify-end mb-4">
-            {firma && <NotificationCenter firma={firma} />}
+      {/* ══ ANA İÇERİK ═════════════════════════════════════════════════════════ */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Üst bar: bildirimler + hata */}
+        {(firma || error) && (
+          <div className="shrink-0 flex items-center justify-between px-6 py-3 gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div className="flex-1">
+              {error && (
+                <p className="rounded-xl px-4 py-2 text-xs" style={{ background: 'rgba(234,67,53,0.08)', border: '1px solid rgba(234,67,53,0.2)', color: '#EA4335' }}>{error}</p>
+              )}
+            </div>
+            <div className="shrink-0">
+              {firma && <NotificationCenter firma={firma} />}
+            </div>
           </div>
-          {error && <p className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-200">{error}</p>}
+        )}
 
-          <section className="flex-1">
-            {firma ? renderModule(activeModule, firma, profile, setFirma) : (
-              <div className="rounded-[32px] border border-white/[0.08] bg-white/[0.04] p-6 text-slate-200 shadow-2xl backdrop-blur-3xl ring-1 ring-white/10">
-                Firma bulunamadi.
-              </div>
-            )}
-          </section>
+        {/* Modül içeriği */}
+        <main className="flex-1 overflow-auto p-4 lg:p-5">
+          {firma ? renderModule(activeModule, firma, profile, setFirma) : (
+            <div className="rounded-2xl p-6 text-sm" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#9AA0A6' }}>
+              Firma bulunamadı.
+            </div>
+          )}
         </main>
       </div>
     </div>
