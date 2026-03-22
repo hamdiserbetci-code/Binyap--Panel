@@ -325,7 +325,7 @@ export default function Page() {
           </div>
           <div className="min-w-0">
             <p className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: '#5B9FFF' }}>ETM · BİNYAPI</p>
-            <p className="text-[12px] font-semibold leading-tight" style={{ color: '#E8EAED' }}>ERP Sistemi</p>
+            <p className="text-[12px] font-semibold leading-tight" style={{ color: '#E8EAED' }}>ERP v2.1</p>
           </div>
         </div>
 
