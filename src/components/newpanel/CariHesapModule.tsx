@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, ChevronRight, Search, RefreshCw, Loader2, CheckCircle2, AlertCircle, Upload, FileSpreadsheet, X, SlidersHorizontal } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronRight, Search, RefreshCw, Loader2, CheckCircle2, AlertCircle, Upload, FileSpreadsheet, X, SlidersHorizontal, Eye, EyeOff } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
@@ -20,6 +20,7 @@ interface CariHareket {
   tutar: number; kdv_tutari?: number | null; stopaj_tutari?: number | null; tarih: string; vade_tarihi: string | null
   belge_no: string | null; aciklama: string | null
   cek_no: string | null; cek_banka: string | null; durum: string
+  incelendi?: boolean | null
 }
 
 interface Props { firma: FirmaRecord; role?: string | null }
@@ -805,6 +806,12 @@ export default function CariHesapModule({ firma, role }: Props) {
     setHareketModal(false); fetchHareketler(selectedId)
   }
 
+  async function toggleIncelendi(h: CariHareket) {
+    const { error } = await supabase.from('cari_hareketler').update({ incelendi: !h.incelendi }).eq('id', h.id)
+    if (error) { if (!error.message.includes('incelendi')) setError(error.message); return }
+    setHareketler(prev => prev.map(x => x.id === h.id ? { ...x, incelendi: !h.incelendi } : x))
+  }
+
   async function deleteHareket(id: string) {
     if (!confirm('Bu hareketi silmek istediğinize emin misiniz?')) return
     await supabase.from('cari_hareketler').delete().eq('id', id)
@@ -830,6 +837,7 @@ export default function CariHesapModule({ firma, role }: Props) {
   const [fTutarMax, setFTutarMax] = useState('')
   const [fAciklama, setFAciklama] = useState('')
   const [fYon, setFYon] = useState<'all' | 'borc' | 'alacak'>('all')
+  const [fInceleme, setFInceleme] = useState<'tumu' | 'incelenmemis' | 'incelendi'>('tumu')
 
   const BORC_TURLERI = ['alis_fatura', 'diger_borc', 'odeme_nakit', 'odeme_cek']
 
@@ -858,15 +866,17 @@ export default function CariHesapModule({ firma, role }: Props) {
     if (fTutarMax) result = result.filter(h => (Number(h.tutar || 0) + Number(h.kdv_tutari || 0)) <= Number(fTutarMax))
     if (fYon === 'borc') result = result.filter(h => BORC_TURLERI.includes(h.hareket_turu))
     if (fYon === 'alacak') result = result.filter(h => !BORC_TURLERI.includes(h.hareket_turu))
+    if (fInceleme === 'incelendi') result = result.filter(h => h.incelendi)
+    if (fInceleme === 'incelenmemis') result = result.filter(h => !h.incelendi)
     return result
-  }, [hareketler, fTarihBas, fTarihBit, fTurler, fAciklama, fTutarMin, fTutarMax, fYon])
+  }, [hareketler, fTarihBas, fTarihBit, fTurler, fAciklama, fTutarMin, fTutarMax, fYon, fInceleme])
 
   const activeFilterCount = [fTarihBas, fTarihBit, fAciklama, fTutarMin, fTutarMax,
-    fTurler.length > 0 ? 'x' : '', fYon !== 'all' ? 'x' : ''].filter(Boolean).length
+    fTurler.length > 0 ? 'x' : '', fYon !== 'all' ? 'x' : '', fInceleme !== 'tumu' ? 'x' : ''].filter(Boolean).length
 
   function clearFilters() {
     setFTarihBas(''); setFTarihBit(''); setFTurler([])
-    setFTutarMin(''); setFTutarMax(''); setFAciklama(''); setFYon('all')
+    setFTutarMin(''); setFTutarMax(''); setFAciklama(''); setFYon('all'); setFInceleme('tumu')
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1080,6 +1090,7 @@ export default function CariHesapModule({ firma, role }: Props) {
                               { label: 'Borç', w: '120px', align: 'right' },
                               { label: 'Alacak', w: '120px', align: 'right' },
                               { label: 'Kalan Bakiye', w: '130px', align: 'right' },
+                              { label: 'İnceleme', w: '80px', align: 'center' },
                             ].map(col => (
                               <th key={col.label} className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
                                 style={{ color: '#5F6368', textAlign: col.align as any, width: col.w, minWidth: col.w !== 'auto' ? col.w : undefined }}>
@@ -1140,6 +1151,21 @@ export default function CariHesapModule({ firma, role }: Props) {
                                 <td className="px-4 py-3 text-right text-[12px] font-bold tabular-nums whitespace-nowrap" style={{ color: balPos ? '#5B9FFF' : '#EA4335' }}>
                                   {money(Math.abs(runBal))}
                                   <span className="text-[9px] font-normal ml-1 opacity-50">{balPos ? 'A' : 'B'}</span>
+                                </td>
+
+                                {/* İnceleme */}
+                                <td className="px-2 py-3 text-center">
+                                  <button
+                                    onClick={() => toggleIncelendi(h)}
+                                    title={h.incelendi ? 'İncelendi — tekrar işaretle' : 'İncelenmedi — işaretle'}
+                                    className="inline-flex items-center justify-center rounded-lg w-7 h-7 transition-all"
+                                    style={h.incelendi
+                                      ? { background: 'rgba(52,168,83,0.12)', color: '#34A853', border: '1px solid rgba(52,168,83,0.25)' }
+                                      : { background: 'transparent', color: '#3C4550', border: '1px solid rgba(255,255,255,0.06)' }}
+                                    onMouseEnter={e => { if (!h.incelendi) e.currentTarget.style.color = '#9AA0A6' }}
+                                    onMouseLeave={e => { if (!h.incelendi) e.currentTarget.style.color = '#3C4550' }}>
+                                    {h.incelendi ? <Eye size={11} /> : <EyeOff size={11} />}
+                                  </button>
                                 </td>
 
                                 {can(role, 'edit') && (
@@ -1234,6 +1260,27 @@ export default function CariHesapModule({ firma, role }: Props) {
                           <input value={fAciklama} onChange={e => setFAciklama(e.target.value)} placeholder="Metinde ara..."
                             className="w-full rounded-lg text-[11px] outline-none placeholder:text-[#3C4550]"
                             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#E8EAED', padding: '6px 10px 6px 28px' }} />
+                        </div>
+                      </div>
+
+                      {/* İnceleme Durumu */}
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest mb-2.5" style={{ color: '#5F6368' }}>İnceleme Durumu</p>
+                        <div className="flex flex-col gap-1.5">
+                          {([
+                            { id: 'tumu', label: 'Tümü', color: '#9AA0A6' },
+                            { id: 'incelenmemis', label: 'İncelenmemiş', color: '#F9AB00' },
+                            { id: 'incelendi', label: 'İncelendi', color: '#34A853' },
+                          ] as const).map(opt => (
+                            <button key={opt.id} onClick={() => setFInceleme(opt.id)}
+                              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[12px] font-medium transition-all text-left"
+                              style={fInceleme === opt.id
+                                ? { background: 'rgba(91,159,255,0.1)', border: '1px solid rgba(91,159,255,0.25)', color: '#5B9FFF' }
+                                : { background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: '#5F6368' }}>
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: opt.color }} />
+                              {opt.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
