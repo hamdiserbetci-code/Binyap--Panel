@@ -13,8 +13,6 @@ interface Props { firma: FirmaRecord; role?: string | null }
 
 const MODULLER = [
   { id: 'projeler',      label: 'Projeler',              icon: '📁', renk: 'blue',    aciklama: 'Proje kayıtları, bütçe ve durum bilgileri' },
-  { id: 'gelir',         label: 'Gelir Kayıtları',       icon: '📈', renk: 'emerald', aciklama: 'Fatura, hakediş ve diğer gelir kalemleri' },
-  { id: 'gider',         label: 'Gider Kayıtları',       icon: '📉', renk: 'rose',    aciklama: 'Malzeme, işçilik ve tüm gider kalemleri' },
   { id: 'cari_hareket',  label: 'Cari Hesap Hareketleri',icon: '🤝', renk: 'cyan',    aciklama: 'Seçili cari hesabın tüm hareketleri (veya tümü)' },
   { id: 'cari_bakiye',   label: 'Cari Hesap Bakiyeleri', icon: '⚖️', renk: 'teal',    aciklama: 'Tüm cari hesapların borç/alacak/net bakiye özeti' },
   { id: 'banka',         label: 'Banka Hareketleri',     icon: '🏦', renk: 'indigo',  aciklama: 'Banka hesap hareketleri ve bakiyeleri' },
@@ -172,22 +170,6 @@ async function fetchModulRows(
     q = addSirket(q)
     const rows = await run(q)
     return rows.map(r => ({ Kod: r.kod || '', Proje: r.ad, Durum: r.durum, Şirket: r.sirket || 'ETM', Başlangıç: r.baslangic_tarihi || '', Bitiş: r.bitis_tarihi || '', 'Bütçe (₺)': Number(r.butce || 0), Lokasyon: r.lokasyon || '', Açıklama: r.aciklama || '' }))
-  }
-
-  if (id === 'gelir') {
-    let q = supabase.from('gelir_kayitlari').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
-    if (projectId) q = q.eq('proje_id', projectId)
-    q = addSirket(q); q = addTarih(q, 'tarih')
-    const rows = await run(q)
-    return rows.map(r => ({ Proje: projLabel(r.proje_id), 'Cari Ünvan': r.cari_unvan || '', Tarih: r.tarih || '', 'Kayıt Türü': r.kayit_turu || '', 'Evrak No': r.evrak_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Tahsilat Durumu': r.tahsilat_durumu || '', Açıklama: r.aciklama || '' }))
-  }
-
-  if (id === 'gider') {
-    let q = supabase.from('gider_kayitlari').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
-    if (projectId) q = q.eq('proje_id', projectId)
-    q = addSirket(q); q = addTarih(q, 'tarih')
-    const rows = await run(q)
-    return rows.map(r => ({ Proje: projLabel(r.proje_id), Tedarikçi: r.tedarikci || '', Tarih: r.tarih || '', Kategori: r.kategori || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Ödeme Durumu': r.odeme_durumu || '', Açıklama: r.aciklama || '' }))
   }
 
   // Cari hesaplar - ortak hesap haritası
