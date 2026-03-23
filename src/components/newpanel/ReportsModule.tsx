@@ -62,81 +62,93 @@ async function fetchModulRows(
   projects: ProjectRecord[],
   projectId: string
 ): Promise<Record<string, unknown>[]> {
-  const isEtm = (s: string | null | undefined) => !s || s === 'ETM'
-  const matchSirket = (s: string | null | undefined) => sirket === 'ETM' ? isEtm(s) : s === sirket
   const projLabel = (pid: string | null | undefined) => projects.find(p => p.id === pid)?.ad || 'Genel'
+
+  // Supabase tarafında sirket filtresi
+  function addSirketFilter(q: any) {
+    return sirket === 'ETM'
+      ? q.or('sirket.eq.ETM,sirket.is.null')
+      : q.eq('sirket', sirket)
+  }
+
+  async function run(q: any) {
+    const { data, error } = await q
+    if (error) throw new Error(error.message)
+    return (data || []) as any[]
+  }
 
   if (id === 'projeler') {
     let q = supabase.from('projeler').select('*').eq('firma_id', firmaId).order('ad')
     if (projectId) q = q.eq('id', projectId)
-    const { data } = await q
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Kod: r.kod || '', Proje: r.ad, Durum: r.durum, Şirket: r.sirket || 'ETM', Başlangıç: r.baslangic_tarihi || '', Bitiş: r.bitis_tarihi || '', 'Bütçe (₺)': Number(r.butce || 0), Lokasyon: r.lokasyon || '', Açıklama: r.aciklama || '' }))
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Kod: r.kod || '', Proje: r.ad, Durum: r.durum, Şirket: r.sirket || 'ETM', Başlangıç: r.baslangic_tarihi || '', Bitiş: r.bitis_tarihi || '', 'Bütçe (₺)': Number(r.butce || 0), Lokasyon: r.lokasyon || '', Açıklama: r.aciklama || '' }))
   }
 
   if (id === 'gelir') {
     let q = supabase.from('gelir_kayitlari').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
     if (projectId) q = q.eq('proje_id', projectId)
-    const { data } = await q
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Proje: projLabel(r.proje_id), 'Cari Ünvan': r.cari_unvan || '', Tarih: r.tarih || '', 'Kayıt Türü': r.kayit_turu || '', 'Evrak No': r.evrak_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Tahsilat Durumu': r.tahsilat_durumu || '', Açıklama: r.aciklama || '' }))
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Proje: projLabel(r.proje_id), 'Cari Ünvan': r.cari_unvan || '', Tarih: r.tarih || '', 'Kayıt Türü': r.kayit_turu || '', 'Evrak No': r.evrak_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Tahsilat Durumu': r.tahsilat_durumu || '', Açıklama: r.aciklama || '' }))
   }
 
   if (id === 'gider') {
     let q = supabase.from('gider_kayitlari').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
     if (projectId) q = q.eq('proje_id', projectId)
-    const { data } = await q
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Proje: projLabel(r.proje_id), Tedarikçi: r.tedarikci || '', Tarih: r.tarih || '', Kategori: r.kategori || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Ödeme Durumu': r.odeme_durumu || '', Açıklama: r.aciklama || '' }))
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Proje: projLabel(r.proje_id), Tedarikçi: r.tedarikci || '', Tarih: r.tarih || '', Kategori: r.kategori || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Ödeme Durumu': r.odeme_durumu || '', Açıklama: r.aciklama || '' }))
   }
 
   if (id === 'cari') {
-    const hesaplarRes = await supabase.from('cari_hesaplar').select('id, Reklam, sirket').eq('firma_id', firmaId)
-    const hareketlerRes = await supabase.from('cari_hareketler').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
-    const hesapMap = new Map(((hesaplarRes.data || []) as any[]).map(c => [c.id, c]))
-    return ((hareketlerRes.data || []) as any[])
-      .filter(r => { const h = hesapMap.get(r.cari_hesap_id) as any; return matchSirket(h?.sirket) })
-      .map(r => {
-        const h = hesapMap.get(r.cari_hesap_id) as any
-        return { 'Cari Adı': h?.Reklam || '—', Şirket: h?.sirket || 'ETM', Tarih: r.tarih || '', 'Hareket Türü': r.hareket_turu || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Vade Tarihi': r.vade_tarihi || '', 'Çek No': r.cek_no || '', 'Çek Banka': r.cek_banka || '', Durum: r.durum || '', Açıklama: r.aciklama || '' }
-      })
+    // cari_hesaplar join ile hesapların sirket filtresi uygulanır
+    const hesapQ = sirket === 'ETM'
+      ? supabase.from('cari_hesaplar').select('id, Reklam, sirket').eq('firma_id', firmaId).or('sirket.eq.ETM,sirket.is.null')
+      : supabase.from('cari_hesaplar').select('id, Reklam, sirket').eq('firma_id', firmaId).eq('sirket', sirket)
+    const { data: hesapData, error: hesapErr } = await hesapQ
+    if (hesapErr) throw new Error(hesapErr.message)
+    const hesapMap = new Map(((hesapData || []) as any[]).map(c => [c.id, c]))
+    const hesapIds = Array.from(hesapMap.keys())
+    if (hesapIds.length === 0) return []
+    const { data: hareketData, error: hareketErr } = await supabase
+      .from('cari_hareketler').select('*').in('cari_hesap_id', hesapIds).order('tarih', { ascending: false })
+    if (hareketErr) throw new Error(hareketErr.message)
+    return ((hareketData || []) as any[]).map(r => {
+      const h = hesapMap.get(r.cari_hesap_id) as any
+      return { 'Cari Adı': h?.Reklam || '—', Şirket: h?.sirket || 'ETM', Tarih: r.tarih || '', 'Hareket Türü': r.hareket_turu || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Vade Tarihi': r.vade_tarihi || '', 'Çek No': r.cek_no || '', 'Çek Banka': r.cek_banka || '', Durum: r.durum || '', Açıklama: r.aciklama || '' }
+    })
   }
 
   if (id === 'kasa') {
     let q = supabase.from('kasa_hareketleri').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
     if (projectId) q = q.eq('proje_id', projectId)
-    const { data } = await q
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Proje: projLabel(r.proje_id), Kanal: r.kanal || '', 'Hareket Türü': r.hareket_turu || '', Tarih: r.tarih || '', 'Tutar (₺)': Number(r.tutar || 0), 'Fiş No': r.fis_no || '', Açıklama: r.aciklama || '' }))
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Proje: projLabel(r.proje_id), Kanal: r.kanal || '', 'Hareket Türü': r.hareket_turu || '', Tarih: r.tarih || '', 'Tutar (₺)': Number(r.tutar || 0), 'Fiş No': r.fis_no || '', Açıklama: r.aciklama || '' }))
   }
 
   if (id === 'puantaj') {
     let q = supabase.from('puantaj_kayitlari').select('*').eq('firma_id', firmaId).order('tarih', { ascending: false })
     if (projectId) q = q.eq('proje_id', projectId)
-    const { data } = await q
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Proje: projLabel(r.proje_id), 'Çalışan': r.calisan_id || '', Tarih: r.tarih || '', Durum: r.durum || '', 'Mesai (saat)': Number(r.mesai_saati || 0), 'Yevmiye (₺)': Number(r.yevmiye || 0), Açıklama: r.aciklama || '' }))
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Proje: projLabel(r.proje_id), 'Çalışan': r.calisan_id || '', Tarih: r.tarih || '', Durum: r.durum || '', 'Mesai (saat)': Number(r.mesai_saati || 0), 'Yevmiye (₺)': Number(r.yevmiye || 0), Açıklama: r.aciklama || '' }))
   }
 
   if (id === 'sgk') {
-    const { data } = await supabase.from('sgk_prim_bildirgeleri').select('*').eq('firma_id', firmaId).order('yil', { ascending: false }).order('ay', { ascending: false })
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Şirket: r.sirket || 'ETM', Yıl: r.yil, Ay: r.ay, 'Tahakkuk (₺)': Number(r.tahakkuk_tutari || 0), 'Son Ödeme': r.son_odeme_tarihi || '', 'Ödeme Tarihi': r.odeme_tarihi || '', Durum: r.durum || '', Açıklama: r.aciklama || '' }))
+    let q = supabase.from('sgk_prim_bildirgeleri').select('*').eq('firma_id', firmaId).order('yil', { ascending: false }).order('ay', { ascending: false })
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Şirket: r.sirket || 'ETM', Yıl: r.yil, Ay: r.ay, 'Tahakkuk (₺)': Number(r.tahakkuk_tutari || 0), 'Son Ödeme': r.son_odeme_tarihi || '', 'Ödeme Tarihi': r.odeme_tarihi || '', Durum: r.durum || '', Açıklama: r.aciklama || '' }))
   }
 
   if (id === 'vergi') {
     let q = supabase.from('vergi_surecleri').select('*').eq('firma_id', firmaId).order('yil', { ascending: false })
     if (projectId) q = q.eq('proje_id', projectId)
-    const { data } = await q
-    return ((data || []) as any[])
-      .filter(r => matchSirket(r.sirket))
-      .map(r => ({ Proje: projLabel(r.proje_id), 'Süreç': r.surec_turu || '', Yıl: r.yil, Ay: r.ay || '', Dönem: r.donem || '', 'Son Tarih': r.son_tarih || '', 'Beyan Tarihi': r.beyan_tarihi || '', 'Tutar (₺)': Number(r.tutar || 0), Durum: r.durum || '', Sorumlu: r.sorumlu || '' }))
+    q = addSirketFilter(q)
+    const rows = await run(q)
+    return rows.map(r => ({ Proje: projLabel(r.proje_id), 'Süreç': r.surec_turu || '', Yıl: r.yil, Ay: r.ay || '', Dönem: r.donem || '', 'Son Tarih': r.son_tarih || '', 'Beyan Tarihi': r.beyan_tarihi || '', 'Tutar (₺)': Number(r.tutar || 0), Durum: r.durum || '', Sorumlu: r.sorumlu || '' }))
   }
 
   return []
