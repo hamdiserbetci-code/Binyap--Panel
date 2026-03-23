@@ -134,6 +134,20 @@ export default function BankalarModule({ firma, role }: Props) {
   const [excelLoading, setExcelLoading] = useState(false)
   const [excelHata, setExcelHata] = useState('')
   const [excelSonuc, setExcelSonuc] = useState({ eklenen: 0, atlanan: 0 })
+  const [excelCariId, setExcelCariId] = useState('')
+  const [cariHesaplar, setCariHesaplar] = useState<{ id: string; ad: string }[]>([])
+
+  const fetchCariHesaplar = useCallback(async () => {
+    const q = sirket === 'ETM'
+      ? supabase.from('cari_hesaplar').select('*').eq('firma_id', firma.id).or('sirket.eq.ETM,sirket.is.null')
+      : supabase.from('cari_hesaplar').select('*').eq('firma_id', firma.id).eq('sirket', sirket)
+    const { data } = await q
+    const list = ((data || []) as any[]).map(c => ({
+      id: c.id,
+      ad: (Object.entries(c).find(([k]) => k.toLowerCase() === 'reklam')?.[1] as string) || c.ad || c.id,
+    }))
+    setCariHesaplar(list)
+  }, [firma.id, sirket])
 
   function sablonIndir() {
     const baslikStil = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E3A8A' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: 'FFFFFF' } } } }
@@ -285,7 +299,8 @@ export default function BankalarModule({ firma, role }: Props) {
     const basePayload = uniqueRows.map(r => ({
       firma_id: firma.id, banka_id: selectedId,
       hareket_turu: r.hareket_turu, tutar: r.tutar, tarih: r.tarih,
-      aciklama: r.aciklama || null, belge_no: r.belge_no || null
+      aciklama: r.aciklama || null, belge_no: r.belge_no || null,
+      ...(excelCariId ? { cari_hesap_id: excelCariId } : {}),
     }))
 
     let workingKeys = Object.keys(basePayload[0])
@@ -401,7 +416,7 @@ export default function BankalarModule({ firma, role }: Props) {
           {can(role, 'edit') && (
             <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <p className="text-[9px] font-semibold uppercase tracking-widest px-1 mb-2" style={{ color: '#5F6368' }}>Veri Aktarımı</p>
-              <button onClick={() => { if(!selectedId){ setError('Önce bir banka hesabı seçin.'); return; } setExcelStep('upload'); setExcelModal(true) }} className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium transition-all text-left bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
+              <button onClick={() => { if(!selectedId){ setError('Önce bir banka hesabı seçin.'); return; } setExcelStep('upload'); setExcelCariId(''); fetchCariHesaplar(); setExcelModal(true) }} className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium transition-all text-left bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20">
                 <FileSpreadsheet size={11} /> Banka Ekstresi Yükle
               </button>
             </div>
@@ -533,6 +548,13 @@ export default function BankalarModule({ firma, role }: Props) {
                   <button onClick={sablonIndir} className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-colors whitespace-nowrap">
                     <FileSpreadsheet size={12} /> Şablon İndir
                   </button>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">Cari Hesap (opsiyonel)</label>
+                  <select className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300 outline-none" value={excelCariId} onChange={e => setExcelCariId(e.target.value)}>
+                    <option value="">— Cari hesap seçin (opsiyonel) —</option>
+                    {cariHesaplar.map(c => <option key={c.id} value={c.id} className="bg-slate-900">{c.ad}</option>)}
+                  </select>
                 </div>
                 <label className="flex flex-col items-center gap-3 border-2 border-dashed border-emerald-500/30 bg-emerald-500/5 p-8 rounded-2xl cursor-pointer hover:bg-emerald-500/10 transition-colors">
                   <Upload size={32} className="text-emerald-400" />
