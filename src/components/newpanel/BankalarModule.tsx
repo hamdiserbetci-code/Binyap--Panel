@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Pencil, Trash2, ChevronRight, Search, FileSpreadsheet, Upload, X, Loader2, CheckCircle2, AlertCircle, Landmark, ChevronLeft } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
@@ -134,6 +134,53 @@ export default function BankalarModule({ firma, role }: Props) {
   const [excelLoading, setExcelLoading] = useState(false)
   const [excelHata, setExcelHata] = useState('')
   const [excelSonuc, setExcelSonuc] = useState({ eklenen: 0, atlanan: 0 })
+
+  function sablonIndir() {
+    const baslikStil = { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 }, fill: { fgColor: { rgb: '1E3A8A' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: 'FFFFFF' } } } }
+    const aciklamaStil = { font: { italic: true, sz: 9, color: { rgb: '64748B' } }, fill: { fgColor: { rgb: 'EFF6FF' } }, alignment: { horizontal: 'center' } }
+    const ornek1Stil = { font: { sz: 10, color: { rgb: '1E293B' } }, fill: { fgColor: { rgb: 'F8FAFC' } } }
+    const ornek2Stil = { font: { sz: 10, color: { rgb: '1E293B' } }, fill: { fgColor: { rgb: 'EFF6FF' } } }
+
+    const ws: XLSX.WorkSheet = {}
+
+    // Başlık satırı
+    const kolonlar = ['Tarih', 'Açıklama', 'Belge No', 'Giriş', 'Çıkış']
+    kolonlar.forEach((k, i) => {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: i })
+      ws[addr] = { v: k, t: 's', s: baslikStil }
+    })
+
+    // Açıklama satırı
+    const aciklamalar = ['GG.AA.YYYY', 'İşlem açıklaması', 'Dekont/Belge no (opsiyonel)', 'Gelen tutar (₺)', 'Giden tutar (₺)']
+    aciklamalar.forEach((a, i) => {
+      const addr = XLSX.utils.encode_cell({ r: 1, c: i })
+      ws[addr] = { v: a, t: 's', s: aciklamaStil }
+    })
+
+    // Örnek satırlar
+    const ornekler = [
+      ['15.03.2025', 'Müşteri ödemesi - ABC Ltd.', 'DK2025001', 50000, ''],
+      ['16.03.2025', 'Kira ödemesi - Mart 2025', 'DK2025002', '', 12500],
+      ['17.03.2025', 'Fatura tahsilatı - DEF A.Ş.', 'DK2025003', 28750, ''],
+      ['18.03.2025', 'SGK prim ödemesi', 'DK2025004', '', 8300],
+    ]
+    ornekler.forEach((row, ri) => {
+      row.forEach((val, ci) => {
+        const addr = XLSX.utils.encode_cell({ r: ri + 2, c: ci })
+        const isNum = typeof val === 'number'
+        ws[addr] = { v: val, t: isNum ? 'n' : 's', s: ri % 2 === 0 ? ornek1Stil : ornek2Stil }
+        if (isNum) ws[addr].z = '#,##0.00'
+      })
+    })
+
+    ws['!cols'] = [{ wch: 16 }, { wch: 36 }, { wch: 18 }, { wch: 16 }, { wch: 16 }]
+    ws['!rows'] = [{ hpt: 22 }, { hpt: 16 }]
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: ornekler.length + 1, c: kolonlar.length - 1 } })
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Banka Ekstresi')
+    XLSX.writeFile(wb, 'Banka_Ekstre_Sablonu.xlsx')
+  }
 
   function excelDosyaOku(file: File) {
     setExcelHata('')
@@ -481,7 +528,12 @@ export default function BankalarModule({ firma, role }: Props) {
           <div className="space-y-4">
             {excelStep === 'upload' && (
               <div className="space-y-4">
-                <p className="text-xs text-slate-400">İnternet şubenizden indirdiğiniz Excel ekstremizi yükleyin. Sistem, Tarih, Açıklama ve Giriş/Çıkış tutarlarını otomatik okuyacaktır.</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs text-slate-400">Şablonu indirip doldurun, ardından yükleyin. Sistem Tarih, Açıklama ve Giriş/Çıkış tutarlarını otomatik okuyacaktır.</p>
+                  <button onClick={sablonIndir} className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-colors whitespace-nowrap">
+                    <FileSpreadsheet size={12} /> Şablon İndir
+                  </button>
+                </div>
                 <label className="flex flex-col items-center gap-3 border-2 border-dashed border-emerald-500/30 bg-emerald-500/5 p-8 rounded-2xl cursor-pointer hover:bg-emerald-500/10 transition-colors">
                   <Upload size={32} className="text-emerald-400" />
                   <span className="text-sm font-medium text-emerald-300">Excel Dosyası Seçin</span>
