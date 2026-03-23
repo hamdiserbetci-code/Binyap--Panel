@@ -54,17 +54,8 @@ const fileSize = (v?: number | null) => !v ? '-' : v < 1024 * 1024 ? `${(v / 102
 function parseMissingColumn(msg?: string) {
   return (msg || '').match(/'([^']+)' column of/i)?.[1] || null
 }
-async function safeInsert(table: 'sgk_giris_cikis' | 'sgk_prim_bildirgeleri' | 'dokumanlar', payload: Record<string, unknown>) {
-  let working = { ...payload }
-  while (true) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (supabase.from as any)(table).insert(working)
-    if (!res.error) return res
-    const col = parseMissingColumn(res.error.message)
-    if (!col || !(col in working) || Object.keys(working).length <= 2) return res
-    delete working[col]
-  }
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -112,25 +103,25 @@ export default function SgkModule({ firma, role }: Props) {
   const fetchGc = useCallback(async () => {
     if (!sirket) return
     setLoading(true)
-    const { data, error } = await supabase.from('sgk_giris_cikis')
+    const { data, error } = await db.from('sgk_giris_cikis')
       .select('*').eq('firma_id', firma.id)
       .order('islem_tarihi', { ascending: false })
     if (error) { setError(error.message); setLoading(false); return }
     const all = (data || []) as GirisCikisRecord[]
-    setGcRecords(all.filter(r => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
+    setGcRecords(all.filter((r: GirisCikisRecord) => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
     setLoading(false)
   }, [firma.id, sirket])
 
   const fetchPrim = useCallback(async () => {
     if (!sirket) return
     setLoading(true)
-    const { data, error } = await supabase.from('sgk_prim_bildirgeleri')
+    const { data, error } = await db.from('sgk_prim_bildirgeleri')
       .select('*').eq('firma_id', firma.id)
       .eq('yil', filterYil)
       .order('ay', { ascending: true })
     if (error) { setError(error.message); setLoading(false); return }
     const all = (data || []) as PrimBildirgeRecord[]
-    setPrimRecords(all.filter(r => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
+    setPrimRecords(all.filter((r: PrimBildirgeRecord) => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
     setLoading(false)
   }, [firma.id, sirket, filterYil])
 
@@ -164,16 +155,9 @@ export default function SgkModule({ firma, role }: Props) {
   async function saveGc() {
     if (!can(role, 'edit')) return
     if (!gcForm.calisan_adi || !gcForm.islem_tarihi) { setError('Çalışan adı ve işlem tarihi zorunludur.'); return }
-    const res = await safeInsert('sgk_giris_cikis', {
-      firma_id: firma.id, sirket,
-      calisan_adi: gcForm.calisan_adi,
-      tc_kimlik: gcForm.tc_kimlik || null,
-      islem_turu: gcForm.islem_turu,
-      islem_tarihi: gcForm.islem_tarihi,
-      bildirim_tarihi: gcForm.bildirim_tarihi || null,
-      durum: gcForm.durum,
-      aciklama: gcForm.aciklama || null,
-    })
+    const payload: Record<string, unknown> = { firma_id: firma.id, sirket, calisan_adi: gcForm.calisan_adi, tc_kimlik: gcForm.tc_kimlik || null, islem_turu: gcForm.islem_turu, islem_tarihi: gcForm.islem_tarihi, bildirim_tarihi: gcForm.bildirim_tarihi || null, durum: gcForm.durum, aciklama: gcForm.aciklama || null }
+    let working = { ...payload }; let res
+    while (true) { res = await db.from('sgk_giris_cikis').insert(working); if (!res.error) break; const col = parseMissingColumn(res.error.message); if (!col || !(col in working) || Object.keys(working).length <= 2) break; delete working[col] }
     if (res.error) { setError(res.error.message); return }
     await logActivity({ firmaId: firma.id, modul: 'sgk', islemTuru: 'giris_cikis_eklendi', kayitTuru: 'sgk_giris_cikis', aciklama: `${gcForm.islem_turu === 'giris' ? 'İşe giriş' : 'İşten çıkış'} bildirimi eklendi: ${gcForm.calisan_adi}` })
     setGcModal(false)
@@ -184,14 +168,14 @@ export default function SgkModule({ firma, role }: Props) {
   async function deleteGc(id: string) {
     if (!can(role, 'delete')) return
     if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return
-    const { error } = await supabase.from('sgk_giris_cikis').delete().eq('id', id)
+    const { error } = await db.from('sgk_giris_cikis').delete().eq('id', id)
     if (error) { setError(error.message); return }
     fetchGc()
   }
 
   async function updateGcDurum(id: string, durum: string) {
     if (!can(role, 'edit')) return
-    const { error } = await supabase.from('sgk_giris_cikis').update({ durum }).eq('id', id)
+    const { error } = await db.from('sgk_giris_cikis').update({ durum }).eq('id', id)
     if (error) { setError(error.message); return }
     fetchGc()
   }
@@ -201,16 +185,10 @@ export default function SgkModule({ firma, role }: Props) {
   async function savePrim() {
     if (!can(role, 'edit')) return
     if (!primForm.tahakkuk_tutari) { setError('Tahakkuk tutarı zorunludur.'); return }
-    const res = await safeInsert('sgk_prim_bildirgeleri', {
-      firma_id: firma.id, sirket,
-      yil: Number(primForm.yil), ay: Number(primForm.ay),
-      tahakkuk_tutari: Number(primForm.tahakkuk_tutari),
-      son_odeme_tarihi: primForm.son_odeme_tarihi || null,
-      odeme_tarihi: primForm.odeme_tarihi || null,
-      durum: primForm.durum,
-      aciklama: primForm.aciklama || null,
-    })
-    if (res.error) { setError(res.error.message); return }
+    const payload2: Record<string, unknown> = { firma_id: firma.id, sirket, yil: Number(primForm.yil), ay: Number(primForm.ay), tahakkuk_tutari: Number(primForm.tahakkuk_tutari), son_odeme_tarihi: primForm.son_odeme_tarihi || null, odeme_tarihi: primForm.odeme_tarihi || null, durum: primForm.durum, aciklama: primForm.aciklama || null }
+    let working2 = { ...payload2 }; let res2
+    while (true) { res2 = await db.from('sgk_prim_bildirgeleri').insert(working2); if (!res2.error) break; const col = parseMissingColumn(res2.error.message); if (!col || !(col in working2) || Object.keys(working2).length <= 2) break; delete working2[col] }
+    if (res2.error) { setError(res2.error.message); return }
     await logActivity({ firmaId: firma.id, modul: 'sgk', islemTuru: 'prim_bildirge_eklendi', kayitTuru: 'sgk_prim_bildirgeleri', aciklama: `${primForm.yil}/${primForm.ay} prim bildirge tahakkuku eklendi.` })
     setPrimModal(false)
     setPrimForm(primFormInit)
@@ -220,14 +198,14 @@ export default function SgkModule({ firma, role }: Props) {
   async function deletePrim(id: string) {
     if (!can(role, 'delete')) return
     if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return
-    const { error } = await supabase.from('sgk_prim_bildirgeleri').delete().eq('id', id)
+    const { error } = await db.from('sgk_prim_bildirgeleri').delete().eq('id', id)
     if (error) { setError(error.message); return }
     fetchPrim()
   }
 
   async function updatePrimDurum(id: string, durum: string) {
     if (!can(role, 'edit')) return
-    const { error } = await supabase.from('sgk_prim_bildirgeleri').update({ durum }).eq('id', id)
+    const { error } = await db.from('sgk_prim_bildirgeleri').update({ durum }).eq('id', id)
     if (error) { setError(error.message); return }
     fetchPrim()
   }
@@ -247,8 +225,9 @@ export default function SgkModule({ firma, role }: Props) {
       mime_type: file.type, dosya_boyutu: file.size,
       aciklama: aciklama || null,
     }
-    const res = await safeInsert('dokumanlar', payload)
-    if (res.error) { setError(res.error.message); setUploading(null); return }
+    let workingDoc = { ...payload }; let resDoc
+    while (true) { resDoc = await supabase.from('dokumanlar').insert(workingDoc); if (!resDoc.error) break; const col = parseMissingColumn(resDoc.error.message); if (!col || !(col in workingDoc) || Object.keys(workingDoc).length <= 2) break; delete workingDoc[col] }
+    if (resDoc.error) { setError(resDoc.error.message); setUploading(null); return }
     await logActivity({ firmaId: firma.id, modul: 'sgk', islemTuru: 'dokuman_yuklendi', kayitTuru: 'dokuman', aciklama: `${file.name} (${kategori}) yüklendi.` })
     setUploading(null)
     if (kategori === 'hizmet_bildirimi') fetchHizmet()
