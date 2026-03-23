@@ -7,7 +7,7 @@ import { can } from '@/lib/permissions'
 import { buildCompanyStoragePath } from '@/lib/storagePaths'
 import Modal, { FormField, btnPrimary, btnSecondary, inputCls } from '@/components/ui/Modal'
 import { logActivity } from '@/lib/activityLog'
-import type { FirmaRecord } from '@/components/newpanel/ProjectsModule'
+import type { FirmaRecord, ProjectRecord } from '@/components/newpanel/ProjectsModule'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,7 @@ interface DocRecord {
   id: string; firma_id: string; dosya_adi: string
   dosya_url: string; dosya_boyutu: number | null
   created_at: string; aciklama: string | null; sirket: string | null
+  proje_id: string | null
 }
 
 interface Props { firma: FirmaRecord; role?: string | null }
@@ -77,10 +78,18 @@ export default function SgkModule({ firma, role }: Props) {
   const [filterYil, setFilterYil] = useState(new Date().getFullYear())
   const [filterAy, setFilterAy] = useState(0) // 0 = tümü
 
+  // Projeler
+  const [projects, setProjects] = useState<ProjectRecord[]>([])
+
   // Giriş/Çıkış state
   const [gcRecords, setGcRecords] = useState<GirisCikisRecord[]>([])
   const [gcModal, setGcModal] = useState(false)
   const [gcForm, setGcForm] = useState(gcFormInit)
+
+  // PDF yükleme öncesi bilgi modalı
+  const [gcUploadModal, setGcUploadModal] = useState(false)
+  const [pendingGcFile, setPendingGcFile] = useState<File | null>(null)
+  const [gcUploadForm, setGcUploadForm] = useState({ proje_id: '', islem_turu: 'giris' })
 
   // Prim Bildirge state
   const [primRecords, setPrimRecords] = useState<PrimBildirgeRecord[]>([])
@@ -101,6 +110,15 @@ export default function SgkModule({ firma, role }: Props) {
   const gcFileRef = useRef<HTMLInputElement>(null)
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
+
+  const fetchProjects = useCallback(async () => {
+    if (!sirket) return
+    const { data } = await supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad')
+    const all = (data as unknown as ProjectRecord[]) || []
+    setProjects(all.filter((p: any) => sirket === 'ETM' ? (!(p as any).sirket || (p as any).sirket === 'ETM') : (p as any).sirket === sirket))
+  }, [firma.id, sirket])
+
+  useEffect(() => { fetchProjects() }, [fetchProjects])
 
   const fetchGc = useCallback(async () => {
     if (!sirket) return
@@ -224,7 +242,7 @@ export default function SgkModule({ firma, role }: Props) {
 
   // ── File upload ───────────────────────────────────────────────────────────
 
-  async function uploadFile(file: File, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi', aciklama?: string) {
+  async function uploadFile(file: File, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi', aciklama?: string, projeId?: string | null) {
     if (!can(role, 'edit')) return
     if (file.size > 15 * 1024 * 1024) { setError('Dosya boyutu 15MB üzerinde olamaz.'); return }
     setUploading(kategori)
@@ -236,6 +254,7 @@ export default function SgkModule({ firma, role }: Props) {
       dosya_adi: file.name, dosya_url: filePath,
       mime_type: file.type, dosya_boyutu: file.size,
       aciklama: aciklama || null,
+      proje_id: projeId || null,
     }
     let workingDoc = { ...payload }; let resDoc
     while (true) { resDoc = await supabase.from('dokumanlar').insert(workingDoc); if (!resDoc.error) break; const col = parseMissingColumn(resDoc.error.message); if (!col || !(col in workingDoc) || Object.keys(workingDoc).length <= 2) break; delete workingDoc[col] }
@@ -263,6 +282,18 @@ export default function SgkModule({ firma, role }: Props) {
     else if (kategori === 'prim_dekont') fetchDekont()
     else fetchGcDocs()
   }
+
+  async function confirmGcUpload() {
+    if (!pendingGcFile) return
+    const projeName = projects.find(p => p.id === gcUploadForm.proje_id)?.ad || 'Genel'
+    const tur = gcUploadForm.islem_turu === 'giris' ? 'İşe Giriş' : 'İşten Çıkış'
+    const aciklama = `${tur} — ${projeName} (${filterYil})`
+    setGcUploadModal(false)
+    await uploadFile(pendingGcFile, 'giris_cikis_bildirimi', aciklama, gcUploadForm.proje_id || null)
+    setPendingGcFile(null)
+  }
+
+  const projectName = (id?: string | null) => projects.find(p => p.id === id)?.ad || null
 
   // ── Filtered data ─────────────────────────────────────────────────────────
 
@@ -442,7 +473,7 @@ export default function SgkModule({ firma, role }: Props) {
                     <Upload size={16} /> {uploading === 'giris_cikis_bildirimi' ? 'Yükleniyor...' : 'PDF Yükle'}
                   </button>
                   <input ref={gcFileRef} type="file" className="hidden" accept=".pdf"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, 'giris_cikis_bildirimi', `Giriş/Çıkış Bildirimi ${filterYil}`); e.target.value = '' }} />
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingGcFile(f); setGcUploadForm({ proje_id: '', islem_turu: 'giris' }); setGcUploadModal(true) } e.target.value = '' }} />
                 </>
               )}
             </div>
@@ -463,6 +494,7 @@ export default function SgkModule({ firma, role }: Props) {
                       <div>
                         <p className="text-sm font-medium text-slate-200 truncate max-w-[160px]">{doc.dosya_adi}</p>
                         {doc.aciklama && <p className="text-xs text-slate-400 mt-0.5">{doc.aciklama}</p>}
+                        {doc.proje_id && <p className="text-[11px] text-sky-400/80 mt-0.5">Proje: {projectName(doc.proje_id)}</p>}
                         <p className="text-[11px] text-slate-500 mt-0.5">{doc.created_at?.split('T')[0]} · {fileSize(doc.dosya_boyutu)}</p>
                       </div>
                     </div>
@@ -664,6 +696,38 @@ export default function SgkModule({ firma, role }: Props) {
             </div>
           )}
         </div>
+      )}
+
+      {/* ══ MODAL: PDF Yükleme Bilgileri ════════════════════════════════════ */}
+      {gcUploadModal && pendingGcFile && (
+        <Modal title="PDF Yükleme Bilgileri" onClose={() => { setGcUploadModal(false); setPendingGcFile(null) }}
+          footer={<><button className={btnSecondary} onClick={() => { setGcUploadModal(false); setPendingGcFile(null) }}>İptal</button><button className={btnPrimary} onClick={confirmGcUpload}>Yükle</button></>}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
+              <FileText size={18} className="text-sky-400 shrink-0" />
+              <p className="text-sm text-slate-300 truncate">{pendingGcFile.name}</p>
+            </div>
+            <FormField label="Proje">
+              <select className={inputCls} value={gcUploadForm.proje_id}
+                onChange={e => setGcUploadForm(p => ({ ...p, proje_id: e.target.value }))}>
+                <option value="">Genel (Projeye bağlı değil)</option>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Bildirim Türü" required>
+              <div className="flex gap-3">
+                <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${gcUploadForm.islem_turu === 'giris' ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-white/10 bg-white/5 text-slate-400'}`}>
+                  <input type="radio" className="hidden" value="giris" checked={gcUploadForm.islem_turu === 'giris'} onChange={() => setGcUploadForm(p => ({ ...p, islem_turu: 'giris' }))} />
+                  <UserCheck size={16} /> İşe Giriş
+                </label>
+                <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${gcUploadForm.islem_turu === 'cikis' ? 'border-rose-500/50 bg-rose-500/10 text-rose-400' : 'border-white/10 bg-white/5 text-slate-400'}`}>
+                  <input type="radio" className="hidden" value="cikis" checked={gcUploadForm.islem_turu === 'cikis'} onChange={() => setGcUploadForm(p => ({ ...p, islem_turu: 'cikis' }))} />
+                  <UserMinus size={16} /> İşten Çıkış
+                </label>
+              </div>
+            </FormField>
+          </div>
+        </Modal>
       )}
 
       {/* ══ MODAL: Giriş/Çıkış Ekle ══════════════════════════════════════════ */}
