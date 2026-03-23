@@ -313,7 +313,7 @@ export default function BankalarModule({ firma, role }: Props) {
       ...(excelCariId ? { cari_hesap_id: excelCariId } : {}),
     }))
 
-    // 50'şer batch ile ekle
+    // 50'şer batch ile banka_hareketleri'ne ekle
     for (let i = 0; i < payload.length; i += 50) {
       const batch = payload.slice(i, i + 50)
       const { error } = await supabase.from('banka_hareketleri').insert(batch)
@@ -330,6 +330,35 @@ export default function BankalarModule({ firma, role }: Props) {
         }
       } else {
         eklenen += batch.length
+      }
+    }
+
+    // Cari hesap seçildiyse cari_hareketler'e de işle
+    if (excelCariId) {
+      const cariPayload = uniqueRows.map(r => ({
+        firma_id: firma.id,
+        cari_hesap_id: excelCariId,
+        hareket_turu: r.hareket_turu === 'giris' ? 'tahsilat_nakit' : 'odeme_nakit',
+        tutar: r.tutar,
+        tarih: r.tarih,
+        belge_no: r.belge_no || null,
+        aciklama: r.aciklama || null,
+        kdv_tutari: 0,
+        stopaj_tutari: 0,
+        durum: 'tamamlandi',
+      }))
+      for (let i = 0; i < cariPayload.length; i += 50) {
+        const batch = cariPayload.slice(i, i + 50)
+        let res = await supabase.from('cari_hareketler').insert(batch)
+        if (res.error) {
+          // eksik kolon varsa silerek tekrar dene
+          const working = batch.map(r => ({ ...r })) as any[]
+          const eksik = res.error.message.match(/'([^']+)' column of/i)?.[1]
+          if (eksik) {
+            const temiz = working.map(r => { const c = { ...r }; delete c[eksik]; return c })
+            await supabase.from('cari_hareketler').insert(temiz)
+          }
+        }
       }
     }
 
