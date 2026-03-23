@@ -1,7 +1,7 @@
-﻿﻿'use client'
+﻿﻿﻿﻿'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, FileArchive, FileText, Plus, Trash2 } from 'lucide-react'
+import { Download, FileArchive, FileText, Plus, Trash2, ChevronLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import { buildCompanyStoragePath } from '@/lib/storagePaths'
@@ -11,6 +11,11 @@ import type { FirmaRecord, ProjectRecord } from '@/components/newpanel/ProjectsM
 
 interface DocumentRecord { id: string; proje_id: string | null; modul: string; kategori: string; dosya_adi: string; dosya_url: string; mime_type: string | null; dosya_boyutu: number | null; donem: string | null; aciklama: string | null; created_at: string }
 interface Props { firma: FirmaRecord; role?: string | null }
+
+function parseMissingColumn(message?: string) {
+  const match = (message || '').match(/'([^']+)' column of/i)
+  return match?.[1] || null
+}
 
 const formInitial = { proje_id: '', modul: 'genel', kategori: '', donem: '', aciklama: '' }
 const modules = [{ value: 'genel', label: 'Genel' }, { value: 'gelir_gider', label: 'Gelir / Gider' }, { value: 'puantaj', label: 'Puantaj' }, { value: 'odeme_plani', label: 'Odeme Plani' }, { value: 'kasa', label: 'Kasa' }, { value: 'vergi_sgk', label: 'Vergi / SGK' }]
@@ -25,10 +30,11 @@ export default function DocumentsModule({ firma, role }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState(formInitial)
+  const [sirket, setSirket] = useState<'ETM' | 'BİNYAPI' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchProjects = useCallback(async () => { const { data, error } = await supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad'); if (error) { setError(error.message); return }; setProjects((data as ProjectRecord[]) || []) }, [firma.id])
-  const fetchDocuments = useCallback(async () => { setLoading(true); let query = supabase.from('dokumanlar').select('*').eq('firma_id', firma.id).order('created_at', { ascending: false }); if (selectedProjectId) query = query.eq('proje_id', selectedProjectId); if (selectedModule) query = query.eq('modul', selectedModule); const { data, error } = await query; if (error) { setError(error.message); setDocuments([]); setLoading(false); return }; setDocuments((data as DocumentRecord[]) || []); setLoading(false) }, [firma.id, selectedModule, selectedProjectId])
+  const fetchDocuments = useCallback(async () => { if (!sirket) return; setLoading(true); let query = supabase.from('dokumanlar').select('*').eq('firma_id', firma.id).order('created_at', { ascending: false }); if (selectedProjectId) query = query.eq('proje_id', selectedProjectId); if (selectedModule) query = query.eq('modul', selectedModule); const { data, error } = await query; if (error) { setError(error.message); setDocuments([]); setLoading(false); return }; const all = (data as any[]) || []; setDocuments(all.filter(r => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket) as DocumentRecord[]); setLoading(false) }, [firma.id, selectedModule, selectedProjectId, sirket])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
   useEffect(() => { fetchDocuments() }, [fetchDocuments])
@@ -44,7 +50,8 @@ export default function DocumentsModule({ firma, role }: Props) {
     const path = buildCompanyStoragePath({ firmaId: firma.id, modul: form.modul, category: form.kategori, fileName: file.name })
     const uploadRes = await supabase.storage.from('dokumanlar').upload(path, file, { contentType: file.type })
     if (uploadRes.error) { setError(uploadRes.error.message); setUploading(false); return }
-    const insertRes = await supabase.from('dokumanlar').insert({ firma_id: firma.id, proje_id: form.proje_id || null, modul: form.modul, kategori: form.kategori, dosya_adi: file.name, dosya_url: path, mime_type: file.type, dosya_boyutu: file.size, donem: form.donem || null, aciklama: form.aciklama || null })
+    const payload: any = { firma_id: firma.id, sirket, proje_id: form.proje_id || null, modul: form.modul, kategori: form.kategori, dosya_adi: file.name, dosya_url: path, mime_type: file.type, dosya_boyutu: file.size, donem: form.donem || null, aciklama: form.aciklama || null }
+    let working = { ...payload }; let insertRes; while(true) { insertRes = await supabase.from('dokumanlar').insert(working); if (!insertRes.error) break; const col = parseMissingColumn(insertRes.error.message); if (!col || !(col in working) || Object.keys(working).length <= 2) break; delete working[col] }
     if (insertRes.error) { setError(insertRes.error.message); setUploading(false); return }
     await logActivity({ firmaId: firma.id, modul: 'dokumanlar', islemTuru: 'yuklendi', kayitTuru: 'dokuman', aciklama: file.name + ' dokumani yüklendi.'.replace('ü','u'), meta: { projeId: form.proje_id || null, kategori: form.kategori, modul: form.modul } })
     setUploading(false); setModalOpen(false); fetchDocuments()

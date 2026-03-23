@@ -9,6 +9,7 @@ import {
   FolderKanban,
   History,
   KeyRound,
+  Landmark,
   LayoutGrid,
   ListTodo,
   LogOut,
@@ -16,11 +17,13 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  Menu,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import ProjectsModule, { type FirmaRecord } from '@/components/newpanel/ProjectsModule'
-import FinanceModule from '@/components/newpanel/FinanceModule'
 import TimesheetModule from '@/components/newpanel/TimesheetModule'
 import CashModule from '@/components/newpanel/CashModule'
 import TaxModule from '@/components/newpanel/TaxModule'
@@ -32,13 +35,16 @@ import NotificationCenter from '@/components/newpanel/NotificationCenter'
 import ActivityLogModule from '@/components/newpanel/ActivityLogModule'
 import UsersModule, { type UserProfileRecord } from '@/components/newpanel/UsersModule'
 import CariHesapModule from '@/components/newpanel/CariHesapModule'
+import BankalarModule from '@/components/newpanel/BankalarModule'
+import SgkModule from '@/components/newpanel/SgkModule'
 import { logActivity } from '@/lib/activityLog'
 
 type ModuleId =
   | 'genel-bakis'
   | 'projeler'
-  | 'gelir-gider'
   | 'puantaj'
+  | 'sgk-bildirimleri'
+  | 'bankalar'
   | 'cari'
   | 'kasa'
   | 'vergi-sgk'
@@ -50,6 +56,7 @@ type ModuleId =
 
 type ModuleConfig = {
   id: ModuleId
+  category: string
   label: string
   shortLabel: string
   icon: LucideIcon
@@ -60,22 +67,23 @@ type ModuleConfig = {
 }
 
 const iconRegistry: Record<string, LucideIcon> = {
-  LayoutGrid, FolderKanban, TrendingUp, Users, BookUser, Wallet, ShieldCheck, FileArchive, FileSpreadsheet, ListTodo, KeyRound, History
+  LayoutGrid, FolderKanban, TrendingUp, Users, BookUser, Landmark, Wallet, ShieldCheck, FileArchive, FileSpreadsheet, ListTodo, KeyRound, History
 }
 
 const defaultModules: ModuleConfig[] = [
-  { id: 'genel-bakis', label: 'Genel Bakis', shortLabel: 'Panel', icon: LayoutGrid, accent: 'from-sky-500 to-cyan-400', title: 'Merkezi Operasyon Paneli', description: 'Sistemdeki aktif görevlerin, finansal yükümlülüklerin ve resmi süreçlerin konsolide özetini sunar.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
-  { id: 'projeler', label: 'Projeler', shortLabel: 'Projeler', icon: FolderKanban, accent: 'from-blue-500 to-indigo-400', title: 'Proje Yönetimi', description: 'Kurum bünyesindeki tüm projelerin bütçe, lokasyon ve operasyonel yaşam döngülerinin yönetildiği merkez.', allowedRoles: ['yonetici', 'santiye', 'izleme'] },
-  { id: 'gelir-gider', label: 'Gelir / Gider', shortLabel: 'Finans', icon: TrendingUp, accent: 'from-emerald-500 to-lime-400', title: 'Finansal Operasyonlar', description: 'Proje ve cari bazlı tüm gelir-gider kalemlerinin işlendiği ve finansal analizlerin yapıldığı sistem.', allowedRoles: ['yonetici', 'muhasebe'] },
-  { id: 'puantaj', label: 'Puantaj', shortLabel: 'Puantaj', icon: Users, accent: 'from-orange-500 to-amber-400', title: 'Personel Mesai Takibi', description: 'Saha ve ofis personeline ait mesai, izin ve günlük çalışma verilerinin proje bazlı izlendiği modül.', allowedRoles: ['yonetici', 'santiye'] },
-  { id: 'cari', label: 'Cari Hesap', shortLabel: 'Cari', icon: BookUser, accent: 'from-cyan-500 to-teal-400', title: 'Cari Hesap Takibi', description: 'Alış/satış faturaları, tahsilat, ödeme ve çek hareketlerinin cari bazlı izlendiği modül.', allowedRoles: ['yonetici', 'muhasebe'] },
-  { id: 'kasa', label: 'Kasa', shortLabel: 'Kasa', icon: Wallet, accent: 'from-teal-500 to-cyan-400', title: 'Nakit Yonetimi', description: 'Nakit ve banka hesaplarındaki tüm finansal hareketlerin ve güncel likidite durumunun izlendiği kasa modülü.', allowedRoles: ['yonetici', 'muhasebe'] },
-  { id: 'vergi-sgk', label: 'Vergi / SGK', shortLabel: 'Vergi', icon: ShieldCheck, accent: 'from-rose-500 to-orange-400', title: 'Resmi Surecler', description: 'Resmi kurumlarla yürütülen periyodik vergi ve SGK yükümlülüklerinin tahakkuk ve ödeme takibi.', allowedRoles: ['yonetici', 'muhasebe'] },
-  { id: 'dokuman', label: 'Dokumanlar', shortLabel: 'Arsiv', icon: FileArchive, accent: 'from-slate-700 to-slate-500', title: 'Kurumsal Arsiv', description: 'Sisteme yüklenen tüm sözleşme, fatura ve resmi evrakların merkezi olarak arşivlendiği ve yönetildiği alan.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
-  { id: 'raporlar', label: 'Raporlar', shortLabel: 'Raporlar', icon: FileSpreadsheet, accent: 'from-indigo-500 to-blue-400', title: 'Raporlama ve Analiz', description: 'Tüm veri kaynaklarından derlenen operasyonel ve finansal metriklerin detaylı analiz ve dışa aktarım aracı.', allowedRoles: ['yonetici', 'muhasebe', 'izleme'] },
-  { id: 'gorevler', label: 'Yapilacak Isler', shortLabel: 'Gorevler', icon: ListTodo, accent: 'from-amber-500 to-orange-400', title: 'Gorev Yonetimi', description: 'Kurum içi iş süreçlerinin, önceliklendirme ve hatırlatma algoritmalarıyla takip edildiği operasyonel görev merkezi.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
-  { id: 'kullanicilar', label: 'Kullanicilar', shortLabel: 'Yetkiler', icon: KeyRound, accent: 'from-slate-600 to-slate-400', title: 'Sistem Erisimi', description: 'Sistem erişim yetkilerinin, kullanıcı rollerinin ve kurumsal profil ayarlarının yapılandırıldığı güvenlik modülü.', allowedRoles: ['yonetici'] },
-  { id: 'aktivite', label: 'Aktivite Logu', shortLabel: 'Log', icon: History, accent: 'from-cyan-500 to-sky-400', title: 'Sistem Gunlugu', description: 'Platform üzerindeki tüm kritik kullanıcı hareketlerinin ve veri değişikliklerinin denetim amacıyla kaydedildiği izleme günlüğü.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'genel-bakis', category: 'Operasyon', label: 'Genel Bakis', shortLabel: 'Panel', icon: LayoutGrid, accent: 'from-sky-500 to-cyan-400', title: 'Merkezi Operasyon Paneli', description: 'Sistemdeki aktif görevlerin, finansal yükümlülüklerin ve resmi süreçlerin konsolide özetini sunar.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
+  { id: 'projeler', category: 'Operasyon', label: 'Projeler', shortLabel: 'Projeler', icon: FolderKanban, accent: 'from-blue-500 to-indigo-400', title: 'Proje Yönetimi', description: 'Kurum bünyesindeki tüm projelerin bütçe, lokasyon ve operasyonel yaşam döngülerinin yönetildiği merkez.', allowedRoles: ['yonetici', 'santiye', 'izleme'] },
+  { id: 'gorevler', category: 'Operasyon', label: 'Yapilacak Isler', shortLabel: 'Gorevler', icon: ListTodo, accent: 'from-amber-500 to-orange-400', title: 'Gorev Yonetimi', description: 'Kurum içi iş süreçlerinin, önceliklendirme ve hatırlatma algoritmalarıyla takip edildiği operasyonel görev merkezi.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
+  { id: 'cari', category: 'Finans', label: 'Cari Hesap', shortLabel: 'Cari', icon: BookUser, accent: 'from-cyan-500 to-teal-400', title: 'Cari Hesap Takibi', description: 'Alış/satış faturaları, tahsilat, ödeme ve çek hareketlerinin cari bazlı izlendiği modül.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'bankalar', category: 'Finans', label: 'Banka Hesapları', shortLabel: 'Banka', icon: Landmark, accent: 'from-indigo-500 to-blue-500', title: 'Banka ve Finans Yönetimi', description: 'Firma banka hesaplarının ve hesap hareketlerinin, ekstre aktarımlarıyla yönetildiği modül.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'kasa', category: 'Finans', label: 'Kasa', shortLabel: 'Kasa', icon: Wallet, accent: 'from-teal-500 to-cyan-400', title: 'Nakit Yonetimi', description: 'Nakit ve banka hesaplarındaki tüm finansal hareketlerin ve güncel likidite durumunun izlendiği kasa modülü.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'vergi-sgk', category: 'Finans', label: 'Vergi / SGK', shortLabel: 'Vergi', icon: ShieldCheck, accent: 'from-rose-500 to-orange-400', title: 'Resmi Surecler', description: 'Resmi kurumlarla yürütülen periyodik vergi ve SGK yükümlülüklerinin tahakkuk ve ödeme takibi.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'puantaj', category: 'Personel', label: 'Puantaj', shortLabel: 'Puantaj', icon: Users, accent: 'from-orange-500 to-amber-400', title: 'Personel Mesai Takibi', description: 'Saha ve ofis personeline ait mesai, izin ve günlük çalışma verilerinin proje bazlı izlendiği modül.', allowedRoles: ['yonetici', 'santiye'] },
+  { id: 'sgk-bildirimleri', category: 'Personel', label: 'SGK Bildirimleri', shortLabel: 'SGK', icon: ShieldCheck, accent: 'from-cyan-500 to-sky-400', title: 'SGK Bildirimleri', description: 'İşçi giriş/çıkış bildirimleri, aylık prim bildirge tahakkukları, ödeme dekontları ve hizmet bildirimleri.', allowedRoles: ['yonetici', 'muhasebe'] },
+  { id: 'dokuman', category: 'Arşiv & Rapor', label: 'Dokumanlar', shortLabel: 'Arsiv', icon: FileArchive, accent: 'from-slate-700 to-slate-500', title: 'Kurumsal Arsiv', description: 'Sisteme yüklenen tüm sözleşme, fatura ve resmi evrakların merkezi olarak arşivlendiği ve yönetildiği alan.', allowedRoles: ['yonetici', 'muhasebe', 'santiye', 'izleme'] },
+  { id: 'raporlar', category: 'Arşiv & Rapor', label: 'Raporlar', shortLabel: 'Raporlar', icon: FileSpreadsheet, accent: 'from-indigo-500 to-blue-400', title: 'Raporlama ve Analiz', description: 'Tüm veri kaynaklarından derlenen operasyonel ve finansal metriklerin detaylı analiz ve dışa aktarım aracı.', allowedRoles: ['yonetici', 'muhasebe', 'izleme'] },
+  { id: 'kullanicilar', category: 'Sistem', label: 'Kullanicilar', shortLabel: 'Yetkiler', icon: KeyRound, accent: 'from-slate-600 to-slate-400', title: 'Sistem Erisimi', description: 'Sistem erişim yetkilerinin, kullanıcı rollerinin ve kurumsal profil ayarlarının yapılandırıldığı güvenlik modülü.', allowedRoles: ['yonetici'] },
+  { id: 'aktivite', category: 'Sistem', label: 'Aktivite Logu', shortLabel: 'Log', icon: History, accent: 'from-cyan-500 to-sky-400', title: 'Sistem Gunlugu', description: 'Platform üzerindeki tüm kritik kullanıcı hareketlerinin ve veri değişikliklerinin denetim amacıyla kaydedildiği izleme günlüğü.', allowedRoles: ['yonetici', 'muhasebe'] },
 ]
 
 const roleLabels: Record<string, string> = {
@@ -96,8 +104,34 @@ export default function Page() {
   const [profile, setProfile] = useState<UserProfileRecord | null>(null)
   const [modules, setModules] = useState<ModuleConfig[]>([])
   const [activeModule, setActiveModule] = useState<ModuleId>('genel-bakis')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    'Operasyon': true,
+    'Finans': true,
+    'Personel': true,
+    'Arşiv & Rapor': true,
+    'Sistem': false
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024)
+      if (window.innerWidth < 1024) setIsSidebarOpen(false)
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  function toggleGroup(group: string) {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [group]: prev[group] !== undefined ? !prev[group] : false
+    }))
+  }
 
   useEffect(() => {
     let mounted = true
@@ -201,16 +235,30 @@ export default function Page() {
         let loadedModules = defaultModules
         const modRes = await supabase.from('sistem_modulleri').select('*').eq('aktif', true).order('sira', { ascending: true })
         if (!modRes.error && modRes.data && modRes.data.length > 0) {
-          loadedModules = modRes.data.map((m: any) => ({
-            id: m.id as ModuleId,
-            label: m.label,
-            shortLabel: m.short_label,
-            icon: iconRegistry[m.icon] || LayoutGrid,
-            accent: m.accent,
-            title: m.title,
-            description: m.description,
-            allowedRoles: m.izin_verilen_roller || ['yonetici']
-          }))
+          const dbMods = modRes.data
+            .filter((m: any) => m.id !== 'gelir-gider' && m.id !== 'finans') // DB'den gelse bile yoksay
+            .map((m: any) => {
+              const def = defaultModules.find(d => d.id === m.id)
+              return {
+                id: m.id as ModuleId,
+                category: def?.category || 'Diğer',
+                label: m.label,
+                shortLabel: m.short_label,
+                icon: iconRegistry[m.icon] || LayoutGrid,
+                accent: m.accent,
+                title: m.title,
+                description: m.description,
+                allowedRoles: m.izin_verilen_roller || ['yonetici']
+              }
+            })
+            
+          // Veritabaninda henuz olmayan lokal modulleri (bankalar vb.) otomatik menuye ekle
+          defaultModules.forEach(dm => {
+            if (!dbMods.find((m: any) => m.id === dm.id)) {
+              dbMods.push(dm)
+            }
+          })
+          loadedModules = dbMods
         }
         
         if (!mounted) return
@@ -246,6 +294,17 @@ export default function Page() {
     const currentRole = profile?.rol || 'izleme'
     return modules.filter((item) => item.allowedRoles.includes(currentRole))
   }, [modules, profile?.rol])
+
+  const CATEGORY_ORDER = ['Operasyon', 'Finans', 'Personel', 'Arşiv & Rapor', 'Sistem', 'Diğer']
+  const groupedModules = useMemo(() => {
+    const groups: Record<string, ModuleConfig[]> = {}
+    visibleModules.forEach(m => {
+      const cat = m.category || 'Diğer'
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(m)
+    })
+    return groups
+  }, [visibleModules])
 
   useEffect(() => {
     if (!visibleModules.length) return
@@ -316,64 +375,112 @@ export default function Page() {
       </div>
 
       {/* ══ SOL SIDEBAR ════════════════════════════════════════════════════════ */}
-      <aside className="w-[220px] shrink-0 flex flex-col h-screen z-30" style={{ background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      {isMobile && isSidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm lg:hidden" onClick={() => setIsSidebarOpen(false)} />
+      )}
+      
+      <aside className={`${isSidebarOpen ? 'translate-x-0 w-[240px]' : '-translate-x-full w-[240px] lg:translate-x-0 lg:w-[76px]'} absolute lg:relative shrink-0 flex flex-col h-screen z-50 transition-all duration-300 shadow-2xl lg:shadow-none`} style={{ background: '#0D1117', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
 
-        {/* Logo */}
-        <div className="px-4 py-5 flex items-center gap-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)' }}>
-            <Briefcase size={15} strokeWidth={2.5} className="text-white" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: '#5B9FFF' }}>ETM · BİNYAPI</p>
-            <p className="text-[12px] font-semibold leading-tight" style={{ color: '#E8EAED' }}>ERP v2.1</p>
-          </div>
+        {/* Logo & Toggle */}
+        <div className={`px-4 py-5 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'} shrink-0`} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          {isSidebarOpen && (
+            <div className="flex items-center gap-3 shrink-0 overflow-hidden">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg" style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #6366F1 100%)' }}>
+                <Briefcase size={15} strokeWidth={2.5} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] truncate" style={{ color: '#5B9FFF' }}>ETM · BİNYAPI</p>
+                <p className="text-[12px] font-semibold leading-tight truncate" style={{ color: '#E8EAED' }}>ERP v2.1</p>
+              </div>
+            </div>
+          )}
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0 hidden lg:block" title="Menüyü Daralt/Genişlet">
+            <Menu size={18} />
+          </button>
         </div>
 
         {/* Navigasyon */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5 [&::-webkit-scrollbar]:hidden">
-          {visibleModules.map((item) => {
-            const Icon = item.icon
-            const isActive = item.id === activeModule
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveModule(item.id)}
-                title={item.label}
-                className="w-full flex items-center gap-3 rounded-xl transition-all duration-150 text-left"
-                style={isActive
-                  ? { background: 'rgba(91,159,255,0.12)', borderLeft: '2px solid #5B9FFF', padding: '9px 12px 9px 10px' }
-                  : { borderLeft: '2px solid transparent', padding: '9px 12px' }}
-              >
-                <Icon size={15} style={{ color: isActive ? '#5B9FFF' : '#5F6368', flexShrink: 0 }} />
-                <span className="text-[13px] font-medium" style={{ color: isActive ? '#E8EAED' : '#9AA0A6' }}>
-                  {item.shortLabel}
-                </span>
-              </button>
-            )
-          })}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-3 [&::-webkit-scrollbar]:hidden">
+          {Object.entries(groupedModules)
+            .sort(([a], [b]) => {
+              const idxA = CATEGORY_ORDER.indexOf(a)
+              const idxB = CATEGORY_ORDER.indexOf(b)
+              return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB)
+            })
+            .map(([group, items], idx) => {
+              const isExpanded = expandedGroups[group] ?? true
+              return (
+                <div key={group} className="space-y-1">
+                  {isSidebarOpen ? (
+                    <button
+              onClick={() => toggleGroup(group)}
+              className="w-full flex items-center justify-between px-3 py-2 mb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 hover:text-white hover:bg-white/[0.03] rounded-lg transition-colors"
+                    >
+                      {group}
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    </button>
+                  ) : (
+                    idx > 0 && <div className="w-8 h-px bg-white/10 mx-auto my-2" />
+                  )}
+                  
+                  {(isExpanded || !isSidebarOpen) && items.map((item) => {
+                    const Icon = item.icon
+                    const isActive = item.id === activeModule
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                onClick={() => {
+                  setActiveModule(item.id)
+                  if (isMobile) setIsSidebarOpen(false)
+                }}
+                        title={item.label}
+                        className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 justify-start' : 'justify-center'} rounded-xl transition-all duration-150 text-left`}
+                        style={isActive
+                          ? { background: 'rgba(91,159,255,0.12)', borderLeft: '2px solid #5B9FFF', padding: isSidebarOpen ? '9px 12px 9px 10px' : '10px 0' }
+                          : { borderLeft: '2px solid transparent', padding: isSidebarOpen ? '9px 12px' : '10px 0' }}
+                      >
+                        <Icon size={18} style={{ color: isActive ? '#5B9FFF' : '#5F6368', flexShrink: 0 }} />
+                        {isSidebarOpen && (
+                          <span className="text-[13px] font-medium truncate" style={{ color: isActive ? '#E8EAED' : '#9AA0A6' }}>
+                            {item.shortLabel}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })}
         </nav>
 
         {/* Kullanıcı + Çıkış */}
         <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: '#1A2535', color: '#9AA0A6', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {isSidebarOpen ? (
+            <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1" style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: '#1A2535', color: '#9AA0A6', border: '1px solid rgba(255,255,255,0.08)' }}>
+                {user.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-medium truncate" style={{ color: '#9AA0A6' }}>{user.email}</p>
+                {profile?.rol && <p className="text-[9px] capitalize" style={{ color: '#5F6368' }}>{roleLabels[profile.rol] ?? profile.rol}</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="w-8 h-8 mx-auto rounded-full flex items-center justify-center text-[12px] font-bold mb-2 cursor-help" style={{ background: '#1A2535', color: '#9AA0A6', border: '1px solid rgba(255,255,255,0.08)' }} title={user.email}>
               {user.email?.charAt(0).toUpperCase() || 'U'}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-medium truncate" style={{ color: '#9AA0A6' }}>{user.email}</p>
-              {profile?.rol && <p className="text-[9px] capitalize" style={{ color: '#5F6368' }}>{roleLabels[profile.rol] ?? profile.rol}</p>}
-            </div>
-          </div>
+          )}
           <button
             type="button"
             onClick={signOut}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium transition-all duration-150 group"
+            title="Güvenli Çıkış"
+            className={`w-full flex items-center ${isSidebarOpen ? 'gap-2 px-3 justify-start' : 'justify-center'} py-2 rounded-xl text-[11px] font-medium transition-all duration-150 group`}
             style={{ color: '#5F6368' }}
             onMouseEnter={e => { e.currentTarget.style.color = '#EA4335'; e.currentTarget.style.background = 'rgba(234,67,53,0.08)' }}
             onMouseLeave={e => { e.currentTarget.style.color = '#5F6368'; e.currentTarget.style.background = 'transparent' }}
           >
-            <LogOut size={12} />Güvenli Çıkış
+            <LogOut size={16} />{isSidebarOpen && 'Güvenli Çıkış'}
           </button>
         </div>
       </aside>
@@ -384,9 +491,14 @@ export default function Page() {
         {(firma || error) && (
           <div className="shrink-0 flex items-center justify-between px-6 py-3 gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div className="flex-1">
-              {error && (
-                <p className="rounded-xl px-4 py-2 text-xs" style={{ background: 'rgba(234,67,53,0.08)', border: '1px solid rgba(234,67,53,0.2)', color: '#EA4335' }}>{error}</p>
-              )}
+        <div className="flex items-center gap-3">
+          <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-colors shrink-0">
+            <Menu size={18} />
+          </button>
+          {error && (
+            <p className="rounded-xl px-4 py-2 text-xs" style={{ background: 'rgba(234,67,53,0.08)', border: '1px solid rgba(234,67,53,0.2)', color: '#EA4335' }}>{error}</p>
+          )}
+        </div>
             </div>
             <div className="shrink-0">
               {firma && <NotificationCenter firma={firma} />}
@@ -411,12 +523,14 @@ function renderModule(moduleId: ModuleId, firma: FirmaRecord, profile: UserProfi
   switch (moduleId) {
     case 'projeler':
       return <ProjectsModule firma={firma} role={profile?.rol} />
-    case 'gelir-gider':
-      return <FinanceModule firma={firma} role={profile?.rol} />
     case 'puantaj':
       return <TimesheetModule firma={firma} role={profile?.rol} />
+    case 'sgk-bildirimleri':
+      return <SgkModule firma={firma} role={profile?.rol} />
     case 'cari':
       return <CariHesapModule firma={firma} role={profile?.rol} />
+    case 'bankalar':
+      return <BankalarModule firma={firma} role={profile?.rol} />
     case 'kasa':
       return <CashModule firma={firma} role={profile?.rol} />
     case 'vergi-sgk':
@@ -438,7 +552,7 @@ function renderModule(moduleId: ModuleId, firma: FirmaRecord, profile: UserProfi
   }
 }
 
-function PlaceholderModule({ moduleId }: { moduleId: Exclude<ModuleId, 'projeler' | 'gelir-gider' | 'puantaj'> }) {
+function PlaceholderModule({ moduleId }: { moduleId: string }) {
   const items: Record<string, string[]> = {
     'genel-bakis': ['Yeni SQL semasi hazir', 'Projeler modulu baglandi', 'Finans modulu baglandi', 'Puantaj modulu baglandi'],
     kasa: ['Kasa ve banka hareket formu', 'Bagli islem kaydi mantigi', 'Gunluk bakiye ve hareket dokumu'],
@@ -450,12 +564,14 @@ function PlaceholderModule({ moduleId }: { moduleId: Exclude<ModuleId, 'projeler
     aktivite: ['Oturum hareketlerini kaydet', 'Rol degisikliklerini izleme alani', 'Modul bazli filtrelenebilir log akisi'],
   }
 
+  const displayItems = items[moduleId] || ['Bu modül devre dışı bırakılmış veya güncellenmektedir.']
+
   return (
     <div className="rounded-[32px] border border-white/[0.08] bg-white/[0.04] p-6 text-slate-200 shadow-2xl backdrop-blur-3xl ring-1 ring-white/10">
       <h3 className="text-2xl font-semibold text-white">Siradaki modul</h3>
       <p className="mt-3 text-sm leading-6 text-slate-400">Bu alan bir sonraki adimda ayni desenle calisan module donusecek. Hazirlanan kapsam:</p>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
-        {items[moduleId].map((item) => (
+        {displayItems.map((item) => (
           <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-sm text-slate-300">{item}</div>
         ))}
       </div>

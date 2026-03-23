@@ -124,7 +124,13 @@ function MaliyetKarti({ sirketAd, renk, harf, incomeRecords, expenseRecords }: {
     const dbmVal = tur !== 'donemlik' ? (Number(dbm) || 0) : 0
     const gelir = filteredInc.reduce((s, r) => s + Number(r.tutar || 0), 0)
     const gider = filteredExp.reduce((s, r) => s + Number(r.tutar || 0), 0) + dbmVal
-    return { gelir, gider, net: gelir - gider }
+    const alisFatura = filteredExp.filter(r => r.kategori === 'alis_fatura').reduce((s, r) => s + Number(r.tutar || 0), 0)
+    const iscilik = filteredExp.filter(r => r.kategori === 'iscilik').reduce((s, r) => s + Number(r.tutar || 0), 0)
+    const digerGider = gider - alisFatura - iscilik
+    const satisFatura = filteredInc.filter(r => r.kayit_turu === 'satis_fatura').reduce((s, r) => s + Number(r.tutar || 0), 0)
+    const hakedis = filteredInc.filter(r => r.kayit_turu === 'hakedis').reduce((s, r) => s + Number(r.tutar || 0), 0)
+    const digerGelir = gelir - satisFatura - hakedis
+    return { gelir, gider, net: gelir - gider, alisFatura, iscilik, digerGider, satisFatura, hakedis, digerGelir }
   }, [filteredInc, filteredExp, dbm, tur])
 
   const donutSegs = [
@@ -140,12 +146,12 @@ function MaliyetKarti({ sirketAd, renk, harf, incomeRecords, expenseRecords }: {
     <section className={`flex flex-col rounded-2xl border ${borderCls} p-5 gap-4`}>
 
       {/* Başlık + Filtre */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3 shrink-0">
           <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${accentCls}`}>{harf}</div>
           <h3 className="text-lg font-bold text-white tracking-tight">{sirketAd}</h3>
         </div>
-        <div className="flex items-center gap-1.5 bg-white/[0.03] px-3 py-1.5 rounded-xl border border-white/5">
+        <div className="flex flex-wrap items-center gap-1.5 bg-white/[0.03] px-3 py-1.5 rounded-xl border border-white/5">
           <select className="bg-transparent text-xs text-slate-300 outline-none cursor-pointer font-medium" value={tur} onChange={e => setTur(e.target.value as FilterTuru)}>
             <option value="tum_zamanlar" className="bg-slate-900">Genel</option>
             <option value="kumulatif" className="bg-slate-900">Kümülatif</option>
@@ -166,14 +172,14 @@ function MaliyetKarti({ sirketAd, renk, harf, incomeRecords, expenseRecords }: {
 
       {/* Dönem Başı Maliyet */}
       {tur !== 'donemlik' && (
-        <div className={`flex items-center gap-4 rounded-xl border px-4 py-3 ${dbmBorderCls}`}>
+        <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-xl border px-4 py-3 ${dbmBorderCls}`}>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Dönem Başı Maliyet</span>
             <span className="text-[10px] text-slate-600 mt-0.5">Geçmiş dönem bakiye girişi (₺)</span>
           </div>
           <input
             type="number"
-            className={`ml-auto w-44 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-100 bg-white/[0.04] outline-none transition-colors placeholder:text-slate-600 focus:ring-1 ${inputFocusCls}`}
+            className={`w-full sm:w-44 sm:ml-auto rounded-lg border px-3 py-2 text-sm font-semibold text-slate-100 bg-white/[0.04] outline-none transition-colors placeholder:text-slate-600 focus:ring-1 ${inputFocusCls}`}
             value={dbm}
             onChange={e => setDbm(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0,00"
@@ -182,7 +188,7 @@ function MaliyetKarti({ sirketAd, renk, harf, incomeRecords, expenseRecords }: {
       )}
 
       {/* İstatistikler + Donut */}
-      <div className="flex items-center gap-5">
+      <div className="flex flex-col sm:flex-row items-center gap-5">
         {/* Donut */}
         <div className="relative shrink-0">
           <DonutChart segments={donutSegs} size={110} strokeWidth={16} />
@@ -193,18 +199,23 @@ function MaliyetKarti({ sirketAd, renk, harf, incomeRecords, expenseRecords }: {
         </div>
 
         {/* Stat Kartları */}
-        <div className="flex-1 grid grid-cols-3 gap-2 min-w-0">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2 min-w-0 w-full">
           {/* Gelir */}
           <button
             onClick={() => toggleDetay('gelir')}
-            className={`rounded-2xl border p-3 text-left transition-all ${detay === 'gelir' ? 'border-emerald-400/40 bg-emerald-500/10 ring-1 ring-emerald-500/20' : 'border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10'}`}
+            className={`rounded-2xl border p-3 text-left transition-all flex flex-col ${detay === 'gelir' ? 'border-emerald-400/40 bg-emerald-500/10 ring-1 ring-emerald-500/20' : 'border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10'}`}
           >
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 w-full">
               <p className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold">Gelir</p>
               <span className="text-[10px] text-emerald-600">{filteredInc.length} kayıt</span>
             </div>
-            <p className="text-xl font-bold text-emerald-300 truncate">{money(ozet.gelir)}</p>
-            <div className="flex items-center gap-1 mt-1.5">
+            <p className="text-xl font-bold text-emerald-300 truncate w-full">{money(ozet.gelir)}</p>
+            <div className="mt-2 w-full space-y-1 border-t border-emerald-500/10 pt-2 flex-1">
+              <div className="flex justify-between items-center text-[9px] text-emerald-300/80"><span>Satış Fat.</span> <span className="font-semibold">{money(ozet.satisFatura)}</span></div>
+              <div className="flex justify-between items-center text-[9px] text-emerald-300/80"><span>Hakediş</span> <span className="font-semibold">{money(ozet.hakedis)}</span></div>
+              <div className="flex justify-between items-center text-[9px] text-emerald-300/80"><span>Diğer</span> <span className="font-semibold">{money(ozet.digerGelir)}</span></div>
+            </div>
+            <div className="flex items-center gap-1 mt-2 pt-2 border-t border-emerald-500/10 w-full">
               <span className="text-[9px] text-emerald-600">Detay</span>
               {detay === 'gelir' ? <ChevronUp size={10} className="text-emerald-500" /> : <ChevronDown size={10} className="text-emerald-600" />}
             </div>
@@ -213,26 +224,37 @@ function MaliyetKarti({ sirketAd, renk, harf, incomeRecords, expenseRecords }: {
           {/* Gider */}
           <button
             onClick={() => toggleDetay('gider')}
-            className={`rounded-2xl border p-3 text-left transition-all ${detay === 'gider' ? 'border-rose-400/40 bg-rose-500/10 ring-1 ring-rose-500/20' : 'border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10'}`}
+            className={`rounded-2xl border p-3 text-left transition-all flex flex-col ${detay === 'gider' ? 'border-rose-400/40 bg-rose-500/10 ring-1 ring-rose-500/20' : 'border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10'}`}
           >
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 w-full">
               <p className="text-[10px] uppercase tracking-widest text-rose-400 font-bold">Gider</p>
               <span className="text-[10px] text-rose-600">{filteredExp.length} kayıt</span>
             </div>
-            <p className="text-xl font-bold text-rose-300 truncate">{money(ozet.gider)}</p>
-            <div className="flex items-center gap-1 mt-1.5">
+            <p className="text-xl font-bold text-rose-300 truncate w-full">{money(ozet.gider)}</p>
+            <div className="mt-2 w-full space-y-1 border-t border-rose-500/10 pt-2 flex-1">
+              <div className="flex justify-between items-center text-[9px] text-rose-300/80"><span>Alış Fat.</span> <span className="font-semibold">{money(ozet.alisFatura)}</span></div>
+              <div className="flex justify-between items-center text-[9px] text-rose-300/80"><span>İşçilik</span> <span className="font-semibold">{money(ozet.iscilik)}</span></div>
+              <div className="flex justify-between items-center text-[9px] text-rose-300/80"><span>Diğer / DBM</span> <span className="font-semibold">{money(ozet.digerGider)}</span></div>
+            </div>
+            <div className="flex items-center gap-1 mt-2 pt-2 border-t border-rose-500/10 w-full">
               <span className="text-[9px] text-rose-600">Detay</span>
               {detay === 'gider' ? <ChevronUp size={10} className="text-rose-500" /> : <ChevronDown size={10} className="text-rose-600" />}
             </div>
           </button>
 
           {/* Net */}
-          <div className={`rounded-2xl border p-3 ${ozet.net >= 0 ? 'border-sky-500/20 bg-sky-500/5' : 'border-amber-500/20 bg-amber-500/5'}`}>
-            <p className={`text-[10px] uppercase tracking-widest font-bold mb-1 ${ozet.net >= 0 ? 'text-sky-400' : 'text-amber-400'}`}>Net Kâr/Zarar</p>
-            <p className={`text-xl font-bold truncate ${ozet.net >= 0 ? 'text-sky-300' : 'text-amber-300'}`}>{money(ozet.net)}</p>
-            <p className={`text-[9px] mt-1.5 font-medium ${ozet.net >= 0 ? 'text-sky-600' : 'text-amber-600'}`}>
-              {ozet.gelir > 0 ? `Kâr oranı %${Math.round((ozet.net / ozet.gelir) * 100)}` : '—'}
-            </p>
+          <div className={`rounded-2xl border p-3 flex flex-col ${ozet.net >= 0 ? 'border-sky-500/20 bg-sky-500/5' : 'border-amber-500/20 bg-amber-500/5'}`}>
+            <div className="flex items-center justify-between mb-1 w-full">
+              <p className={`text-[10px] uppercase tracking-widest font-bold ${ozet.net >= 0 ? 'text-sky-400' : 'text-amber-400'}`}>Net Kâr/Zarar</p>
+            </div>
+            <p className={`text-xl font-bold truncate w-full ${ozet.net >= 0 ? 'text-sky-300' : 'text-amber-300'}`}>{money(ozet.net)}</p>
+            <div className={`mt-2 w-full flex-1 border-t pt-2 space-y-2 ${ozet.net >= 0 ? 'border-sky-500/10' : 'border-amber-500/10'}`}>
+              <p className={`text-[9px] leading-relaxed ${ozet.net >= 0 ? 'text-sky-300/80' : 'text-amber-300/80'}`}>Tüm gelirlerden alış faturaları, işçilik ve diğer kalemler düşülmüştür.</p>
+            </div>
+            <div className={`flex items-center justify-between mt-2 pt-2 border-t ${ozet.net >= 0 ? 'border-sky-500/10' : 'border-amber-500/10'} w-full`}>
+              <span className={`text-[9px] font-bold ${ozet.net >= 0 ? 'text-sky-400' : 'text-amber-400'}`}>Kâr Marjı:</span>
+              <span className={`text-[10px] font-bold ${ozet.net >= 0 ? 'text-sky-300' : 'text-amber-300'}`}>{ozet.gelir > 0 ? `%${Math.round((ozet.net / ozet.gelir) * 100)}` : '—'}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -334,7 +356,7 @@ export default function OverviewModule({ firma }: Props) {
     const allCari = (cariHareketlerRes.data || []) as any[]
 
     const cariIncomes: IncomeRecord[] = allCari
-      .filter(r => ['satis_fatura', 'diger_alacak'].includes(r.hareket_turu))
+      .filter(r => ['satis_fatura'].includes(r.hareket_turu))
       .map(r => ({
         id: r.id, tarih: r.tarih, tutar: r.tutar,
         sirket: getSirket(r), cari_unvan: (hesapMap.get(r.cari_hesap_id) as any)?.ad || '—',
@@ -342,7 +364,7 @@ export default function OverviewModule({ firma }: Props) {
       }))
 
     const cariExpenses: ExpenseRecord[] = allCari
-      .filter(r => ['alis_fatura', 'diger_borc'].includes(r.hareket_turu))
+      .filter(r => ['alis_fatura', 'iscilik'].includes(r.hareket_turu))
       .map(r => ({
         id: r.id, tarih: r.tarih, tutar: r.tutar,
         sirket: getSirket(r), tedarikci: (hesapMap.get(r.cari_hesap_id) as any)?.ad || '—',

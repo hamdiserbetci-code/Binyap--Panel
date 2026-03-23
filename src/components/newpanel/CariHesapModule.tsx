@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, ChevronRight, Search, RefreshCw, Loader2, CheckCircle2, AlertCircle, Upload, FileSpreadsheet, X, SlidersHorizontal, Eye, EyeOff } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronRight, Search, RefreshCw, Loader2, CheckCircle2, AlertCircle, Upload, FileSpreadsheet, X, SlidersHorizontal, Eye, EyeOff, Download, ChevronLeft } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
@@ -78,16 +78,37 @@ function parseMissingColumn(message?: string) {
   return match?.[1] || null
 }
 
+// ── Eşleştirme Yardımcı Fonksiyonu ──────────────────────────────────────────
+function findCariMatch(hesaplar: CariHesap[], vkn: string | null | undefined, unvan: string | null | undefined) {
+  const normVkn = (vkn || '').replace(/\D/g, '')
+  const normUnvan = (unvan || '').toLowerCase().replace(/[\s.,-]/g, '')
+  
+  if (normVkn) {
+    const byVkn = hesaplar.find(h => (h.vkn_tckn || '').replace(/\D/g, '') === normVkn)
+    if (byVkn) return byVkn.id
+  }
+  if (normUnvan) {
+    const byUnvan = hesaplar.find(h => {
+      const hUnv = (h.ad || '').toLowerCase().replace(/[\s.,-]/g, '')
+      return hUnv === normUnvan || hUnv.includes(normUnvan) || normUnvan.includes(hUnv)
+    })
+    if (byUnvan) return byUnvan.id
+  }
+  return 'yeni'
+}
+
 // ── Ana Bileşen ─────────────────────────────────────────────────────────────
 
 export default function CariHesapModule({ firma, role }: Props) {
-  const [sirket, setSirket] = useState<'ETM' | 'BİNYAPI'>('ETM')
+  const [sirket, setSirket] = useState<'ETM' | 'BİNYAPI' | null>(null)
   const [hesaplar, setHesaplar] = useState<CariHesap[]>([])
   const [hareketler, setHareketler] = useState<CariHareket[]>([])
+  const [cariBakiyeler, setCariBakiyeler] = useState<Record<string, number>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [arama, setArama] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showListMobile, setShowListMobile] = useState(true)
 
   // Cari modal
   const [cariModal, setCariModal] = useState(false)
@@ -137,6 +158,7 @@ export default function CariHesapModule({ firma, role }: Props) {
   // ── NetFatura Entegrasyon ──────────────────────────────────────────────────
   const [nfModal, setNfModal]         = useState(false)
   const [nfStep, setNfStep]           = useState<'ayarlar'|'donem'|'faturalar'|'sonuc'>('ayarlar')
+  const [nfFaturaTuru, setNfFaturaTuru] = useState('alis_fatura')
   const [nfLoading, setNfLoading]     = useState(false)
   const [nfHata, setNfHata]           = useState('')
   const [nfAyarlar, setNfAyarlar]     = useState({
@@ -175,8 +197,7 @@ export default function CariHesapModule({ firma, role }: Props) {
       // Otomatik VKN eşleştir
       const eslestir: Record<string, string> = {}
       for (const f of faturalar) {
-        const eslesen = hesaplar.find(h => h.vkn_tckn === f.gonderenVkn)
-        eslestir[f.uuid] = eslesen?.id ?? 'yeni'
+        eslestir[f.uuid] = findCariMatch(hesaplar, f.gonderenVkn, f.gonderenUnvan)
       }
       setNfEslestir(eslestir)
       setNfStep('faturalar')
@@ -214,7 +235,7 @@ export default function CariHesapModule({ firma, role }: Props) {
       if (!cariId) { atlanan++; continue }
       let payload: any = {
         firma_id: firma.id, cari_hesap_id: cariId,
-        hareket_turu: 'alis_fatura',
+        hareket_turu: nfFaturaTuru,
         tutar: f.matrah,
         kdv_tutari: f.kdv,
         stopaj_tutari: 0,
@@ -251,6 +272,7 @@ export default function CariHesapModule({ firma, role }: Props) {
   // ── e-Fatura Excel Import ──────────────────────────────────────────────────
   const [efModal, setEfModal]         = useState(false)
   const [efStep, setEfStep]           = useState<'upload' | 'preview' | 'done'>('upload')
+  const [efFaturaTuru, setEfFaturaTuru] = useState('alis_fatura')
   const [efLoading, setEfLoading]     = useState(false)
   const [efHata, setEfHata]           = useState('')
   const [efRows, setEfRows]           = useState<EfSatir[]>([])
@@ -300,8 +322,8 @@ export default function CariHesapModule({ firma, role }: Props) {
 
         const colFaturaNo  = findCol('faturano','faturanumarasi','belgeno')
         const colTarih     = findCol('tarih','faturatarihi','islemtarihi')
-        const colVkn       = findCol('gondericivkn','saticicivkn','satıcıvkn','vkntckn','vkn')
-        const colUnvan     = findCol('gondericiunvan','satıcıunvan','saticiadi','firmaadi','unvan','gonderen')
+        const colVkn       = findCol('gondericivkn','saticicivkn','satıcıvkn','vkntckn','vkn','alicivkn','alıcıvkn','musterivkn')
+        const colUnvan     = findCol('gondericiunvan','satıcıunvan','saticiadi','firmaadi','unvan','gonderen','aliciunvan','alıcıunvan','musteriunvan','aliciadi','alıcıadı')
 
         // Toplam matrah: "toplam matrah" veya "mal/hizmet bedeli" veya "vergisiz tutar" — öncelikli
         const colToplamMatrah = findCol('toplammatrah','malvehizmetbedeli','malhizmetbedeli','vergisiztutar','kdvharictoplam')
@@ -419,8 +441,8 @@ export default function CariHesapModule({ firma, role }: Props) {
         // Otomatik VKN eşleştir
         const eslestir: Record<string, string> = {}
         for (const r of satirlar) {
-          const eslesen = r.vkn ? hesaplar.find(h => h.vkn_tckn === r.vkn) : undefined
-          eslestir[r.id] = eslesen?.id ?? (r.vkn || r.unvan ? 'yeni' : 'atla')
+          const match = findCariMatch(hesaplar, r.vkn, r.unvan)
+          eslestir[r.id] = match === 'yeni' && !r.vkn && !r.unvan ? 'atla' : match
         }
         setEfEslestir(eslestir)
         setEfRows(satirlar)
@@ -463,7 +485,7 @@ export default function CariHesapModule({ firma, role }: Props) {
 
     const makePayload = (r: EfSatir, cariId: string) => ({
       firma_id: firma.id, cari_hesap_id: cariId,
-      hareket_turu: 'alis_fatura',
+      hareket_turu: efFaturaTuru,
       tutar: r.matrah, kdv_tutari: r.kdv, stopaj_tutari: r.tevkifat,
       tarih: r.tarih, vade_tarihi: null as null,
       belge_no: r.faturaNo || null,
@@ -704,11 +726,39 @@ export default function CariHesapModule({ firma, role }: Props) {
   // ── Fetch ─────────────────────────────────────────────────────────────────
 
   const fetchHesaplar = useCallback(async () => {
+    if (!sirket) return
     setLoading(true)
-    const { data, error } = await supabase.from('cari_hesaplar')
-      .select('*').eq('firma_id', firma.id).eq('sirket', sirket).order('ad')
+    let query = supabase.from('cari_hesaplar').select('*').eq('firma_id', firma.id).order('ad')
+    if (sirket === 'ETM') {
+      query = query.or('sirket.eq.ETM,sirket.is.null')
+    } else {
+      query = query.eq('sirket', sirket)
+    }
+    const { data, error } = await query
     if (error) { setError(error.message); setLoading(false); return }
-    setHesaplar((data as CariHesap[]) || [])
+    
+    const caris = (data as CariHesap[]) || []
+    setHesaplar(caris)
+
+    if (caris.length > 0) {
+      const { data: hrkData } = await supabase.from('cari_hareketler').select('cari_hesap_id, hareket_turu, tutar, kdv_tutari, stopaj_tutari').eq('firma_id', firma.id)
+      const bmap: Record<string, number> = {}
+      caris.forEach(c => bmap[c.id] = 0)
+      if (hrkData) {
+        hrkData.forEach(h => {
+          if (bmap[h.cari_hesap_id] !== undefined) {
+             const t = Number(h.tutar || 0) + Number(h.kdv_tutari || 0) - Number(h.stopaj_tutari || 0)
+             if (h.hareket_turu === 'satis_fatura' || h.hareket_turu === 'diger_alacak') bmap[h.cari_hesap_id] += t
+             else if (h.hareket_turu === 'alis_fatura' || h.hareket_turu === 'diger_borc' || h.hareket_turu === 'iscilik') bmap[h.cari_hesap_id] -= t
+             else if (h.hareket_turu === 'tahsilat_nakit' || h.hareket_turu === 'tahsilat_cek') bmap[h.cari_hesap_id] -= t
+             else if (h.hareket_turu === 'odeme_nakit' || h.hareket_turu === 'odeme_cek') bmap[h.cari_hesap_id] += t
+          }
+        })
+      }
+      setCariBakiyeler(bmap)
+    } else {
+      setCariBakiyeler({})
+    }
     setLoading(false)
   }, [firma.id, sirket])
 
@@ -881,26 +931,47 @@ export default function CariHesapModule({ firma, role }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  if (!sirket) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-112px)] min-h-[600px] gap-8" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif' }}>
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white mb-3">Cari Hesap Yönetimi</h2>
+          <p className="text-slate-400 text-sm">İşlem yapmak istediğiniz firmayı seçin</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-6 w-full max-w-2xl px-4">
+          <button onClick={() => setSirket('ETM')} className="flex-1 group flex flex-col items-center justify-center py-12 rounded-[32px] border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_15px_40px_rgba(59,130,246,0.15)]">
+             <div className="w-20 h-20 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-3xl font-bold mb-5 group-hover:scale-110 transition-transform duration-300">E</div>
+             <h3 className="text-xl font-bold text-slate-100">ETM A.Ş.</h3>
+             <p className="mt-2 text-xs text-slate-400">Merkez Firma Carileri</p>
+          </button>
+          <button onClick={() => setSirket('BİNYAPI')} className="flex-1 group flex flex-col items-center justify-center py-12 rounded-[32px] border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)]">
+             <div className="w-20 h-20 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-3xl font-bold mb-5 group-hover:scale-110 transition-transform duration-300">B</div>
+             <h3 className="text-xl font-bold text-slate-100">BİNYAPI</h3>
+             <p className="mt-2 text-xs text-slate-400">Binyapı Firma Carileri</p>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col h-[calc(100vh-112px)] min-h-[600px]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif' }}>
-      <div className="flex flex-1 min-h-0 rounded-2xl overflow-hidden" style={{ background: '#0F1419', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className="flex flex-col h-[calc(100vh-112px)] md:min-h-[600px]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif' }}>
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 rounded-2xl overflow-hidden" style={{ background: '#0F1419', border: '1px solid rgba(255,255,255,0.07)' }}>
 
         {/* ══ SOL: Hesap Listesi ══════════════════════════════════════ */}
-        <div className="w-64 shrink-0 flex flex-col" style={{ background: '#111827', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className={`${showListMobile ? 'flex' : 'hidden'} md:flex w-full md:w-64 shrink-0 flex-col`} style={{ background: '#111827', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
 
-          {/* Şirket toggle */}
-          <div className="px-4 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] mb-3" style={{ color: '#5F6368' }}>Şirket</p>
-            <div className="flex rounded-lg p-0.5 gap-0.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {(['ETM', 'BİNYAPI'] as const).map(s => (
-                <button key={s} onClick={() => { setSirket(s); setSelectedId(null) }}
-                  className="flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-all duration-150"
-                  style={sirket === s
-                    ? { background: 'rgba(91,159,255,0.15)', color: '#5B9FFF', border: '1px solid rgba(91,159,255,0.25)' }
-                    : { color: '#5F6368', border: '1px solid transparent' }}>
-                  {s}
-                </button>
-              ))}
+          {/* Geri Butonu ve Başlık */}
+          <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <button onClick={() => { setSirket(null); setSelectedId(null) }} className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors mb-4">
+              <ChevronLeft size={14} /> Firmalara Dön
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold">{sirket === 'ETM' ? 'E' : 'B'}</div>
+              <div>
+                <p className="text-[10px] text-slate-500 leading-tight">Seçili Firma</p>
+                <p className="text-sm font-bold text-white leading-tight">{sirket === 'ETM' ? 'ETM A.Ş.' : 'BİNYAPI'}</p>
+              </div>
             </div>
           </div>
 
@@ -935,29 +1006,38 @@ export default function CariHesapModule({ firma, role }: Props) {
               <p className="py-10 text-center text-[11px]" style={{ color: '#5F6368' }}>Hesap bulunamadı</p>
             ) : filteredHesaplar.map(c => {
               const isActive = c.id === selectedId
+              const cb = cariBakiyeler[c.id] || 0
               return (
-                <div key={c.id} onClick={() => setSelectedId(c.id)}
-                  className="group flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150 mb-0.5"
+                <div key={c.id} onClick={() => { setSelectedId(c.id); setShowListMobile(false); }}
+                  className="group flex flex-col mx-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-150 mb-0.5"
                   style={isActive
                     ? { background: 'rgba(91,159,255,0.1)', borderLeft: '2px solid #5B9FFF', paddingLeft: '10px' }
                     : { borderLeft: '2px solid transparent' }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium leading-snug transition-colors" style={{ color: isActive ? '#E8EAED' : '#9AA0A6', wordBreak: 'break-word' }}>{c.ad}</p>
-                    {c.vkn_tckn && <p className="text-[10px] mt-0.5" style={{ color: '#5F6368' }}>{c.vkn_tckn}</p>}
+                  
+                  <div className="flex items-center justify-between gap-3 min-w-0">
+                    <p className="text-[13px] font-medium leading-snug transition-colors truncate" style={{ color: isActive ? '#E8EAED' : '#9AA0A6' }}>{c.ad}</p>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      {can(role, 'edit') && (
+                        <button onClick={e => { e.stopPropagation(); openCariModal(c) }} className="rounded p-1 transition-colors" style={{ color: '#5F6368' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#9AA0A6')} onMouseLeave={e => (e.currentTarget.style.color = '#5F6368')}>
+                          <Pencil size={11} />
+                        </button>
+                      )}
+                      {can(role, 'delete') && (
+                        <button onClick={e => { e.stopPropagation(); deleteCari(c.id) }} className="rounded p-1 transition-colors" style={{ color: '#5F6368' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#EA4335')} onMouseLeave={e => (e.currentTarget.style.color = '#5F6368')}>
+                          <Trash2 size={11} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    {can(role, 'edit') && (
-                      <button onClick={e => { e.stopPropagation(); openCariModal(c) }} className="rounded p-1 transition-colors" style={{ color: '#5F6368' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#9AA0A6')} onMouseLeave={e => (e.currentTarget.style.color = '#5F6368')}>
-                        <Pencil size={11} />
-                      </button>
-                    )}
-                    {can(role, 'delete') && (
-                      <button onClick={e => { e.stopPropagation(); deleteCari(c.id) }} className="rounded p-1 transition-colors" style={{ color: '#5F6368' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#EA4335')} onMouseLeave={e => (e.currentTarget.style.color = '#5F6368')}>
-                        <Trash2 size={11} />
-                      </button>
-                    )}
+
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-[10px]" style={{ color: '#5F6368' }}>{c.vkn_tckn || 'VKN Yok'}</p>
+                    <p className="text-[11px] font-bold tabular-nums" style={{ color: cb > 0 ? '#34A853' : cb < 0 ? '#EA4335' : '#5F6368' }}>
+                      {Math.abs(cb).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                      <span className="text-[9px] font-normal ml-0.5 opacity-70">{cb > 0 ? 'A' : cb < 0 ? 'B' : ''}</span>
+                    </p>
                   </div>
                 </div>
               )
@@ -984,7 +1064,7 @@ export default function CariHesapModule({ firma, role }: Props) {
         </div>
 
         {/* ══ SAĞ: Detay Paneli ═══════════════════════════════════════ */}
-        <div className="flex-1 flex flex-col min-w-0" style={{ background: '#0F1419' }}>
+        <div className={`${!showListMobile ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0`} style={{ background: '#0F1419' }}>
           {!selectedCari ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -999,11 +1079,16 @@ export default function CariHesapModule({ firma, role }: Props) {
             <>
               {/* ── Başlık + Özet ── */}
               <div className="px-6 py-4 flex items-start justify-between gap-4 flex-wrap" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div>
-                  <h2 className="text-[15px] font-semibold" style={{ color: '#E8EAED' }}>{selectedCari.ad}</h2>
-                  <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-start gap-3">
+                  <button onClick={() => setShowListMobile(true)} className="md:hidden mt-0.5 p-1 text-slate-400 hover:text-white bg-white/5 rounded-lg shrink-0">
+                    <ChevronLeft size={18} />
+                  </button>
+                  <div className="min-w-0">
+                    <h2 className="text-[15px] font-semibold" style={{ color: '#E8EAED' }}>{selectedCari.ad}</h2>
+                    <div className="flex items-center gap-3 mt-1">
                     {selectedCari.vkn_tckn && <span className="text-[11px]" style={{ color: '#5F6368' }}>VKN {selectedCari.vkn_tckn}</span>}
                     <span className="text-[11px]" style={{ color: '#3C4550' }}>{hareketler.length} işlem</span>
+                  </div>
                   </div>
                 </div>
 
@@ -1330,7 +1415,7 @@ export default function CariHesapModule({ firma, role }: Props) {
               <div className="flex items-center gap-3">
                 <Upload size={18} className="text-blue-400" />
                 <div>
-                  <h3 className="text-base font-bold text-white">İşnet NetFatura — Alış Faturaları</h3>
+                  <h3 className="text-base font-bold text-white">İşnet NetFatura — {nfFaturaTuru === 'alis_fatura' ? 'Alış' : 'Satış'} Faturaları</h3>
                   <div className="flex gap-3 mt-1">
                     {(['ayarlar','donem','faturalar','sonuc'] as const).map((s, i) => (
                       <span key={s} className={`text-[10px] font-semibold uppercase tracking-wider ${nfStep === s ? 'text-blue-400' : 'text-slate-600'}`}>
@@ -1354,11 +1439,20 @@ export default function CariHesapModule({ firma, role }: Props) {
                     <p className="text-slate-500">Kimlik bilgileriniz yalnızca tarayıcınızda tutulur, sunucuya kaydedilmez.</p>
                   </div>
                   <div className="space-y-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">API Adresi</label>
-                      <input className={inputCls} value={nfAyarlar.apiUrl}
-                        onChange={e => setNfAyarlar(a => ({ ...a, apiUrl: e.target.value }))}
-                        placeholder="https://efatura.isnet.net.tr" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">Fatura Türü</label>
+                        <select className={inputCls} value={nfFaturaTuru} onChange={e => setNfFaturaTuru(e.target.value)}>
+                          <option value="alis_fatura" className="bg-slate-900">Alış Faturası (Gider)</option>
+                          <option value="satis_fatura" className="bg-slate-900">Satış Faturası (Gelir)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">API Adresi</label>
+                        <input className={inputCls} value={nfAyarlar.apiUrl}
+                          onChange={e => setNfAyarlar(a => ({ ...a, apiUrl: e.target.value }))}
+                          placeholder="https://efatura.isnet.net.tr" />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -1700,7 +1794,7 @@ export default function CariHesapModule({ firma, role }: Props) {
               <div className="flex items-center gap-2">
                 <FileSpreadsheet size={18} className="text-orange-400" />
                 <div>
-                  <h3 className="text-base font-bold text-white">e-Fatura Excel — Alış Faturaları Aktar</h3>
+                  <h3 className="text-base font-bold text-white">e-Fatura Excel — {efFaturaTuru === 'alis_fatura' ? 'Alış' : 'Satış'} Faturaları Aktar</h3>
                   <p className="text-xs text-slate-500 mt-0.5">VKN bazlı otomatik cari eşleştirme</p>
                 </div>
               </div>
@@ -1715,7 +1809,15 @@ export default function CariHesapModule({ firma, role }: Props) {
                   <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4 text-xs text-orange-200/70 space-y-1">
                     <p className="font-semibold text-orange-400 text-sm">e-Fatura / NetFatura Excel Aktarımı</p>
                     <p>İşnet veya GİB e-Arşiv portalından indirdiğiniz Excel dosyasını yükleyin.</p>
-                    <p className="text-slate-500">Her fatura Gönderici VKN'ye göre mevcut carilerinizle otomatik eşleştirilir. Eşleşemeyen cariler için yeni kayıt oluşturulur.</p>
+                    <p className="text-slate-500">Her fatura Gönderici/Alıcı VKN'ye göre mevcut carilerinizle otomatik eşleştirilir. Eşleşemeyen cariler için yeni kayıt oluşturulur.</p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">Aktarılacak Fatura Türü</label>
+                    <select className={inputCls} value={efFaturaTuru} onChange={e => setEfFaturaTuru(e.target.value)}>
+                      <option value="alis_fatura" className="bg-slate-900">Alış Faturaları (Tedarikçi / Gider)</option>
+                      <option value="satis_fatura" className="bg-slate-900">Satış Faturaları (Müşteri / Gelir)</option>
+                    </select>
                   </div>
 
                   <label

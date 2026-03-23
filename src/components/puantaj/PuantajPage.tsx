@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, Firma, AY_LABELS } from '@/lib/supabase'
 import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
-import { Plus, Pencil, Trash2, CheckCircle, Clock, FolderOpen, ChevronRight, Upload, Download, FileText, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, Clock, FolderOpen, ChevronRight, Upload, Download, FileText, X, ChevronLeft } from 'lucide-react'
 
 interface Proje { id: string; ad: string; durum: string }
 interface Ekip { id: string; ad_soyad: string; pozisyon?: string; gunluk_ucret?: number; durum: string }
@@ -47,35 +47,43 @@ export default function PuantajPage({ userId, firma }: Props) {
     findLastDataMonth()
   }, [firma.id])
   const [form, setForm] = useState({ ekip_id:'', yil:new Date().getFullYear(), ay:new Date().getMonth()+1, gun_sayisi:'0', notlar:'', onaylandi:false, teyit_edildi:false, maas_odendi:false })
+  const [sirket, setSirket] = useState<'ETM' | 'BİNYAPI' | null>(null)
 
   const fetchProjeler = useCallback(async () => {
+    if (!sirket) return
     const { data } = await supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad')
-    setProjeler(data || [])
-  }, [firma.id])
+    const all = data || []
+    setProjeler(all.filter((p: any) => sirket === 'ETM' ? (!p.sirket || p.sirket === 'ETM') : p.sirket === sirket))
+  }, [firma.id, sirket])
 
   const fetchEkipler = useCallback(async (projeId?: string) => {
+    if (!sirket) return
     let q = supabase.from('ekipler').select('*').eq('firma_id', firma.id).eq('durum', 'aktif')
     if (projeId) q = q.eq('proje_id', projeId)
     const { data } = await q
-    setEkipler(data || [])
-  }, [firma.id])
+    const all = data || []
+    setEkipler(all.filter((e: any) => sirket === 'ETM' ? (!e.sirket || e.sirket === 'ETM') : e.sirket === sirket))
+  }, [firma.id, sirket])
 
   const fetchDokumanlar = useCallback(async () => {
-    if (!selectedProje) return
+    if (!selectedProje || !sirket) return
     const { data } = await supabase.from('puantaj_dokumanlar').select('*')
       .eq('proje_id', selectedProje.id).eq('yil', selectedYil).eq('ay', selectedAy)
       .order('olusturulma', { ascending: false })
-    setDokumanlar(data || [])
-  }, [selectedProje, selectedYil, selectedAy])
+    const all = data || []
+    setDokumanlar(all.filter((d: any) => sirket === 'ETM' ? (!d.sirket || d.sirket === 'ETM') : d.sirket === sirket))
+  }, [selectedProje, selectedYil, selectedAy, sirket])
 
   const fetchPuantaj = useCallback(async () => {
+    if (!sirket) return
     setLoading(true)
     let q = supabase.from('puantaj').select('*').eq('firma_id', firma.id).eq('yil', selectedYil).eq('ay', selectedAy)
     if (selectedProje) q = q.eq('proje_id', selectedProje.id)
     const { data } = await q.order('ekip_id')
-    setPuantajlar(data || [])
+    const all = data || []
+    setPuantajlar(all.filter((p: any) => sirket === 'ETM' ? (!p.sirket || p.sirket === 'ETM') : p.sirket === sirket))
     setLoading(false)
-  }, [userId, selectedYil, selectedAy, selectedProje])
+  }, [userId, selectedYil, selectedAy, selectedProje, sirket])
 
   useEffect(() => { fetchProjeler() }, [fetchProjeler])
   useEffect(() => { fetchPuantaj() }, [fetchPuantaj])
@@ -96,9 +104,17 @@ export default function PuantajPage({ userId, firma }: Props) {
     const ekip = ekipler.find(e => e.id === form.ekip_id)
     const projeId = selectedProje?.id || (ekip ? (await supabase.from('ekipler').select('proje_id').eq('id', form.ekip_id).single()).data?.proje_id : null)
     if (!projeId) return
-    const data = { ekip_id:form.ekip_id, yil:Number(form.yil), ay:Number(form.ay), gun_sayisi:Number(form.gun_sayisi), notlar:form.notlar, onaylandi:form.onaylandi, teyit_edildi:form.teyit_edildi, maas_odendi:form.maas_odendi, proje_id:projeId, firma_id:firma.id, user_id:userId }
-    if (editing) await supabase.from('puantaj').update(data).eq('id', editing.id)
-    else await supabase.from('puantaj').insert(data)
+    const payload: any = { ekip_id:form.ekip_id, yil:Number(form.yil), ay:Number(form.ay), gun_sayisi:Number(form.gun_sayisi), notlar:form.notlar, onaylandi:form.onaylandi, teyit_edildi:form.teyit_edildi, maas_odendi:form.maas_odendi, proje_id:projeId, firma_id:firma.id, user_id:userId, sirket }
+    let working = { ...payload }
+    let res
+    while(true) {
+      res = editing ? await supabase.from('puantaj').update(working).eq('id', editing.id) : await supabase.from('puantaj').insert(working)
+      if (!res.error) break
+      const match = res.error.message.match(/'([^']+)' column of/i)
+      const col = match ? match[1] : null
+      if (!col || !(col in working) || Object.keys(working).length <= 2) break
+      delete working[col]
+    }
     setModal(false); fetchPuantaj()
   }
 
@@ -113,12 +129,20 @@ export default function PuantajPage({ userId, firma }: Props) {
       const fileName = `puantaj/${userId}/${selectedProje.id}/${selectedYil}-${selectedAy}/${Date.now()}_${safeName}`
       const { error } = await supabase.storage.from('dokumanlar').upload(fileName, file, { contentType: file.type })
       if (error) throw error
-      await supabase.from('puantaj_dokumanlar').insert({
-        proje_id: selectedProje.id, firma_id: firma.id,
-        yil: selectedYil, ay: selectedAy,
-        dosya_adi: file.name, dosya_url: fileName,
+      const payload: any = {
+        proje_id: selectedProje.id, firma_id: firma.id, sirket,
+        yil: selectedYil, ay: selectedAy, dosya_adi: file.name, dosya_url: fileName,
         dosya_boyut: file.size, dosya_tipi: file.type, user_id: userId
-      })
+      }
+      let working = { ...payload }; let res;
+      while(true) {
+        res = await supabase.from('puantaj_dokumanlar').insert(working)
+        if (!res.error) break
+        const match = res.error.message.match(/'([^']+)' column of/i)
+        const col = match ? match[1] : null
+        if (!col || !(col in working) || Object.keys(working).length <= 2) break
+        delete working[col]
+      }
       fetchDokumanlar()
     } catch (e: any) { alert('Yükleme hatası: ' + e.message) }
     finally { setUploading(false) }
@@ -169,10 +193,42 @@ export default function PuantajPage({ userId, firma }: Props) {
   const maasOdenenler = puantajlar.filter(p => p.maas_odendi).length
   const yillar = Array.from({ length:5 }, (_,i) => new Date().getFullYear()-i)
 
+  if (!sirket) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-112px)] min-h-[600px] gap-8" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif' }}>
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white mb-3">Puantaj ve İK Yönetimi</h2>
+          <p className="text-slate-400 text-sm">İşlem yapmak istediğiniz firmayı seçin</p>
+        </div>
+        <div className="flex gap-6">
+          <button onClick={() => setSirket('ETM')} className="group flex flex-col items-center justify-center w-64 h-64 rounded-[32px] border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_15px_40px_rgba(59,130,246,0.15)]">
+             <div className="w-20 h-20 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-3xl font-bold mb-5 group-hover:scale-110 transition-transform duration-300">E</div>
+             <h3 className="text-xl font-bold text-slate-100">ETM A.Ş.</h3>
+             <p className="mt-2 text-xs text-slate-400">Merkez Firma Kadroları</p>
+          </button>
+          <button onClick={() => setSirket('BİNYAPI')} className="group flex flex-col items-center justify-center w-64 h-64 rounded-[32px] border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)]">
+             <div className="w-20 h-20 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-3xl font-bold mb-5 group-hover:scale-110 transition-transform duration-300">B</div>
+             <h3 className="text-xl font-bold text-slate-100">BİNYAPI</h3>
+             <p className="mt-2 text-xs text-slate-400">Binyapı Firma Kadroları</p>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex gap-0 h-full overflow-hidden">
       {/* SOL: Proje Seçim Paneli */}
       <div className="w-64 flex-shrink-0 border-r border-white/[0.08] p-4 overflow-y-auto bg-white/[0.02]">
+        <div className="mb-4 pb-4 border-b border-white/[0.08]">
+          <button onClick={() => setSirket(null)} className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors mb-4">
+            <ChevronLeft size={16} /> Firmalara Dön
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white text-xs font-bold">{sirket === 'ETM' ? 'E' : 'B'}</div>
+            <p className="text-sm font-bold text-white">{sirket === 'ETM' ? 'ETM A.Ş.' : 'BİNYAPI'}</p>
+          </div>
+        </div>
         <h3 className="text-sm font-semibold text-slate-200 mb-3">Proje Filtrele</h3>
         <div className="space-y-1.5">
           {/* Tüm projeler seçeneği */}

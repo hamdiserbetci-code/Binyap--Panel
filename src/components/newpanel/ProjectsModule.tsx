@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FolderKanban, Pencil, Plus, Trash2, ChevronLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { can } from '@/lib/permissions'
 import Modal, { FormField, btnPrimary, btnSecondary, inputCls } from '@/components/ui/Modal'
@@ -63,6 +63,11 @@ const emptyForm = {
   aciklama: '',
 }
 
+function parseMissingColumn(message?: string) {
+  const match = (message || '').match(/'([^']+)' column of/i)
+  return match?.[1] || null
+}
+
 export default function ProjectsModule({ firma, role }: Props) {
   const [projects, setProjects] = useState<ProjectRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,9 +77,11 @@ export default function ProjectsModule({ firma, role }: Props) {
   const [editing, setEditing] = useState<ProjectRecord | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [filter, setFilter] = useState<'all' | 'aktif' | null>(null)
+  const [sirket, setSirket] = useState<'ETM' | 'BİNYAPI' | null>(null)
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
+    if (!sirket) return
     setError('')
     const { data, error } = await supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad')
     if (error) {
@@ -83,9 +90,11 @@ export default function ProjectsModule({ firma, role }: Props) {
       setLoading(false)
       return
     }
-    setProjects((data as ProjectRecord[]) || [])
+    const allData = (data as any[]) || []
+    const filtered = allData.filter(p => sirket === 'ETM' ? (!p.sirket || p.sirket === 'ETM') : p.sirket === sirket)
+    setProjects(filtered as ProjectRecord[])
     setLoading(false)
-  }, [firma.id])
+  }, [firma.id, sirket])
 
   useEffect(() => {
     fetchProjects()
@@ -136,9 +145,10 @@ export default function ProjectsModule({ firma, role }: Props) {
     setSaving(true)
     setError('')
 
-    const payload = {
+    const payload: any = {
       firma_id: firma.id,
       kod: form.kod || null,
+      sirket: sirket,
       ad: form.ad.trim(),
       durum: form.durum,
       baslangic_tarihi: form.baslangic_tarihi || null,
@@ -148,9 +158,15 @@ export default function ProjectsModule({ firma, role }: Props) {
       aciklama: form.aciklama || null,
     }
 
-    const response = editing
-      ? await supabase.from('projeler').update(payload).eq('id', editing.id)
-      : await supabase.from('projeler').insert(payload)
+    let working = { ...payload }
+    let response;
+    while (true) {
+      response = editing ? await supabase.from('projeler').update(working).eq('id', editing.id) : await supabase.from('projeler').insert(working)
+      if (!response.error) break
+      const col = parseMissingColumn(response.error.message)
+      if (!col || !(col in working) || Object.keys(working).length <= 2) break
+      delete working[col]
+    }
 
     if (response.error) {
       setError(response.error.message)
@@ -176,8 +192,41 @@ export default function ProjectsModule({ firma, role }: Props) {
 
   const currency = (value: number) => value.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' TL'
 
+  if (!sirket) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-112px)] min-h-[600px] gap-8" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif' }}>
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-white mb-3">Proje Yönetimi</h2>
+          <p className="text-slate-400 text-sm">İşlem yapmak istediğiniz firmayı seçin</p>
+        </div>
+        <div className="flex gap-6">
+          <button onClick={() => setSirket('ETM')} className="group flex flex-col items-center justify-center w-64 h-64 rounded-[32px] border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_15px_40px_rgba(59,130,246,0.15)]">
+             <div className="w-20 h-20 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-3xl font-bold mb-5 group-hover:scale-110 transition-transform duration-300">E</div>
+             <h3 className="text-xl font-bold text-slate-100">ETM A.Ş.</h3>
+             <p className="mt-2 text-xs text-slate-400">Merkez Firma Projeleri</p>
+          </button>
+          <button onClick={() => setSirket('BİNYAPI')} className="group flex flex-col items-center justify-center w-64 h-64 rounded-[32px] border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 hover:border-indigo-500/40 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_15px_40px_rgba(99,102,241,0.15)]">
+             <div className="w-20 h-20 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-3xl font-bold mb-5 group-hover:scale-110 transition-transform duration-300">B</div>
+             <h3 className="text-xl font-bold text-slate-100">BİNYAPI</h3>
+             <p className="mt-2 text-xs text-slate-400">Binyapı Firma Projeleri</p>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
+      <div className="flex items-center gap-4 mb-5">
+        <button onClick={() => setSirket(null)} className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-colors">
+          <ChevronLeft size={16} /> Firmalara Dön
+        </button>
+        <div className="w-px h-5 bg-white/10" />
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-white text-xs font-bold">{sirket === 'ETM' ? 'E' : 'B'}</div>
+          <p className="text-sm font-bold text-white">{sirket === 'ETM' ? 'ETM A.Ş.' : 'BİNYAPI'}</p>
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         <SummaryCard label="Toplam Proje" value={String(projects.length)} note="Tum projeleri listele" onClick={() => setFilter(filter === 'all' ? null : 'all')} isActive={filter === 'all'} />
         <SummaryCard label="Aktif Proje" value={String(summary.activeCount)} note="Sadece aktifleri listele" onClick={() => setFilter(filter === 'aktif' ? null : 'aktif')} isActive={filter === 'aktif'} />
