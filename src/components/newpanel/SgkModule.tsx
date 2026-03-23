@@ -54,10 +54,11 @@ const fileSize = (v?: number | null) => !v ? '-' : v < 1024 * 1024 ? `${(v / 102
 function parseMissingColumn(msg?: string) {
   return (msg || '').match(/'([^']+)' column of/i)?.[1] || null
 }
-async function safeInsert(table: string, payload: Record<string, unknown>) {
+async function safeInsert(table: 'sgk_giris_cikis' | 'sgk_prim_bildirgeleri' | 'dokumanlar', payload: Record<string, unknown>) {
   let working = { ...payload }
   while (true) {
-    const res = await supabase.from(table).insert(working)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await (supabase.from as any)(table).insert(working)
     if (!res.error) return res
     const col = parseMissingColumn(res.error.message)
     if (!col || !(col in working) || Object.keys(working).length <= 2) return res
