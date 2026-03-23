@@ -116,7 +116,8 @@ async function fetchModulRows(
     if (hareketErr) throw new Error(hareketErr.message)
     return ((hareketData || []) as any[]).map(r => {
       const h = hesapMap.get(r.cari_hesap_id) as any
-      return { 'Cari Adı': h?.Reklam || '—', Şirket: h?.sirket || 'ETM', Tarih: r.tarih || '', 'Hareket Türü': r.hareket_turu || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Vade Tarihi': r.vade_tarihi || '', 'Çek No': r.cek_no || '', 'Çek Banka': r.cek_banka || '', Durum: r.durum || '', Açıklama: r.aciklama || '' }
+      const cariAdi = h ? (Object.entries(h).find(([k]) => k.toLowerCase() === 'reklam')?.[1] as string || h.ad || '') : ''
+      return { 'Cari Adı': cariAdi || '—', Şirket: h?.sirket || 'ETM', Tarih: r.tarih || '', 'Hareket Türü': r.hareket_turu || '', 'Belge No': r.belge_no || '', 'Tutar (₺)': Number(r.tutar || 0), 'Vade Tarihi': r.vade_tarihi || '', 'Çek No': r.cek_no || '', 'Çek Banka': r.cek_banka || '', Durum: r.durum || '', Açıklama: r.aciklama || '' }
     })
   }
 
