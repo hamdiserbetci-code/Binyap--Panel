@@ -104,8 +104,8 @@ async function fetchModulRows(
   if (id === 'cari') {
     // cari_hesaplar join ile hesapların sirket filtresi uygulanır
     const hesapQ = sirket === 'ETM'
-      ? supabase.from('cari_hesaplar').select('id, Reklam, sirket').eq('firma_id', firmaId).or('sirket.eq.ETM,sirket.is.null')
-      : supabase.from('cari_hesaplar').select('id, Reklam, sirket').eq('firma_id', firmaId).eq('sirket', sirket)
+      ? supabase.from('cari_hesaplar').select('*').eq('firma_id', firmaId).or('sirket.eq.ETM,sirket.is.null')
+      : supabase.from('cari_hesaplar').select('*').eq('firma_id', firmaId).eq('sirket', sirket)
     const { data: hesapData, error: hesapErr } = await hesapQ
     if (hesapErr) throw new Error(hesapErr.message)
     const hesapMap = new Map(((hesapData || []) as any[]).map(c => [c.id, c]))
