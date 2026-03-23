@@ -23,6 +23,7 @@ export interface FirmaRecord {
 export interface ProjectRecord {
   id: string
   firma_id: string
+  sirket?: string | null
   kod: string | null
   ad: string
   durum: string
@@ -53,6 +54,7 @@ const statusClasses: Record<string, string> = {
 }
 
 const emptyForm = {
+  sirket: 'ETM',
   kod: '',
   ad: '',
   durum: 'planlama',
@@ -115,7 +117,7 @@ export default function ProjectsModule({ firma, role }: Props) {
   function openCreateModal() {
     if (!can(role, 'edit')) return
     setEditing(null)
-    setForm(emptyForm)
+    setForm({ ...emptyForm, sirket: sirket || 'ETM' })
     setModalOpen(true)
   }
 
@@ -123,6 +125,7 @@ export default function ProjectsModule({ firma, role }: Props) {
     if (!can(role, 'edit')) return
     setEditing(project)
     setForm({
+      sirket: project.sirket || sirket || 'ETM',
       kod: project.kod || '',
       ad: project.ad,
       durum: project.durum || 'planlama',
@@ -148,7 +151,7 @@ export default function ProjectsModule({ firma, role }: Props) {
     const payload: any = {
       firma_id: firma.id,
       kod: form.kod || null,
-      sirket: sirket,
+      sirket: form.sirket,
       ad: form.ad.trim(),
       durum: form.durum,
       baslangic_tarihi: form.baslangic_tarihi || null,
@@ -172,6 +175,10 @@ export default function ProjectsModule({ firma, role }: Props) {
       setError(response.error.message)
       setSaving(false)
       return
+    }
+
+    if (Object.keys(working).length < Object.keys(payload).length) {
+      alert('Veritabanında "sirket" kolonu bulunamadığı için proje ana firma (ETM) altında kaydedildi. Lütfen Supabase üzerinden "projeler" tablosuna "sirket" adında bir "text" kolonu ekleyin.')
     }
 
     setModalOpen(false)
@@ -302,10 +309,18 @@ export default function ProjectsModule({ firma, role }: Props) {
         <Modal title={editing ? 'Projeyi duzenle' : 'Yeni proje olustur'} onClose={() => setModalOpen(false)} footer={<><button className={btnSecondary} onClick={() => setModalOpen(false)}>Iptal</button><button className={btnPrimary} onClick={saveProject} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Şirket / Marka" required>
+                <select className={inputCls} value={form.sirket} onChange={(e) => setForm({ ...form, sirket: e.target.value })}>
+                  <option value="ETM" className="bg-slate-900 text-white">ETM</option>
+                  <option value="BİNYAPI" className="bg-slate-900 text-white">BİNYAPI</option>
+                </select>
+              </FormField>
               <FormField label="Proje Kodu"><input className={inputCls} value={form.kod} onChange={(e) => setForm({ ...form, kod: e.target.value })} /></FormField>
-              <FormField label="Durum" required><select className={inputCls} value={form.durum} onChange={(e) => setForm({ ...form, durum: e.target.value })}><option value="planlama">Planlama</option><option value="aktif">Aktif</option><option value="beklemede">Beklemede</option><option value="kapandi">Kapandi</option></select></FormField>
             </div>
-            <FormField label="Proje Adi" required><input className={inputCls} value={form.ad} onChange={(e) => setForm({ ...form, ad: e.target.value })} /></FormField>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField label="Durum" required><select className={inputCls} value={form.durum} onChange={(e) => setForm({ ...form, durum: e.target.value })}><option value="planlama">Planlama</option><option value="aktif">Aktif</option><option value="beklemede">Beklemede</option><option value="kapandi">Kapandi</option></select></FormField>
+              <FormField label="Proje Adi" required><input className={inputCls} value={form.ad} onChange={(e) => setForm({ ...form, ad: e.target.value })} /></FormField>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField label="Baslangic Tarihi"><input type="date" className={inputCls} value={form.baslangic_tarihi} onChange={(e) => setForm({ ...form, baslangic_tarihi: e.target.value })} /></FormField>
               <FormField label="Bitis Tarihi"><input type="date" className={inputCls} value={form.bitis_tarihi} onChange={(e) => setForm({ ...form, bitis_tarihi: e.target.value })} /></FormField>

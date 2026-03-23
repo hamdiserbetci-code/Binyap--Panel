@@ -280,50 +280,57 @@ export default function BankalarModule({ firma, role }: Props) {
   async function excelImporta() {
     if (!selectedId || excelRows.length === 0) return
     setExcelLoading(true)
+    setExcelHata('')
     let eklenen = 0, atlanan = 0
 
-    const { data: extDocs } = await supabase.from('banka_hareketleri').select('belge_no, tarih, tutar').eq('firma_id', firma.id).eq('banka_id', selectedId)
-    const existingSet = new Set((extDocs || []).map(d => `${d.tarih}_${d.tutar}_${(d.belge_no||'').trim().toLowerCase()}`))
+    // Mükerrer kontrolü
+    const { data: extDocs } = await supabase.from('banka_hareketleri')
+      .select('belge_no, tarih, tutar').eq('firma_id', firma.id).eq('banka_id', selectedId)
+    const existingSet = new Set((extDocs || []).map((d: any) =>
+      `${d.tarih}_${d.tutar}_${(d.belge_no||'').trim().toLowerCase()}`))
 
     const uniqueRows = excelRows.filter(r => {
       const key = `${r.tarih}_${r.tutar}_${(r.belge_no||'').trim().toLowerCase()}`
-      if (existingSet.has(key)) return false
+      if (existingSet.has(key)) { atlanan++; return false }
       return true
     })
-    atlanan = excelRows.length - uniqueRows.length
 
     if (uniqueRows.length === 0) {
-      setExcelSonuc({ eklenen, atlanan }); setExcelStep('done'); setExcelLoading(false); return;
+      setExcelSonuc({ eklenen: 0, atlanan })
+      setExcelStep('done')
+      setExcelLoading(false)
+      return
     }
 
-    const basePayload = uniqueRows.map(r => ({
-      firma_id: firma.id, banka_id: selectedId,
-      hareket_turu: r.hareket_turu, tutar: r.tutar, tarih: r.tarih,
-      aciklama: r.aciklama || null, belge_no: r.belge_no || null,
+    const payload = uniqueRows.map(r => ({
+      firma_id: firma.id,
+      banka_id: selectedId,
+      hareket_turu: r.hareket_turu,
+      tutar: r.tutar,
+      tarih: r.tarih,
+      aciklama: r.aciklama || null,
+      belge_no: r.belge_no || null,
       ...(excelCariId ? { cari_hesap_id: excelCariId } : {}),
     }))
 
-    let workingKeys = Object.keys(basePayload[0])
-    const testRow = { ...basePayload[0] }
-    let kolonTest = await supabase.from('banka_hareketleri').insert([testRow])
-    while (kolonTest.error) {
-      const eksik = parseMissingColumn(kolonTest.error.message)
-      if (!eksik || !workingKeys.includes(eksik) || workingKeys.length <= 3) break
-      workingKeys = workingKeys.filter(k => k !== eksik)
-      const temizRow: any = {}; workingKeys.forEach(k => { temizRow[k] = (testRow as any)[k] })
-      kolonTest = await supabase.from('banka_hareketleri').insert([temizRow])
-    }
-    if (kolonTest.error) { setExcelHata('Kayıt hatası: ' + kolonTest.error.message); setExcelLoading(false); return }
-    eklenen++
-
-    const kalanlar = basePayload.slice(1)
-    for (let i = 0; i < kalanlar.length; i += 50) {
-      const batch = kalanlar.slice(i, i + 50).map(r => {
-        const temiz: any = {}; workingKeys.forEach(k => { temiz[k] = (r as any)[k] })
-        return temiz
-      })
+    // 50'şer batch ile ekle
+    for (let i = 0; i < payload.length; i += 50) {
+      const batch = payload.slice(i, i + 50)
       const { error } = await supabase.from('banka_hareketleri').insert(batch)
-      if (error) atlanan += batch.length; else eklenen += batch.length;
+      if (error) {
+        // cari_hesap_id kolonu yoksa onsuz tekrar dene
+        if (error.message.includes('cari_hesap_id')) {
+          const batchSiz = batch.map(({ cari_hesap_id: _, ...r }: any) => r)
+          const { error: e2 } = await supabase.from('banka_hareketleri').insert(batchSiz)
+          if (e2) { atlanan += batch.length } else { eklenen += batch.length }
+        } else {
+          setExcelHata('Kayıt hatası: ' + error.message)
+          setExcelLoading(false)
+          return
+        }
+      } else {
+        eklenen += batch.length
+      }
     }
 
     setExcelSonuc({ eklenen, atlanan })

@@ -11,13 +11,6 @@ import type { FirmaRecord, ProjectRecord } from '@/components/newpanel/ProjectsM
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface GirisCikisRecord {
-  id: string; firma_id: string; sirket: string | null
-  calisan_adi: string; tc_kimlik: string | null
-  islem_turu: 'giris' | 'cikis'; islem_tarihi: string
-  bildirim_tarihi: string | null; durum: string; aciklama: string | null
-}
-
 interface PrimBildirgeRecord {
   id: string; firma_id: string; sirket: string | null
   yil: number; ay: number; tahakkuk_tutari: number
@@ -30,6 +23,7 @@ interface DocRecord {
   dosya_url: string; dosya_boyutu: number | null
   created_at: string; aciklama: string | null; sirket: string | null
   proje_id: string | null
+  kategori: string
 }
 
 interface Props { firma: FirmaRecord; role?: string | null }
@@ -38,10 +32,6 @@ type SgkTab = 'giris-cikis' | 'prim-bildirge' | 'hizmet-bildirimi'
 
 // ─── Initial forms ────────────────────────────────────────────────────────────
 
-const gcFormInit = {
-  calisan_adi: '', tc_kimlik: '', islem_turu: 'giris',
-  islem_tarihi: '', bildirim_tarihi: '', durum: 'taslak', aciklama: ''
-}
 const primFormInit = {
   yil: new Date().getFullYear(), ay: new Date().getMonth() + 1,
   tahakkuk_tutari: '', son_odeme_tarihi: '', odeme_tarihi: '', durum: 'taslak', aciklama: ''
@@ -77,19 +67,18 @@ export default function SgkModule({ firma, role }: Props) {
   const [tab, setTab] = useState<SgkTab>('giris-cikis')
   const [filterYil, setFilterYil] = useState(new Date().getFullYear())
   const [filterAy, setFilterAy] = useState(0) // 0 = tümü
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [gcDocFilter, setGcDocFilter] = useState<'all' | 'giris' | 'cikis'>('all')
 
   // Projeler
   const [projects, setProjects] = useState<ProjectRecord[]>([])
 
   // Giriş/Çıkış state
-  const [gcRecords, setGcRecords] = useState<GirisCikisRecord[]>([])
-  const [gcModal, setGcModal] = useState(false)
-  const [gcForm, setGcForm] = useState(gcFormInit)
 
   // PDF yükleme öncesi bilgi modalı
   const [gcUploadModal, setGcUploadModal] = useState(false)
   const [pendingGcFile, setPendingGcFile] = useState<File | null>(null)
-  const [gcUploadForm, setGcUploadForm] = useState({ proje_id: '', islem_turu: 'giris' })
+  const [gcUploadForm, setGcUploadForm] = useState({ proje_id: '', islem_turu: '' })
 
   // Prim Bildirge state
   const [primRecords, setPrimRecords] = useState<PrimBildirgeRecord[]>([])
@@ -119,18 +108,6 @@ export default function SgkModule({ firma, role }: Props) {
   }, [firma.id, sirket])
 
   useEffect(() => { fetchProjects() }, [fetchProjects])
-
-  const fetchGc = useCallback(async () => {
-    if (!sirket) return
-    setLoading(true)
-    const { data, error } = await db.from('sgk_giris_cikis')
-      .select('*').eq('firma_id', firma.id)
-      .order('islem_tarihi', { ascending: false })
-    if (error) { setError(error.message); setLoading(false); return }
-    const all = (data || []) as GirisCikisRecord[]
-    setGcRecords(all.filter((r: GirisCikisRecord) => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
-    setLoading(false)
-  }, [firma.id, sirket])
 
   const fetchPrim = useCallback(async () => {
     if (!sirket) return
@@ -169,46 +146,16 @@ export default function SgkModule({ firma, role }: Props) {
   const fetchGcDocs = useCallback(async () => {
     if (!sirket) return
     const { data, error } = await supabase.from('dokumanlar').select('*').eq('firma_id', firma.id)
-      .eq('modul', 'sgk').eq('kategori', 'giris_cikis_bildirimi')
+      .eq('modul', 'sgk').in('kategori', ['giris_cikis_bildirimi', 'ise_giris_bildirgesi', 'isten_cikis_bildirgesi'])
       .order('created_at', { ascending: false })
     if (error) { setError(error.message); return }
     const all = (data || []) as DocRecord[]
     setGcDocs(all.filter(r => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
   }, [firma.id, sirket])
 
-  useEffect(() => { if (tab === 'giris-cikis') { fetchGc(); fetchGcDocs() } }, [fetchGc, fetchGcDocs, tab])
+  useEffect(() => { if (tab === 'giris-cikis') { fetchGcDocs() } }, [fetchGcDocs, tab])
   useEffect(() => { if (tab === 'prim-bildirge') { fetchPrim(); fetchDekont() } }, [fetchPrim, fetchDekont, tab])
   useEffect(() => { if (tab === 'hizmet-bildirimi') fetchHizmet() }, [fetchHizmet, tab])
-
-  // ── Giriş/Çıkış CRUD ──────────────────────────────────────────────────────
-
-  async function saveGc() {
-    if (!can(role, 'edit')) return
-    if (!gcForm.calisan_adi || !gcForm.islem_tarihi) { setError('Çalışan adı ve işlem tarihi zorunludur.'); return }
-    const payload: Record<string, unknown> = { firma_id: firma.id, sirket, calisan_adi: gcForm.calisan_adi, tc_kimlik: gcForm.tc_kimlik || null, islem_turu: gcForm.islem_turu, islem_tarihi: gcForm.islem_tarihi, bildirim_tarihi: gcForm.bildirim_tarihi || null, durum: gcForm.durum, aciklama: gcForm.aciklama || null }
-    let working = { ...payload }; let res
-    while (true) { res = await db.from('sgk_giris_cikis').insert(working); if (!res.error) break; const col = parseMissingColumn(res.error.message); if (!col || !(col in working) || Object.keys(working).length <= 2) break; delete working[col] }
-    if (res.error) { setError(res.error.message); return }
-    await logActivity({ firmaId: firma.id, modul: 'sgk', islemTuru: 'giris_cikis_eklendi', kayitTuru: 'sgk_giris_cikis', aciklama: `${gcForm.islem_turu === 'giris' ? 'İşe giriş' : 'İşten çıkış'} bildirimi eklendi: ${gcForm.calisan_adi}` })
-    setGcModal(false)
-    setGcForm(gcFormInit)
-    fetchGc()
-  }
-
-  async function deleteGc(id: string) {
-    if (!can(role, 'delete')) return
-    if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return
-    const { error } = await db.from('sgk_giris_cikis').delete().eq('id', id)
-    if (error) { setError(error.message); return }
-    fetchGc()
-  }
-
-  async function updateGcDurum(id: string, durum: string) {
-    if (!can(role, 'edit')) return
-    const { error } = await db.from('sgk_giris_cikis').update({ durum }).eq('id', id)
-    if (error) { setError(error.message); return }
-    fetchGc()
-  }
 
   // ── Prim Bildirge CRUD ────────────────────────────────────────────────────
 
@@ -242,7 +189,7 @@ export default function SgkModule({ firma, role }: Props) {
 
   // ── File upload ───────────────────────────────────────────────────────────
 
-  async function uploadFile(file: File, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi', aciklama?: string, projeId?: string | null) {
+  async function uploadFile(file: File, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi' | 'ise_giris_bildirgesi' | 'isten_cikis_bildirgesi', aciklama?: string, projeId?: string | null) {
     if (!can(role, 'edit')) return
     if (file.size > 15 * 1024 * 1024) { setError('Dosya boyutu 15MB üzerinde olamaz.'); return }
     setUploading(kategori)
@@ -272,24 +219,26 @@ export default function SgkModule({ firma, role }: Props) {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  async function deleteDoc(doc: DocRecord, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi') {
+  async function deleteDoc(doc: DocRecord, tabName: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis') {
     if (!can(role, 'delete')) return
     if (!confirm('Bu dosyayı silmek istediğinize emin misiniz?')) return
     await supabase.storage.from('dokumanlar').remove([doc.dosya_url])
     const { error } = await supabase.from('dokumanlar').delete().eq('id', doc.id)
     if (error) { setError(error.message); return }
-    if (kategori === 'hizmet_bildirimi') fetchHizmet()
-    else if (kategori === 'prim_dekont') fetchDekont()
+    if (tabName === 'hizmet_bildirimi') fetchHizmet()
+    else if (tabName === 'prim_dekont') fetchDekont()
     else fetchGcDocs()
   }
 
   async function confirmGcUpload() {
     if (!pendingGcFile) return
+    if (!gcUploadForm.islem_turu) return
     const projeName = projects.find(p => p.id === gcUploadForm.proje_id)?.ad || 'Genel'
     const tur = gcUploadForm.islem_turu === 'giris' ? 'İşe Giriş' : 'İşten Çıkış'
     const aciklama = `${tur} — ${projeName} (${filterYil})`
     setGcUploadModal(false)
-    await uploadFile(pendingGcFile, 'giris_cikis_bildirimi', aciklama, gcUploadForm.proje_id || null)
+    const kategori = gcUploadForm.islem_turu === 'giris' ? 'ise_giris_bildirgesi' : 'isten_cikis_bildirgesi'
+    await uploadFile(pendingGcFile, kategori as any, aciklama, gcUploadForm.proje_id || null)
     setPendingGcFile(null)
   }
 
@@ -297,11 +246,15 @@ export default function SgkModule({ firma, role }: Props) {
 
   // ── Filtered data ─────────────────────────────────────────────────────────
 
-  const filteredGc = gcRecords.filter(r => {
-    if (!r.islem_tarihi) return true
-    const d = new Date(r.islem_tarihi)
-    if (d.getFullYear() !== filterYil) return false
-    if (filterAy > 0 && (d.getMonth() + 1) !== filterAy) return false
+  const filteredGcDocs = gcDocs.filter(r => {
+    if (selectedProjectId && r.proje_id !== selectedProjectId) return false
+    if (r.created_at) {
+      const d = new Date(r.created_at)
+      if (d.getFullYear() !== filterYil) return false
+      if (filterAy > 0 && (d.getMonth() + 1) !== filterAy) return false
+    }
+    if (gcDocFilter === 'giris' && r.kategori !== 'ise_giris_bildirgesi') return false
+    if (gcDocFilter === 'cikis' && r.kategori !== 'isten_cikis_bildirgesi') return false
     return true
   })
 
@@ -357,6 +310,10 @@ export default function SgkModule({ firma, role }: Props) {
 
       {/* ── Filters ── */}
       <div className="flex flex-wrap items-center gap-3">
+        <select className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-200 outline-none" value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}>
+          <option value="" className="text-slate-900">Tüm Projeler</option>
+          {projects.map(p => <option key={p.id} value={p.id} className="text-slate-900">{p.ad}</option>)}
+        </select>
         <select className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-200 outline-none" value={filterYil} onChange={e => setFilterYil(Number(e.target.value))}>
           {years.map(y => <option key={y} value={y} className="text-slate-900">{y}</option>)}
         </select>
@@ -392,118 +349,64 @@ export default function SgkModule({ firma, role }: Props) {
       {tab === 'giris-cikis' && (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <MetricCard label="Toplam Bildirim" value={String(filteredGc.length)} tone="sky" />
-            <MetricCard label="İşe Giriş" value={String(filteredGc.filter(r => r.islem_turu === 'giris').length)} tone="emerald" />
-            <MetricCard label="İşten Çıkış" value={String(filteredGc.filter(r => r.islem_turu === 'cikis').length)} tone="rose" />
+            <MetricCard label="Toplam Belge" value={String(filteredGcDocs.length)} tone="sky" />
+            <MetricCard label="İşe Giriş" value={String(filteredGcDocs.filter(r => r.kategori === 'ise_giris_bildirgesi').length)} tone="emerald" />
+            <MetricCard label="İşten Çıkış" value={String(filteredGcDocs.filter(r => r.kategori === 'isten_cikis_bildirgesi').length)} tone="rose" />
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
           <div className="rounded-[32px] border border-white/[0.04] bg-white/[0.02] p-6 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400/80">SGK Personel Bildirimleri</p>
-                <h3 className="mt-2 text-xl font-bold text-white">İşçi Giriş / Çıkış Bildirimleri</h3>
-                <p className="mt-1 text-sm text-slate-400">SGK'ya yapılan işe giriş ve işten çıkış bildirimleri.</p>
-              </div>
-              {can(role, 'edit') && (
-                <button onClick={() => { setGcForm(gcFormInit); setError(''); setGcModal(true) }}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
-                  <Plus size={16} /> Yeni Bildirim
-                </button>
-              )}
-            </div>
-
-            {loading ? (
-              <p className="text-sm text-slate-500">Yükleniyor...</p>
-            ) : filteredGc.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-10 text-center">
-                <UserCheck size={30} className="mx-auto text-slate-500 mb-3" />
-                <p className="text-sm text-slate-400">Bu filtre için kayıt bulunamadı.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredGc.map(r => (
-                  <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${r.islem_turu === 'giris' ? 'bg-emerald-500/15' : 'bg-rose-500/15'}`}>
-                        {r.islem_turu === 'giris'
-                          ? <UserCheck size={16} className="text-emerald-400" />
-                          : <UserMinus size={16} className="text-rose-400" />}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-100">{r.calisan_adi}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          TC: {r.tc_kimlik || '-'} · {r.islem_turu === 'giris' ? 'İşe Giriş' : 'İşten Çıkış'}: {r.islem_tarihi}
-                        </p>
-                        {r.bildirim_tarihi && <p className="text-[11px] text-slate-500 mt-0.5">SGK Bildirim: {r.bildirim_tarihi}</p>}
-                        {r.aciklama && <p className="text-[11px] text-slate-500 mt-0.5">{r.aciklama}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {can(role, 'edit') && (
-                        <select className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 outline-none"
-                          value={r.durum} onChange={e => updateGcDurum(r.id, e.target.value)}>
-                          <option value="taslak">Taslak</option>
-                          <option value="bildirildi">Bildirildi</option>
-                        </select>
-                      )}
-                      {can(role, 'delete') && (
-                        <button onClick={() => deleteGc(r.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/20">
-                          <Trash2 size={14} /> Sil
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Sağ: Giriş/Çıkış Bildirim Belgeleri */}
-          <div className="rounded-[32px] border border-white/[0.04] bg-white/[0.02] p-6 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400/80">Bildirim Belgeleri</p>
-                <h3 className="mt-2 text-xl font-bold text-white">PDF Arşivi</h3>
+                <h3 className="mt-2 text-xl font-bold text-white">İşe Giriş ve Çıkış Belgeleri</h3>
+                <p className="mt-1 text-sm text-slate-400">Proje bazında personellerin işe giriş ve işten çıkış evrakları (PDF Arşivi).</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button onClick={() => setGcDocFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${gcDocFilter === 'all' ? 'bg-sky-500/20 text-sky-300' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>Tümü</button>
+                  <button onClick={() => setGcDocFilter('giris')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${gcDocFilter === 'giris' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>Sadece İşe Giriş</button>
+                  <button onClick={() => setGcDocFilter('cikis')} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${gcDocFilter === 'cikis' ? 'bg-rose-500/20 text-rose-300' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}>Sadece İşten Çıkış</button>
+                </div>
               </div>
               {can(role, 'edit') && (
                 <>
-                  <button onClick={() => gcFileRef.current?.click()} disabled={uploading === 'giris_cikis_bildirimi'}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 transition-colors disabled:opacity-50">
-                    <Upload size={16} /> {uploading === 'giris_cikis_bildirimi' ? 'Yükleniyor...' : 'PDF Yükle'}
+                  <button onClick={() => gcFileRef.current?.click()} disabled={uploading === 'ise_giris_bildirgesi' || uploading === 'isten_cikis_bildirgesi'}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                    <Upload size={16} /> {uploading === 'ise_giris_bildirgesi' || uploading === 'isten_cikis_bildirgesi' ? 'Yükleniyor...' : 'Belge Yükle'}
                   </button>
                   <input ref={gcFileRef} type="file" className="hidden" accept=".pdf"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingGcFile(f); setGcUploadForm({ proje_id: '', islem_turu: 'giris' }); setGcUploadModal(true) } e.target.value = '' }} />
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setPendingGcFile(f); setGcUploadForm({ proje_id: selectedProjectId, islem_turu: '' }); setGcUploadModal(true) } e.target.value = '' }} />
                 </>
               )}
             </div>
-            {gcDocs.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
-                <Upload size={24} className="mx-auto text-slate-500 mb-2" />
+            {filteredGcDocs.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-12 text-center">
+                <Upload size={32} className="mx-auto text-slate-500 mb-3" />
                 <p className="text-sm text-slate-400">Henüz belge yüklenmedi.</p>
-                <p className="text-xs text-slate-500 mt-1">PDF formatında yükleyin.</p>
+                <p className="text-xs text-slate-500 mt-1">Giriş / çıkış bildirgelerini PDF olarak yükleyin.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {gcDocs.map(doc => (
-                  <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-sky-500/15 flex items-center justify-center shrink-0">
-                        <FileText size={16} className="text-sky-400" />
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {filteredGcDocs.map(doc => (
+                  <div key={doc.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${doc.kategori === 'ise_giris_bildirgesi' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                        <FileText size={20} />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-200 truncate max-w-[160px]">{doc.dosya_adi}</p>
-                        {doc.aciklama && <p className="text-xs text-slate-400 mt-0.5">{doc.aciklama}</p>}
-                        {doc.proje_id && <p className="text-[11px] text-sky-400/80 mt-0.5">Proje: {projectName(doc.proje_id)}</p>}
-                        <p className="text-[11px] text-slate-500 mt-0.5">{doc.created_at?.split('T')[0]} · {fileSize(doc.dosya_boyutu)}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-200 truncate">{doc.dosya_adi}</p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {doc.kategori === 'ise_giris_bildirgesi' && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">İşe Giriş</span>}
+                          {doc.kategori === 'isten_cikis_bildirgesi' && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">İşten Çıkış</span>}
+                          {doc.proje_id && <span className="text-[10px] text-sky-400/80">Proje: {projectName(doc.proje_id)}</span>}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1.5">{doc.created_at?.split('T')[0]} · {fileSize(doc.dosya_boyutu)}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => downloadDoc(doc)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10">
+                    <div className="flex items-center gap-2 pt-2 border-t border-white/[0.04]">
+                      <button onClick={() => downloadDoc(doc)} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10">
                         <Download size={14} /> İndir
                       </button>
                       {can(role, 'delete') && (
-                        <button onClick={() => deleteDoc(doc, 'giris_cikis_bildirimi')} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/20">
+                        <button onClick={() => deleteDoc(doc, 'giris_cikis')} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/20">
                           <X size={14} /> Sil
                         </button>
                       )}
@@ -512,7 +415,6 @@ export default function SgkModule({ firma, role }: Props) {
                 ))}
               </div>
             )}
-          </div>
           </div>
         </div>
       )}
@@ -700,78 +602,33 @@ export default function SgkModule({ firma, role }: Props) {
 
       {/* ══ MODAL: PDF Yükleme Bilgileri ════════════════════════════════════ */}
       {gcUploadModal && pendingGcFile && (
-        <Modal title="PDF Yükleme Bilgileri" onClose={() => { setGcUploadModal(false); setPendingGcFile(null) }}
-          footer={<><button className={btnSecondary} onClick={() => { setGcUploadModal(false); setPendingGcFile(null) }}>İptal</button><button className={btnPrimary} onClick={confirmGcUpload}>Yükle</button></>}>
+        <Modal title="Belge Yükleme Bilgileri" onClose={() => { setGcUploadModal(false); setPendingGcFile(null) }}
+          footer={<><button className={btnSecondary} onClick={() => { setGcUploadModal(false); setPendingGcFile(null) }}>İptal</button><button className={btnPrimary} onClick={confirmGcUpload} disabled={!gcUploadForm.islem_turu}>Yükle</button></>}>
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
               <FileText size={18} className="text-sky-400 shrink-0" />
               <p className="text-sm text-slate-300 truncate">{pendingGcFile.name}</p>
             </div>
-            <FormField label="Proje">
+            <FormField label="Hangi Projeye Ait?">
               <select className={inputCls} value={gcUploadForm.proje_id}
                 onChange={e => setGcUploadForm(p => ({ ...p, proje_id: e.target.value }))}>
                 <option value="">Genel (Projeye bağlı değil)</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.ad}</option>)}
               </select>
             </FormField>
-            <FormField label="Bildirim Türü" required>
-              <div className="flex gap-3">
-                <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${gcUploadForm.islem_turu === 'giris' ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-white/10 bg-white/5 text-slate-400'}`}>
-                  <input type="radio" className="hidden" value="giris" checked={gcUploadForm.islem_turu === 'giris'} onChange={() => setGcUploadForm(p => ({ ...p, islem_turu: 'giris' }))} />
-                  <UserCheck size={16} /> İşe Giriş
-                </label>
-                <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${gcUploadForm.islem_turu === 'cikis' ? 'border-rose-500/50 bg-rose-500/10 text-rose-400' : 'border-white/10 bg-white/5 text-slate-400'}`}>
-                  <input type="radio" className="hidden" value="cikis" checked={gcUploadForm.islem_turu === 'cikis'} onChange={() => setGcUploadForm(p => ({ ...p, islem_turu: 'cikis' }))} />
-                  <UserMinus size={16} /> İşten Çıkış
-                </label>
+            <FormField label="Belge Türü (Giriş mi Çıkış mı?)" required>
+              <div className="grid grid-cols-2 gap-3 mt-1">
+                <button type="button" onClick={() => setGcUploadForm(p => ({ ...p, islem_turu: 'giris' }))} 
+                  className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${gcUploadForm.islem_turu === 'giris' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'}`}>
+                  <UserCheck size={24} />
+                  <span className="font-semibold">İşe Giriş</span>
+                </button>
+                <button type="button" onClick={() => setGcUploadForm(p => ({ ...p, islem_turu: 'cikis' }))} 
+                  className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${gcUploadForm.islem_turu === 'cikis' ? 'border-rose-500 bg-rose-500/10 text-rose-400' : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'}`}>
+                  <UserMinus size={24} />
+                  <span className="font-semibold">İşten Çıkış</span>
+                </button>
               </div>
-            </FormField>
-          </div>
-        </Modal>
-      )}
-
-      {/* ══ MODAL: Giriş/Çıkış Ekle ══════════════════════════════════════════ */}
-      {gcModal && can(role, 'edit') && (
-        <Modal title="Yeni Giriş / Çıkış Bildirimi" onClose={() => setGcModal(false)}
-          footer={<><button className={btnSecondary} onClick={() => setGcModal(false)}>İptal</button><button className={btnPrimary} onClick={saveGc}>Kaydet</button></>}>
-          <div className="space-y-4">
-            <FormField label="Çalışan Adı Soyadı" required>
-              <input className={inputCls} placeholder="Ad Soyad" value={gcForm.calisan_adi}
-                onChange={e => setGcForm(p => ({ ...p, calisan_adi: e.target.value }))} />
-            </FormField>
-            <FormField label="TC Kimlik No">
-              <input className={inputCls} placeholder="11 haneli TC No" maxLength={11} value={gcForm.tc_kimlik}
-                onChange={e => setGcForm(p => ({ ...p, tc_kimlik: e.target.value }))} />
-            </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="İşlem Türü" required>
-                <select className={inputCls} value={gcForm.islem_turu}
-                  onChange={e => setGcForm(p => ({ ...p, islem_turu: e.target.value }))}>
-                  <option value="giris">İşe Giriş</option>
-                  <option value="cikis">İşten Çıkış</option>
-                </select>
-              </FormField>
-              <FormField label="Durum">
-                <select className={inputCls} value={gcForm.durum}
-                  onChange={e => setGcForm(p => ({ ...p, durum: e.target.value }))}>
-                  <option value="taslak">Taslak</option>
-                  <option value="bildirildi">Bildirildi</option>
-                </select>
-              </FormField>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="İşlem Tarihi" required>
-                <input type="date" className={inputCls} value={gcForm.islem_tarihi}
-                  onChange={e => setGcForm(p => ({ ...p, islem_tarihi: e.target.value }))} />
-              </FormField>
-              <FormField label="SGK Bildirim Tarihi">
-                <input type="date" className={inputCls} value={gcForm.bildirim_tarihi}
-                  onChange={e => setGcForm(p => ({ ...p, bildirim_tarihi: e.target.value }))} />
-              </FormField>
-            </div>
-            <FormField label="Açıklama">
-              <textarea className={`${inputCls} resize-none`} rows={2} value={gcForm.aciklama}
-                onChange={e => setGcForm(p => ({ ...p, aciklama: e.target.value }))} />
             </FormField>
           </div>
         </Modal>
