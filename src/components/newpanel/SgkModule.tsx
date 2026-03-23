@@ -87,9 +87,10 @@ export default function SgkModule({ firma, role }: Props) {
   const [primModal, setPrimModal] = useState(false)
   const [primForm, setPrimForm] = useState(primFormInit)
 
-  // Hizmet Bildirimi + dekont state
+  // Hizmet Bildirimi + dekont + giriş/çıkış belge state
   const [hizmetDocs, setHizmetDocs] = useState<DocRecord[]>([])
   const [dekontDocs, setDekontDocs] = useState<DocRecord[]>([])
+  const [gcDocs, setGcDocs] = useState<DocRecord[]>([])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -97,6 +98,7 @@ export default function SgkModule({ firma, role }: Props) {
 
   const hizmetFileRef = useRef<HTMLInputElement>(null)
   const dekontFileRef = useRef<HTMLInputElement>(null)
+  const gcFileRef = useRef<HTMLInputElement>(null)
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -146,7 +148,17 @@ export default function SgkModule({ firma, role }: Props) {
     setDekontDocs(all.filter(r => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
   }, [firma.id, sirket])
 
-  useEffect(() => { if (tab === 'giris-cikis') fetchGc() }, [fetchGc, tab])
+  const fetchGcDocs = useCallback(async () => {
+    if (!sirket) return
+    const { data, error } = await supabase.from('dokumanlar').select('*').eq('firma_id', firma.id)
+      .eq('modul', 'sgk').eq('kategori', 'giris_cikis_bildirimi')
+      .order('created_at', { ascending: false })
+    if (error) { setError(error.message); return }
+    const all = (data || []) as DocRecord[]
+    setGcDocs(all.filter(r => sirket === 'ETM' ? (!r.sirket || r.sirket === 'ETM') : r.sirket === sirket))
+  }, [firma.id, sirket])
+
+  useEffect(() => { if (tab === 'giris-cikis') { fetchGc(); fetchGcDocs() } }, [fetchGc, fetchGcDocs, tab])
   useEffect(() => { if (tab === 'prim-bildirge') { fetchPrim(); fetchDekont() } }, [fetchPrim, fetchDekont, tab])
   useEffect(() => { if (tab === 'hizmet-bildirimi') fetchHizmet() }, [fetchHizmet, tab])
 
@@ -212,7 +224,7 @@ export default function SgkModule({ firma, role }: Props) {
 
   // ── File upload ───────────────────────────────────────────────────────────
 
-  async function uploadFile(file: File, kategori: 'hizmet_bildirimi' | 'prim_dekont', aciklama?: string) {
+  async function uploadFile(file: File, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi', aciklama?: string) {
     if (!can(role, 'edit')) return
     if (file.size > 15 * 1024 * 1024) { setError('Dosya boyutu 15MB üzerinde olamaz.'); return }
     setUploading(kategori)
@@ -231,7 +243,8 @@ export default function SgkModule({ firma, role }: Props) {
     await logActivity({ firmaId: firma.id, modul: 'sgk', islemTuru: 'dokuman_yuklendi', kayitTuru: 'dokuman', aciklama: `${file.name} (${kategori}) yüklendi.` })
     setUploading(null)
     if (kategori === 'hizmet_bildirimi') fetchHizmet()
-    else fetchDekont()
+    else if (kategori === 'prim_dekont') fetchDekont()
+    else fetchGcDocs()
   }
 
   async function downloadDoc(doc: DocRecord) {
@@ -240,14 +253,15 @@ export default function SgkModule({ firma, role }: Props) {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  async function deleteDoc(doc: DocRecord, kategori: 'hizmet_bildirimi' | 'prim_dekont') {
+  async function deleteDoc(doc: DocRecord, kategori: 'hizmet_bildirimi' | 'prim_dekont' | 'giris_cikis_bildirimi') {
     if (!can(role, 'delete')) return
     if (!confirm('Bu dosyayı silmek istediğinize emin misiniz?')) return
     await supabase.storage.from('dokumanlar').remove([doc.dosya_url])
     const { error } = await supabase.from('dokumanlar').delete().eq('id', doc.id)
     if (error) { setError(error.message); return }
     if (kategori === 'hizmet_bildirimi') fetchHizmet()
-    else fetchDekont()
+    else if (kategori === 'prim_dekont') fetchDekont()
+    else fetchGcDocs()
   }
 
   // ── Filtered data ─────────────────────────────────────────────────────────
@@ -352,6 +366,7 @@ export default function SgkModule({ firma, role }: Props) {
             <MetricCard label="İşten Çıkış" value={String(filteredGc.filter(r => r.islem_turu === 'cikis').length)} tone="rose" />
           </div>
 
+          <div className="grid gap-4 lg:grid-cols-[1fr_0.85fr]">
           <div className="rounded-[32px] border border-white/[0.04] bg-white/[0.02] p-6 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <div>
@@ -411,6 +426,61 @@ export default function SgkModule({ firma, role }: Props) {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Sağ: Giriş/Çıkış Bildirim Belgeleri */}
+          <div className="rounded-[32px] border border-white/[0.04] bg-white/[0.02] p-6 shadow-2xl backdrop-blur-3xl ring-1 ring-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400/80">Bildirim Belgeleri</p>
+                <h3 className="mt-2 text-xl font-bold text-white">PDF Arşivi</h3>
+              </div>
+              {can(role, 'edit') && (
+                <>
+                  <button onClick={() => gcFileRef.current?.click()} disabled={uploading === 'giris_cikis_bildirimi'}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/10 transition-colors disabled:opacity-50">
+                    <Upload size={16} /> {uploading === 'giris_cikis_bildirimi' ? 'Yükleniyor...' : 'PDF Yükle'}
+                  </button>
+                  <input ref={gcFileRef} type="file" className="hidden" accept=".pdf"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, 'giris_cikis_bildirimi', `Giriş/Çıkış Bildirimi ${filterYil}`); e.target.value = '' }} />
+                </>
+              )}
+            </div>
+            {gcDocs.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
+                <Upload size={24} className="mx-auto text-slate-500 mb-2" />
+                <p className="text-sm text-slate-400">Henüz belge yüklenmedi.</p>
+                <p className="text-xs text-slate-500 mt-1">PDF formatında yükleyin.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {gcDocs.map(doc => (
+                  <div key={doc.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.05] bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-sky-500/15 flex items-center justify-center shrink-0">
+                        <FileText size={16} className="text-sky-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-200 truncate max-w-[160px]">{doc.dosya_adi}</p>
+                        {doc.aciklama && <p className="text-xs text-slate-400 mt-0.5">{doc.aciklama}</p>}
+                        <p className="text-[11px] text-slate-500 mt-0.5">{doc.created_at?.split('T')[0]} · {fileSize(doc.dosya_boyutu)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => downloadDoc(doc)} className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-white/10">
+                        <Download size={14} /> İndir
+                      </button>
+                      {can(role, 'delete') && (
+                        <button onClick={() => deleteDoc(doc, 'giris_cikis_bildirimi')} className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/20">
+                          <X size={14} /> Sil
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
         </div>
       )}
