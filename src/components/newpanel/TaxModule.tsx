@@ -163,30 +163,46 @@ export default function TaxModule({ firma, role }: Props) {
 
   async function fetchSistemKdv(ay: number) {
     setKdvLoading(true)
-    const from = `${yil}-${String(ay).padStart(2, '0')}-01`
-    const sonGun = new Date(yil, ay, 0).getDate()
-    const to = `${yil}-${String(ay).padStart(2, '0')}-${sonGun}`
+    setSistemValues(null)
+    try {
+      // cari_hareketler'de sirket kolonu yok — önce bu firmaya/şirkete ait hesap ID'lerini al
+      const hesapQ = supabase.from('cari_hesaplar').select('id').eq('firma_id', firma.id)
+      const { data: hesaplar } = sirket === 'ETM'
+        ? await (hesapQ as any).or('sirket.eq.ETM,sirket.is.null')
+        : await hesapQ.eq('sirket', sirket)
+      const hesapIds: string[] = ((hesaplar || []) as any[]).map((h: any) => h.id)
 
-    let q = supabase.from('cari_hareketler')
-      .select('hareket_turu, tutar, kdv_tutari')
-      .eq('firma_id', firma.id)
-      .gte('tarih', from).lte('tarih', to)
-
-    if (sirket === 'ETM') q = (q as any).or('sirket.eq.ETM,sirket.is.null')
-    else if (sirket) q = (q as any).eq('sirket', sirket)
-
-    const { data } = await q
-    let matrah = 0, hesaplananKdv = 0, indirilecekKdv = 0
-    for (const h of (data || []) as any[]) {
-      if (h.hareket_turu === 'satis_fatura') {
-        matrah += Number(h.tutar || 0)
-        hesaplananKdv += Number(h.kdv_tutari || 0)
-      } else if (h.hareket_turu === 'alis_fatura') {
-        indirilecekKdv += Number(h.kdv_tutari || 0)
+      if (hesapIds.length === 0) {
+        setSistemValues({ matrah: 0, hesaplananKdv: 0, indirilecekKdv: 0, odenecekKdv: 0 })
+        setKdvLoading(false)
+        return
       }
+
+      const from = `${yil}-${String(ay).padStart(2, '0')}-01`
+      const sonGun = new Date(yil, ay, 0).getDate()
+      const to = `${yil}-${String(ay).padStart(2, '0')}-${String(sonGun).padStart(2, '0')}`
+
+      const { data, error } = await supabase.from('cari_hareketler')
+        .select('hareket_turu, tutar, kdv_tutari')
+        .in('cari_hesap_id', hesapIds)
+        .gte('tarih', from).lte('tarih', to)
+
+      if (error) { setError('Sistem verisi alınamadı: ' + error.message); setKdvLoading(false); return }
+
+      let matrah = 0, hesaplananKdv = 0, indirilecekKdv = 0
+      for (const h of (data || []) as any[]) {
+        if (h.hareket_turu === 'satis_fatura') {
+          matrah += Number(h.tutar || 0)
+          hesaplananKdv += Number(h.kdv_tutari || 0)
+        } else if (h.hareket_turu === 'alis_fatura') {
+          indirilecekKdv += Number(h.kdv_tutari || 0)
+        }
+      }
+      const odenecekKdv = Math.max(0, hesaplananKdv - indirilecekKdv)
+      setSistemValues({ matrah, hesaplananKdv, indirilecekKdv, odenecekKdv })
+    } catch (e: any) {
+      setError('Sistem verisi alınamadı: ' + e.message)
     }
-    const odenecekKdv = Math.max(0, hesaplananKdv - indirilecekKdv)
-    setSistemValues({ matrah, hesaplananKdv, indirilecekKdv, odenecekKdv })
     setKdvLoading(false)
   }
 
