@@ -23,6 +23,7 @@ import CariHesapModule from '@/components/newpanel/CariHesapModule'
 import BankalarModule from '@/components/newpanel/BankalarModule'
 import SgkModule from '@/components/newpanel/SgkModule'
 import SatinAlmaModule from '@/components/newpanel/SatinAlmaModule'
+import TaxModule from '@/components/newpanel/TaxModule'
 import { logActivity } from '@/lib/activityLog'
 
 // ── BİNYAPI Logo SVG ──────────────────────────────────────────────────────────
@@ -609,6 +610,7 @@ function renderModule(moduleId: ModuleId, firma: FirmaRecord, profile: UserProfi
     case 'kullanicilar':     return <UsersModule firma={firma} currentProfile={profile} role={profile?.rol} onFirmaUpdated={onFirmaUpdated} />
     case 'aktivite':         return <ActivityLogModule firma={firma} role={profile?.rol} />
     case 'satinalma':        return <SatinAlmaModule firma={firma} role={profile?.rol} />
+    case 'vergi-sgk':        return <TaxModule firma={firma} role={profile?.rol} />
     case 'genel-bakis':      return <OverviewModule firma={firma} />
     default:                 return (
       <div className="rounded-2xl p-6 glass">
