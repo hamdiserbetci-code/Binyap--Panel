@@ -77,7 +77,7 @@ function BinyapiLogo({ size = 40 }: { size?: number }) {
 type ModuleId =
   | 'genel-bakis' | 'projeler' | 'puantaj' | 'sgk-bildirimleri'
   | 'bankalar' | 'cari' | 'kasa' | 'dokuman'
-  | 'raporlar' | 'gorevler' | 'kullanicilar' | 'aktivite' | 'satinalma'
+  | 'raporlar' | 'gorevler' | 'kullanicilar' | 'aktivite' | 'satinalma' | 'vergi-sgk'
 
 type ModuleConfig = {
   id: ModuleId; category: string; label: string; shortLabel: string
@@ -105,6 +105,7 @@ const defaultModules: ModuleConfig[] = [
   { id: 'projeler',         category: 'Operasyon',     label: 'Projeler',           shortLabel: 'Projeler',    icon: FolderKanban,  accent: '', title: '', description: '', allowedRoles: ['yonetici','santiye','izleme'] },
   { id: 'gorevler',         category: 'Operasyon',     label: 'Yapılacaklar',       shortLabel: 'Görevler',    icon: ListTodo,      accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe','santiye','izleme'] },
   { id: 'satinalma',        category: 'Operasyon',     label: 'Satın Alma',         shortLabel: 'Satın Alma',  icon: ShoppingCart,  accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe','santiye'] },
+  { id: 'vergi-sgk',        category: 'Operasyon',     label: 'Vergi Takip',        shortLabel: 'Vergi Takip', icon: ShieldCheck,   accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'cari',             category: 'Finans',        label: 'Cari Hesap',         shortLabel: 'Cari Hesap', icon: BookUser,      accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'bankalar',         category: 'Finans',        label: 'Banka Hesapları',    shortLabel: 'Banka',       icon: Landmark,      accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'kasa',             category: 'Finans',        label: 'Kasa',               shortLabel: 'Kasa',        icon: Wallet,        accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
