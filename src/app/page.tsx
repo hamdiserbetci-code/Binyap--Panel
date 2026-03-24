@@ -5,7 +5,7 @@ import {
   Briefcase, BookUser, FileArchive, FileSpreadsheet, FolderKanban,
   History, KeyRound, Landmark, LayoutGrid, ListTodo, LogOut,
   ShieldCheck, Users, Wallet, Menu, ChevronDown, ChevronLeft,
-  Building2,
+  Building2, ShoppingCart,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -23,12 +23,14 @@ import UsersModule, { type UserProfileRecord } from '@/components/newpanel/Users
 import CariHesapModule from '@/components/newpanel/CariHesapModule'
 import BankalarModule from '@/components/newpanel/BankalarModule'
 import SgkModule from '@/components/newpanel/SgkModule'
+import SatinAlmaModule from '@/components/newpanel/SatinAlmaModule'
 import { logActivity } from '@/lib/activityLog'
 
 type ModuleId =
   | 'genel-bakis' | 'projeler' | 'puantaj' | 'sgk-bildirimleri'
   | 'bankalar' | 'cari' | 'kasa' | 'vergi-sgk' | 'dokuman'
   | 'raporlar' | 'gorevler' | 'kullanicilar' | 'aktivite'
+  | 'satinalma'
 
 type ModuleConfig = {
   id: ModuleId; category: string; label: string; shortLabel: string
@@ -38,7 +40,7 @@ type ModuleConfig = {
 
 const iconRegistry: Record<string, LucideIcon> = {
   LayoutGrid, FolderKanban, Users, BookUser, Landmark, Wallet,
-  ShieldCheck, FileArchive, FileSpreadsheet, ListTodo, KeyRound, History, Building2,
+  ShieldCheck, FileArchive, FileSpreadsheet, ListTodo, KeyRound, History, Building2, ShoppingCart,
 }
 
 const CATEGORY_META: Record<string, { color: string; dim: string; label: string }> = {
@@ -54,6 +56,7 @@ const defaultModules: ModuleConfig[] = [
   { id: 'genel-bakis',      category: 'Operasyon',     label: 'Maliyet Takibi',    shortLabel: 'Maliyet',     icon: LayoutGrid,    accent: 'from-sky-500 to-cyan-400',    title: 'Merkezi Operasyon Paneli',          description: '', allowedRoles: ['yonetici','muhasebe','santiye','izleme'] },
   { id: 'projeler',         category: 'Operasyon',     label: 'Projeler',           shortLabel: 'Projeler',    icon: FolderKanban,  accent: 'from-blue-500 to-indigo-400', title: 'Proje Yönetimi',                     description: '', allowedRoles: ['yonetici','santiye','izleme'] },
   { id: 'gorevler',         category: 'Operasyon',     label: 'Yapılacaklar',       shortLabel: 'Görevler',    icon: ListTodo,      accent: 'from-amber-500 to-orange-400',title: 'Görev Yönetimi',                     description: '', allowedRoles: ['yonetici','muhasebe','santiye','izleme'] },
+  { id: 'satinalma',        category: 'Operasyon',     label: 'Satın Alma',         shortLabel: 'Satın Alma',  icon: ShoppingCart,  accent: 'from-amber-500 to-orange-500', title: 'Satın Alma Yönetimi',               description: '', allowedRoles: ['yonetici','muhasebe','santiye'] },
   { id: 'vergi-sgk',        category: 'Operasyon',     label: 'Vergi / SGK',        shortLabel: 'Vergi/SGK',   icon: ShieldCheck,   accent: 'from-rose-500 to-orange-400', title: 'Resmi Süreçler',                     description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'cari',             category: 'Finans',        label: 'Cari Hesap',         shortLabel: 'Cari',        icon: BookUser,      accent: 'from-cyan-500 to-teal-400',   title: 'Cari Hesap Takibi',                  description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'bankalar',         category: 'Finans',        label: 'Banka Hesapları',    shortLabel: 'Banka',       icon: Landmark,      accent: 'from-indigo-500 to-blue-500', title: 'Banka ve Finans Yönetimi',           description: '', allowedRoles: ['yonetici','muhasebe'] },
@@ -518,6 +521,7 @@ function renderModule(moduleId: ModuleId, firma: FirmaRecord, profile: UserProfi
     case 'gorevler':         return <TasksModule firma={firma} role={profile?.rol} />
     case 'kullanicilar':     return <UsersModule firma={firma} currentProfile={profile} role={profile?.rol} onFirmaUpdated={onFirmaUpdated} />
     case 'aktivite':         return <ActivityLogModule firma={firma} role={profile?.rol} />
+    case 'satinalma':        return <SatinAlmaModule firma={firma} role={profile?.rol} />
     case 'genel-bakis':      return <OverviewModule firma={firma} />
     default:                 return <PlaceholderModule moduleId={moduleId} />
   }
