@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase'
 import ProjectsModule, { type FirmaRecord } from '@/components/newpanel/ProjectsModule'
 import TimesheetModule from '@/components/newpanel/TimesheetModule'
 import CashModule from '@/components/newpanel/CashModule'
-import TaxModule from '@/components/newpanel/TaxModule'
 import DocumentsModule from '@/components/newpanel/DocumentsModule'
 import ReportsModule from '@/components/newpanel/ReportsModule'
 import TasksModule from '@/components/newpanel/TasksModule'
@@ -77,7 +76,7 @@ function BinyapiLogo({ size = 40 }: { size?: number }) {
 // ── Tipler ────────────────────────────────────────────────────────────────────
 type ModuleId =
   | 'genel-bakis' | 'projeler' | 'puantaj' | 'sgk-bildirimleri'
-  | 'bankalar' | 'cari' | 'kasa' | 'vergi-sgk' | 'dokuman'
+  | 'bankalar' | 'cari' | 'kasa' | 'dokuman'
   | 'raporlar' | 'gorevler' | 'kullanicilar' | 'aktivite' | 'satinalma'
 
 type ModuleConfig = {
@@ -106,7 +105,6 @@ const defaultModules: ModuleConfig[] = [
   { id: 'projeler',         category: 'Operasyon',     label: 'Projeler',           shortLabel: 'Projeler',    icon: FolderKanban,  accent: '', title: '', description: '', allowedRoles: ['yonetici','santiye','izleme'] },
   { id: 'gorevler',         category: 'Operasyon',     label: 'Yapılacaklar',       shortLabel: 'Görevler',    icon: ListTodo,      accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe','santiye','izleme'] },
   { id: 'satinalma',        category: 'Operasyon',     label: 'Satın Alma',         shortLabel: 'Satın Alma',  icon: ShoppingCart,  accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe','santiye'] },
-  { id: 'vergi-sgk',        category: 'Operasyon',     label: 'Vergi / SGK',        shortLabel: 'Vergi/SGK',   icon: ShieldCheck,   accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'cari',             category: 'Finans',        label: 'Cari Hesap',         shortLabel: 'Cari Hesap', icon: BookUser,      accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'bankalar',         category: 'Finans',        label: 'Banka Hesapları',    shortLabel: 'Banka',       icon: Landmark,      accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
   { id: 'kasa',             category: 'Finans',        label: 'Kasa',               shortLabel: 'Kasa',        icon: Wallet,        accent: '', title: '', description: '', allowedRoles: ['yonetici','muhasebe'] },
@@ -135,7 +133,7 @@ export default function Page() {
   const [user, setUser] = useState<any>(null)
   const [firma, setFirma] = useState<FirmaRecord | null>(null)
   const [profile, setProfile] = useState<UserProfileRecord | null>(null)
-  const [modules, setModules] = useState<ModuleConfig[]>([])
+  const [modules, setModules] = useState<ModuleConfig[]>(defaultModules)
   const [activeModule, setActiveModule] = useState<ModuleId>('genel-bakis')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
@@ -239,9 +237,10 @@ export default function Page() {
   }, [])
 
   const visibleModules = useMemo(() => {
-    const role = profile?.rol || 'izleme'
-    return modules.filter(m => m.allowedRoles.includes(role))
-  }, [modules, profile?.rol])
+    // loading sırasında profile null — tüm modülleri göster, auth tamamlanınca filtrele
+    if (!profile) return modules
+    return modules.filter(m => m.allowedRoles.includes(profile.rol))
+  }, [modules, profile])
 
   const CATEGORY_ORDER = ['Operasyon', 'Finans', 'Personel', 'Arşiv & Rapor', 'Sistem', 'Diğer']
   const groupedModules = useMemo(() => {
@@ -267,12 +266,12 @@ export default function Page() {
 
   // ── Loading screen ─────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex min-h-screen items-center justify-center" style={{ background: 'linear-gradient(135deg, #0D1B2E 0%, #142040 100%)' }}>
+    <div className="flex min-h-screen items-center justify-center" style={{ background: 'linear-gradient(135deg, #475569 0%, #64748B 100%)' }}>
       <div className="flex flex-col items-center gap-6">
         <BinyapiLogo size={56} />
         <div>
-          <p className="text-center text-lg font-bold text-white tracking-wide">BİNYAPI</p>
-          <p className="text-center text-xs text-amber-400/70 tracking-[0.3em] uppercase font-semibold">İnşaat ERP</p>
+          <p className="text-center text-3xl font-bold text-white tracking-wide">BİNYAPI</p>
+          <p className="text-center text-base text-amber-400/90 tracking-[0.3em] uppercase font-semibold mt-1">İnşaat ERP</p>
         </div>
         <div className="flex gap-2">
           {[0,1,2].map(i => (
@@ -284,14 +283,14 @@ export default function Page() {
   )
 
   if (error && (!user || !activeItem || !firma)) return (
-    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: 'linear-gradient(135deg, #0D1B2E 0%, #142040 100%)' }}>
+    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: 'linear-gradient(135deg, #475569 0%, #64748B 100%)' }}>
       <div className="w-full max-w-lg rounded-2xl p-6 glass">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-          <p className="text-xs uppercase tracking-widest text-red-400 font-bold">Panel Hatası</p>
+          <p className="text-base uppercase tracking-widest text-red-400 font-bold">Panel Hatası</p>
         </div>
-        <p className="text-sm text-slate-300 leading-6">{error}</p>
-        <button onClick={() => window.location.reload()} className="mt-4 px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: '#3B82F6' }}>
+        <p className="text-lg text-slate-200 leading-6">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-5 px-6 py-3.5 rounded-xl text-lg font-semibold text-white" style={{ background: '#3B82F6' }}>
           Yenile
         </button>
       </div>
@@ -299,18 +298,18 @@ export default function Page() {
   )
 
   if (!user || !activeItem) return (
-    <div className="flex min-h-screen items-center justify-center" style={{ background: '#0D1B2E' }}>
-      <p className="text-slate-500">Yükleniyor...</p>
+    <div className="flex min-h-screen items-center justify-center" style={{ background: '#475569' }}>
+      <p className="text-slate-300 text-xl">Yükleniyor...</p>
     </div>
   )
 
   const activeCatMeta = CATEGORY_META[activeItem.category] || CATEGORY_META['Diğer']
-  const sidebarW = isSidebarOpen ? '280px' : isMobile ? '280px' : '80px'
+  const sidebarW = isSidebarOpen ? '320px' : isMobile ? '320px' : '96px'
 
   // ── Main Layout ────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen overflow-hidden" style={{
-      background: 'linear-gradient(160deg, #0D1B2E 0%, #0F2341 40%, #0D1B2E 100%)',
+      background: 'linear-gradient(160deg, #334155 0%, #475569 40%, #1E293B 100%)',
       fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
     }}>
       {/* Arka plan ışık efektleri */}
@@ -329,7 +328,7 @@ export default function Page() {
         className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} absolute lg:relative shrink-0 flex flex-col h-screen z-50`}
         style={{
           width: sidebarW,
-          background: 'rgba(8, 18, 38, 0.88)',
+          background: 'rgba(51, 65, 85, 0.88)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRight: '1px solid rgba(255,255,255,0.10)',
@@ -344,10 +343,10 @@ export default function Page() {
           </div>
           {isSidebarOpen && (
             <div className="flex-1 min-w-0">
-              <p className="text-[17px] font-extrabold leading-tight text-white tracking-wide">BİNYAPI</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-[11px] font-semibold text-amber-400/80 tracking-widest uppercase leading-none">İnşaat &amp; ETM</p>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.15)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.3)' }}>ERP v2.2</span>
+              <p className="text-[26px] font-extrabold leading-tight text-white tracking-wide">BİNYAPI</p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <p className="text-[15px] font-semibold text-amber-400/90 tracking-widest uppercase leading-none">İnşaat &amp; ETM</p>
+                <span className="text-[13px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,191,36,0.2)', color: '#FCD34D', border: '1px solid rgba(251,191,36,0.4)' }}>ERP v2.2</span>
               </div>
             </div>
           )}
@@ -382,9 +381,9 @@ export default function Page() {
                     >
                       <div className="flex items-center gap-2.5">
                         <div className="w-2 h-2 rounded-full" style={{ background: meta.color, boxShadow: `0 0 6px ${meta.glow}` }} />
-                        <span className="text-[11.5px] font-bold uppercase tracking-[0.15em]" style={{ color: 'rgba(255,255,255,0.35)' }}>{group}</span>
+                        <span className="text-[15px] font-bold uppercase tracking-[0.15em]" style={{ color: 'rgba(255,255,255,0.7)' }}>{group}</span>
                       </div>
-                      <ChevronDown size={13} style={{ color: 'rgba(255,255,255,0.2)', transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
+                      <ChevronDown size={18} style={{ color: 'rgba(255,255,255,0.6)', transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }} />
                     </button>
                   ) : (
                     <div className="mx-4 my-2">
@@ -424,22 +423,22 @@ export default function Page() {
                             )}
                             {/* İkon */}
                             <div
-                              className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150"
+                              className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150"
                               style={isActive
                                 ? { background: itemMeta.dim, boxShadow: `0 0 12px ${itemMeta.glow}` }
                                 : { background: 'rgba(255,255,255,0.04)' }}
                             >
                               <Icon
-                                size={18}
+                                size={24}
                                 strokeWidth={isActive ? 2.5 : 1.8}
-                                style={{ color: isActive ? itemMeta.color : 'rgba(255,255,255,0.35)' }}
+                                style={{ color: isActive ? itemMeta.color : 'rgba(255,255,255,0.65)' }}
                               />
                             </div>
                             {/* Etiket */}
                             {isSidebarOpen && (
                               <span
-                                className="text-[14px] font-semibold truncate"
-                                style={{ color: isActive ? '#F1F5F9' : 'rgba(255,255,255,0.45)', letterSpacing: '0.01em' }}
+                                className="text-[18px] font-semibold truncate"
+                                style={{ color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)', letterSpacing: '0.01em' }}
                               >
                                 {item.shortLabel}
                               </span>
@@ -464,7 +463,7 @@ export default function Page() {
             <div className="rounded-xl p-3 mb-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
               <div className="flex items-center gap-3">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-[14px] font-extrabold shrink-0"
+                  className="w-14 h-14 rounded-xl flex items-center justify-center text-[18px] font-extrabold shrink-0"
                   style={{
                     background: 'linear-gradient(135deg, rgba(59,130,246,0.3), rgba(99,102,241,0.3))',
                     color: '#93C5FD',
@@ -475,10 +474,10 @@ export default function Page() {
                   {user.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] font-semibold truncate" style={{ color: '#CBD5E1' }}>{profile?.ad_soyad || user.email}</p>
-                  <p className="text-[11px] truncate mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{user.email}</p>
+                  <p className="text-[16px] font-semibold truncate" style={{ color: '#F8FAFC' }}>{profile?.ad_soyad || user.email}</p>
+                  <p className="text-[14px] truncate mt-0.5" style={{ color: 'rgba(255,255,255,0.65)' }}>{user.email}</p>
                   {profile?.rol && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1" style={{ background: `${roleColors[profile.rol] || '#94A3B8'}18`, color: roleColors[profile.rol] || '#94A3B8', border: `1px solid ${roleColors[profile.rol] || '#94A3B8'}30` }}>
+                    <span className="text-[13px] font-bold px-3 py-1 rounded-full inline-block mt-1.5" style={{ background: `${roleColors[profile.rol] || '#94A3B8'}25`, color: roleColors[profile.rol] || '#CBD5E1', border: `1px solid ${roleColors[profile.rol] || '#94A3B8'}40` }}>
                       {roleLabels[profile.rol] ?? profile.rol}
                     </span>
                   )}
@@ -487,7 +486,7 @@ export default function Page() {
             </div>
           ) : (
             <div
-              className="w-10 h-10 mx-auto rounded-xl flex items-center justify-center text-[14px] font-extrabold mb-3 cursor-default"
+              className="w-14 h-14 mx-auto rounded-xl flex items-center justify-center text-[18px] font-extrabold mb-3 cursor-default"
               style={{ background: 'rgba(59,130,246,0.2)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.25)' }}
               title={user.email}
             >
@@ -498,12 +497,12 @@ export default function Page() {
             type="button"
             onClick={signOut}
             title="Güvenli Çıkış"
-            className="w-full flex items-center rounded-xl py-2.5 text-[13px] font-semibold transition-all duration-150"
-            style={{ gap: isSidebarOpen ? '10px' : '0', justifyContent: isSidebarOpen ? 'flex-start' : 'center', paddingLeft: isSidebarOpen ? '12px' : '0', color: 'rgba(255,255,255,0.3)' }}
+            className="w-full flex items-center rounded-xl py-3.5 text-[17px] font-semibold transition-all duration-150 mt-1"
+            style={{ gap: isSidebarOpen ? '10px' : '0', justifyContent: isSidebarOpen ? 'flex-start' : 'center', paddingLeft: isSidebarOpen ? '12px' : '0', color: 'rgba(255,255,255,0.6)' }}
             onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'rgba(239,68,68,0.1)'; el.style.color = '#FCA5A5' }}
             onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = 'transparent'; el.style.color = 'rgba(255,255,255,0.3)' }}
           >
-            <LogOut size={17} />
+            <LogOut size={22} />
             {isSidebarOpen && 'Çıkış Yap'}
           </button>
         </div>
@@ -516,8 +515,8 @@ export default function Page() {
         <header
           className="shrink-0 flex items-center justify-between gap-4 px-6"
           style={{
-            height: '72px',
-            background: 'rgba(8,18,38,0.75)',
+            height: '96px',
+            background: 'rgba(51, 65, 85, 0.85)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderBottom: '1px solid rgba(255,255,255,0.09)',
@@ -535,14 +534,14 @@ export default function Page() {
             {/* Breadcrumb */}
             <div className="flex items-center gap-3 min-w-0">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: activeCatMeta.dim, boxShadow: `0 0 16px ${activeCatMeta.glow}` }}
               >
-                {activeItem && <activeItem.icon size={19} style={{ color: activeCatMeta.color }} strokeWidth={2.5} />}
+                {activeItem && <activeItem.icon size={28} style={{ color: activeCatMeta.color }} strokeWidth={2.5} />}
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] leading-none" style={{ color: activeCatMeta.color }}>{activeItem?.category}</p>
-                <p className="text-[16px] font-bold text-white leading-snug mt-0.5 truncate">{activeItem?.label}</p>
+                <p className="text-[15px] font-bold uppercase tracking-[0.18em] leading-none" style={{ color: activeCatMeta.color }}>{activeItem?.category}</p>
+                <p className="text-[24px] font-bold text-white leading-snug mt-1 truncate">{activeItem?.label}</p>
               </div>
             </div>
           </div>
@@ -558,16 +557,16 @@ export default function Page() {
             {firma && <NotificationCenter firma={firma} />}
             <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
               <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-extrabold shrink-0"
+                className="w-12 h-12 rounded-lg flex items-center justify-center text-[17px] font-extrabold shrink-0"
                 style={{ background: 'linear-gradient(135deg,rgba(59,130,246,0.35),rgba(99,102,241,0.35))', color: '#93C5FD' }}
                 title={user.email}
               >
                 {user.email?.charAt(0).toUpperCase() || 'U'}
               </div>
               <div className="hidden sm:block">
-                <p className="text-[12px] font-semibold text-white leading-none">{profile?.ad_soyad?.split(' ')[0] || user.email?.split('@')[0]}</p>
+                <p className="text-[16px] font-semibold text-white leading-none mt-0.5">{profile?.ad_soyad?.split(' ')[0] || user.email?.split('@')[0]}</p>
                 {profile?.rol && (
-                  <p className="text-[11px] font-medium mt-0.5" style={{ color: roleColors[profile.rol] || '#94A3B8' }}>{roleLabels[profile.rol] ?? profile.rol}</p>
+                  <p className="text-[14px] font-medium mt-1" style={{ color: roleColors[profile.rol] || '#94A3B8' }}>{roleLabels[profile.rol] ?? profile.rol}</p>
                 )}
               </div>
             </div>
@@ -603,7 +602,6 @@ function renderModule(moduleId: ModuleId, firma: FirmaRecord, profile: UserProfi
     case 'cari':             return <CariHesapModule firma={firma} role={profile?.rol} />
     case 'bankalar':         return <BankalarModule firma={firma} role={profile?.rol} />
     case 'kasa':             return <CashModule firma={firma} role={profile?.rol} />
-    case 'vergi-sgk':        return <TaxModule firma={firma} role={profile?.rol} />
     case 'dokuman':          return <DocumentsModule firma={firma} role={profile?.rol} />
     case 'raporlar':         return <ReportsModule firma={firma} role={profile?.rol} />
     case 'gorevler':         return <TasksModule firma={firma} role={profile?.rol} />
