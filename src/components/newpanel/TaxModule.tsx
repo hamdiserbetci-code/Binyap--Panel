@@ -379,13 +379,9 @@ export default function TaxModule({ firma, role }: Props) {
         <div className="px-5 py-3 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.1)' }}>
           <p className="text-[12px] text-slate-500">{activeTab.desc}</p>
           {tab === 'kdv' && (
-            <button
-              onClick={() => {}}
-              className="text-[11px] font-semibold text-blue-400 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-              style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)' }}
-            >
-              <FileText size={12} /> KDV PDF Karşılaştır
-            </button>
+            <p className="text-[11px] text-slate-600 flex items-center gap-1.5">
+              <FileText size={12} /> Her satırın sağındaki <FileText size={11} className="inline" /> ikonuna tıklayarak karşılaştırma yapın
+            </p>
           )}
         </div>
 
