@@ -5,8 +5,8 @@
 html { min-height: 100%; }
 
 :root {
-  --page-bg: #0B0F1A;
-  --sidebar-bg: #0D1117;
+  --page-bg: #111827;
+  --sidebar-bg: #161D2E;
   --sidebar-border: rgba(255,255,255,0.06);
   --card-bg: #161B27;
   --card-border: rgba(255,255,255,0.08);

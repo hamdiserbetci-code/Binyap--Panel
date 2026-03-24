@@ -211,7 +211,7 @@ export default function Page() {
 
   // ── Loading / Error screens ──────────────────────────────────────────────
   if (loading) return (
-    <div className="flex min-h-screen items-center justify-center" style={{ background: '#0B0F1A' }}>
+    <div className="flex min-h-screen items-center justify-center" style={{ background: '#111827' }}>
       <div className="flex flex-col items-center gap-4">
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#3B82F6,#6366F1)' }}>
           <Briefcase size={18} className="text-white" />
@@ -227,7 +227,7 @@ export default function Page() {
   )
 
   if (error && (!user || !activeItem || !firma)) return (
-    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: '#0B0F1A' }}>
+    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: '#111827' }}>
       <div className="w-full max-w-lg rounded-2xl p-6" style={{ background: '#161B27', border: '1px solid rgba(239,68,68,0.25)' }}>
         <div className="flex items-center gap-2 mb-3">
           <div className="w-2 h-2 rounded-full bg-red-500" />
@@ -242,7 +242,7 @@ export default function Page() {
   )
 
   if (!user || !activeItem) return (
-    <div className="flex min-h-screen items-center justify-center" style={{ background: '#0B0F1A' }}>
+    <div className="flex min-h-screen items-center justify-center" style={{ background: '#111827' }}>
       <p className="text-sm text-slate-500">Kullanıcı bilgisi bekleniyor...</p>
     </div>
   )
@@ -251,7 +251,7 @@ export default function Page() {
 
   // ── Main Layout ──────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#0B0F1A', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#111827', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
 
       {/* Mobile overlay */}
       {isMobile && isSidebarOpen && (
@@ -263,8 +263,8 @@ export default function Page() {
         className={`${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} absolute lg:relative shrink-0 flex flex-col h-screen z-50`}
         style={{
           width: isSidebarOpen ? '260px' : isMobile ? '260px' : '72px',
-          background: '#0D1117',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
+          background: '#161D2E',
+          borderRight: '1px solid rgba(255,255,255,0.08)',
           transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1), transform 0.25s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
@@ -434,7 +434,7 @@ export default function Page() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* ── Top Header ── */}
-        <header className="shrink-0 flex items-center justify-between h-16 px-5 gap-4" style={{ background: '#0D1117', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <header className="shrink-0 flex items-center justify-between h-16 px-5 gap-4" style={{ background: '#161D2E', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           {/* Left: mobile toggle + breadcrumb */}
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -488,7 +488,7 @@ export default function Page() {
         <div className="topbar-accent shrink-0" style={{ opacity: 0.6 }} />
 
         {/* ── Module content ── */}
-        <main className="flex-1 overflow-auto" style={{ background: '#0B0F1A', padding: '20px' }}>
+        <main className="flex-1 overflow-auto" style={{ background: '#111827', padding: '20px' }}>
           {firma ? (
             <div key={activeModule} className="module-enter h-full">
               {renderModule(activeModule, firma, profile, setFirma)}
