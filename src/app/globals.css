@@ -5,13 +5,11 @@
 html { min-height: 100%; }
 
 :root {
-  --page-bg: #111827;
-  --sidebar-bg: #161D2E;
-  --sidebar-border: rgba(255,255,255,0.06);
-  --card-bg: #161B27;
-  --card-border: rgba(255,255,255,0.08);
+  --page-bg: #0D1B2E;
+  --sidebar-bg: rgba(10, 18, 36, 0.92);
+  --card-bg: rgba(255,255,255,0.055);
+  --card-border: rgba(255,255,255,0.10);
   --accent: #3B82F6;
-  --accent-glow: rgba(59,130,246,0.15);
 }
 
 * { box-sizing: border-box; }
@@ -26,15 +24,15 @@ body {
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-/* Module content entry animation */
+/* Module entry animation */
 @keyframes moduleEnter {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.module-enter { animation: moduleEnter 0.22s cubic-bezier(0.22,1,0.36,1) forwards; }
+.module-enter { animation: moduleEnter 0.25s cubic-bezier(0.22,1,0.36,1) forwards; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -42,21 +40,24 @@ body {
 }
 .fade-in { animation: fadeIn 0.2s ease forwards; }
 
-/* Sidebar item hover */
-@keyframes pulseAccent {
-  0%,100% { opacity: 0.6; }
-  50%      { opacity: 1; }
+/* Loading dot pulse */
+@keyframes dotPulse {
+  0%,100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1;   transform: scale(1.2); }
 }
+.dot-pulse { animation: dotPulse 1.2s ease infinite; }
 
-/* Top bar gradient underline */
+/* Gradient accent line */
 .topbar-accent {
-  background: linear-gradient(90deg, #3B82F6 0%, #8B5CF6 50%, #06B6D4 100%);
+  background: linear-gradient(90deg, #3B82F6 0%, #8B5CF6 45%, #06B6D4 100%);
   height: 2px;
+  opacity: 0.7;
 }
 
-/* Glassmorphism card */
-.glass-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  backdrop-filter: blur(12px);
+/* Glass card utility */
+.glass {
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
