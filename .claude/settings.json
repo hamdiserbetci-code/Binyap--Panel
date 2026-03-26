@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(for d:*)",
+      "Bash(do echo:*)",
+      "Read(//c/etm-panel/src/modules/**)",
+      "Bash(done)",
+      "Read(//c/etm-panel/src/modules/$d/**)",
+      "Bash(rm -rf src/app src/components src/modules src/types)",
+      "Bash(mkdir -p src/app/login src/app/reset-password src/components/ui src/modules/dashboard src/modules/gorevler src/modules/bordro src/modules/arsiv src/modules/raporlar src/modules/ayarlar src/types)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

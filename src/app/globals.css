@@ -2,62 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
-html { min-height: 100%; }
-
+/* ── iOS Sistem Değişkenleri ──────────────────────────────────────────────── */
 :root {
-  --page-bg: #0D1B2E;
-  --sidebar-bg: rgba(10, 18, 36, 0.92);
-  --card-bg: rgba(255,255,255,0.055);
-  --card-border: rgba(255,255,255,0.10);
-  --accent: #3B82F6;
+  --ios-bg:         #000000;
+  --ios-bg2:        #1C1C1E;
+  --ios-bg3:        #2C2C2E;
+  --ios-bg4:        #3A3A3C;
+  --ios-separator:  rgba(60,60,67,0.36);
+  --ios-blue:       #0A84FF;
+  --ios-green:      #30D158;
+  --ios-red:        #FF453A;
+  --ios-orange:     #FF9F0A;
+  --ios-label:      #FFFFFF;
+  --ios-label2:     rgba(235,235,245,0.6);
+  --ios-label3:     rgba(235,235,245,0.3);
+  --ios-fill:       rgba(120,120,128,0.2);
 }
 
 * { box-sizing: border-box; }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  font-size: 16px;
+}
+
 body {
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  min-height: 100vh;
-  background: var(--page-bg);
-  color: #F1F5F9;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+               'Helvetica Neue', system-ui, sans-serif;
+  background: var(--ios-bg);
+  color: var(--ios-label);
   margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+/* iOS Safe Area */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-area-pt { padding-top: env(safe-area-inset-top, 0px); }
 
-/* Module entry animation */
-@keyframes moduleEnter {
-  from { opacity: 0; transform: translateY(12px); }
+/* iOS tap highlight kaldır */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Aktif buton efekti */
+button:active { transform: scale(0.97); }
+
+/* Scrollbar — iOS'ta görünmez */
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/* Select dark tema */
+select option { background-color: #2C2C2E; color: #FFFFFF; }
+
+/* iOS switch toggle animasyonu */
+.ios-toggle {
+  transition: background-color 0.2s ease;
+}
+
+/* iOS Liste separator */
+.ios-list-item + .ios-list-item {
+  border-top: 1px solid var(--ios-separator);
+}
+
+/* Bottom sheet modal için */
+.ios-sheet-enter {
+  animation: sheetUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Page content fade-in */
+.ios-fade {
+  animation: iosFade 0.25s ease;
+}
+
+@keyframes iosFade {
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
-}
-.module-enter { animation: moduleEnter 0.25s cubic-bezier(0.22,1,0.36,1) forwards; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.fade-in { animation: fadeIn 0.2s ease forwards; }
-
-/* Loading dot pulse */
-@keyframes dotPulse {
-  0%,100% { opacity: 0.3; transform: scale(0.8); }
-  50%      { opacity: 1;   transform: scale(1.2); }
-}
-.dot-pulse { animation: dotPulse 1.2s ease infinite; }
-
-/* Gradient accent line */
-.topbar-accent {
-  background: linear-gradient(90deg, #3B82F6 0%, #8B5CF6 45%, #06B6D4 100%);
-  height: 2px;
-  opacity: 0.7;
-}
-
-/* Glass card utility */
-.glass {
-  background: rgba(255,255,255,0.055);
-  border: 1px solid rgba(255,255,255,0.10);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
