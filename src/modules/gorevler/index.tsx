@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import {
-  Plus, CheckCircle2, Upload, FileText, FileSpreadsheet, Image, Download, X, Clock,
+  CheckCircle2, Upload, FileText, FileSpreadsheet, Image, Download, X, Clock,
   Pencil, Trash2, ToggleLeft, ToggleRight,
   Receipt, Users, TrendingUp, Landmark, BookOpen,
-  Briefcase, CreditCard,
+  Briefcase, CreditCard, BellRing, Plus,
   type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Modal, Field, ConfirmModal, cls, Loading, ErrorMsg } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 import type { Musteri } from '@/types'
+import AylikMaliyetModule from './AylikMaliyet'
 
 // ── İş Tipi Tanımları ─────────────────────────────────────────────────────────
 const IS_TIPLERI: Record<string, {
@@ -35,6 +36,7 @@ interface IsTakip {
   adim1_durum: 'bekliyor' | 'tamamlandi'; adim1_tarihi: string | null; adim1_aciklama: string | null
   adim2_durum: 'bekliyor' | 'tamamlandi'; adim2_tarihi: string | null; adim2_aciklama: string | null
   durum: 'aktif' | 'tamamlandi'; notlar: string | null; created_at: string
+  hatirlatici_tarihi: string | null; hatirlatici_saati: string | null;
 }
 
 interface IsDosya {
@@ -52,7 +54,17 @@ function getDonemler(yil: number, periyot: string): { donem: string; label: stri
 }
 
 // ── Bileşen ───────────────────────────────────────────────────────────────────
-export default function IsTakipModule({ firma }: AppCtx) {
+function getDonemLabel(donem: string, _periyot: string) {
+  const periyot = _periyot
+  if (donem.includes('-Q')) return donem.split('-')[1] || donem
+  if (!donem.includes('-')) return donem
+  if (periyot === '3 AylÄ±k') return donem.split('-')[1] || donem
+  if (periyot === 'YÄ±llÄ±k') return 'YÄ±llÄ±k'
+  const monthIndex = Number(donem.split('-')[1]) - 1
+  return MONTHS[monthIndex] || donem
+}
+
+export default function IsTakipModule({ firma, profil, navigate }: AppCtx) {
   const [isler, setIsler]           = useState<IsTakip[]>([])
   const [musteriler, setMusteriler] = useState<Musteri[]>([])
   const [loading, setLoading]       = useState(true)
@@ -74,9 +86,44 @@ export default function IsTakipModule({ firma }: AppCtx) {
   const [selTip, setSelTip]         = useState<string>('kdv')
   const [selMusteri, setSelMusteri] = useState('')
   const [selCell, setSelCell]       = useState<string | null>(null)
+  
+  // Ana sekme (Sabit / Maliyet)
+  const [mainTab, setMainTab]       = useState<'sabit' | 'maliyet'>('sabit')
   const [mobileTab, setMobileTab]   = useState<'isler' | 'donemler'>('isler')
 
+  const [erteleModal, setErteleModal] = useState<IsTakip | null>(null)
+  const [erteleForm, setErteleForm]   = useState({ tarih: new Date().toISOString().split('T')[0], saat: '' })
+  
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useEffect(() => { load() }, [firma.id])
+
+  useEffect(() => {
+    timerRef.current = setInterval(checkReminders, 60_000)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [isler])
+
+  function checkReminders() {
+    if (!('Notification' in window)) return
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const today = now.toISOString().split('T')[0]
+    isler.forEach(is => {
+      if (is.hatirlatici_saati === hhmm && is.hatirlatici_tarihi === today && is.durum === 'aktif') {
+        if (Notification.permission === 'granted') {
+          new Notification(`📌 Periyodik İş Hatırlatıcı`, {
+            body: `${IS_TIPLERI[is.tip]?.label || 'İş'} - Dönem: ${is.donem}`,
+            icon: '/favicon.ico',
+          })
+        }
+      }
+    })
+  }
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return
+    await Notification.requestPermission()
+  }
 
   async function load() {
     setLoading(true); setError('')
@@ -168,6 +215,25 @@ export default function IsTakipModule({ firma }: AppCtx) {
     setDosyalarMap(prev => ({ ...prev, [isId]: (prev[isId] || []).filter(x => x.id !== d.id) }))
   }
 
+  async function saveErtele() {
+    if (!erteleModal) return
+    if (!erteleForm.tarih) return
+    if (!erteleForm.saat) return
+    setSaving(true)
+    const { error } = await supabase.from('is_takip').update({
+      hatirlatici_tarihi: erteleForm.tarih,
+      hatirlatici_saati: erteleForm.saat
+    }).eq('id', erteleModal.id)
+    setSaving(false)
+    if (error) { alert(error.message); return }
+    setErteleModal(null); load()
+  }
+
+  async function clearErtele(id: string) {
+    await supabase.from('is_takip').update({ hatirlatici_tarihi: null, hatirlatici_saati: null }).eq('id', id)
+    load()
+  }
+
   const tipDef = IS_TIPLERI[selTip]
 
   const tipRecords = useMemo(() =>
@@ -177,7 +243,7 @@ export default function IsTakipModule({ firma }: AppCtx) {
 
   const yillar = useMemo(() => {
     const now = new Date().getFullYear()
-    const years = new Set([now - 1, now, now + 1])
+    const years = new Set<number>([now - 1, now, now + 1])
     tipRecords.forEach(r => { const y = parseInt(r.donem.slice(0, 4)); if (!isNaN(y)) years.add(y) })
     return Array.from(years).sort()
   }, [tipRecords])
@@ -205,6 +271,11 @@ export default function IsTakipModule({ firma }: AppCtx) {
         <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-white flex-1 uppercase">
           Periyodik İşler
         </h1>
+        {!('Notification' in window && Notification.permission === 'granted') && (
+          <button onClick={requestNotifPermission} className="flex items-center gap-2 text-[11px] font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-2 rounded-xl transition-all">
+            <BellRing size={14} /> İzin Ver
+          </button>
+        )}
         {musteriler.length > 0 && (
           <select
             value={selMusteri}
@@ -225,7 +296,21 @@ export default function IsTakipModule({ firma }: AppCtx) {
         </button>
       </div>
 
-      {/* ── Mobil Sekme ──────────────────────────────────────────────────────── */}
+      {/* ── Main Tab ──────────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 p-1 mx-4 sm:mx-6 mt-4 bg-slate-800/50 rounded-xl border border-white/5 shadow-inner backdrop-blur-3xl shrink-0">
+        <button onClick={() => setMainTab('sabit')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 justify-center ${mainTab === 'sabit' ? 'bg-blue-500/20 text-blue-400 shadow-lg border border-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+          <Briefcase size={14} /> Sabit Beyannameler
+        </button>
+        <button onClick={() => setMainTab('maliyet')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 justify-center ${mainTab === 'maliyet' ? 'bg-indigo-500/20 text-indigo-400 shadow-lg border border-indigo-500/30' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+          <Receipt size={14} /> Aylık Maliyet Takibi
+        </button>
+      </div>
+
+      {mainTab === 'maliyet' ? (
+        <AylikMaliyetModule firma={firma} profil={profil} navigate={navigate} />
+      ) : (
+        <>
+          {/* ── Mobil Sekme ──────────────────────────────────────────────────────── */}
       <div className="flex sm:hidden border-b border-[rgba(60,60,67,0.36)] shrink-0 bg-[#1C1C1E]">
         <button onClick={() => setMobileTab('isler')}
           className={`flex-1 py-2.5 text-xs font-semibold transition-all ${mobileTab === 'isler' ? 'text-[#0A84FF] border-b-2 border-[#0A84FF]' : 'text-[rgba(235,235,245,0.4)]'}`}>
@@ -293,7 +378,7 @@ export default function IsTakipModule({ firma }: AppCtx) {
 
         {/* ── Sağ: Yıl Kartları Yan Yana ───────────────────────────────────── */}
         <div className={`${mobileTab === 'donemler' ? 'flex' : 'hidden'} sm:flex flex-1 overflow-x-auto overflow-y-auto bg-[#000000]`}>
-          <div className="flex gap-3 p-4 items-start min-w-max">
+          <div className="flex gap-4 p-4 items-start w-full min-w-max">
 
             {yillar.map(yil => {
               const donemler = getDonemler(yil, tipDef?.periyot ?? 'Aylık')
@@ -301,8 +386,8 @@ export default function IsTakipModule({ firma }: AppCtx) {
               const yilDone  = yilRecs.filter(r => r.durum === 'tamamlandi').length
 
               return (
-                <div key={yil} className="rounded-2xl border border-[rgba(60,60,67,0.36)] overflow-hidden"
-                  style={{ minWidth: 188, background: '#1C1C1E' }}>
+                <div key={yil} className="rounded-2xl border border-[rgba(60,60,67,0.36)] overflow-hidden flex-1"
+                  style={{ minWidth: '260px', background: '#1C1C1E' }}>
 
                   {/* Yıl başlığı */}
                   <div className="px-4 py-3 border-b border-[rgba(60,60,67,0.36)]"
@@ -339,7 +424,7 @@ export default function IsTakipModule({ firma }: AppCtx) {
                           {/* Satır butonu */}
                           <button
                             onClick={() => handleCellClick(donem, record)}
-                            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-[rgba(255,255,255,0.04)] transition-colors text-left">
+                            className="group w-full flex items-center gap-2 px-3 py-3 hover:bg-[rgba(255,255,255,0.04)] transition-colors text-left">
                             <span className="text-xs font-medium text-[rgba(235,235,245,0.45)] w-7 shrink-0">
                               {label}
                             </span>
@@ -358,13 +443,15 @@ export default function IsTakipModule({ firma }: AppCtx) {
                               <div className="flex-1 h-px bg-[rgba(60,60,67,0.35)]" />
                             )}
 
-                            <div className="w-5 flex items-center justify-center shrink-0">
+                            <div className="w-8 flex items-center justify-center shrink-0">
                               {record ? (
                                 tamam
                                   ? <CheckCircle2 size={13} style={{ color: '#30D158' }} />
                                   : <Clock size={12} style={{ color: '#FF9F0A' }} />
                               ) : (
-                                <Plus size={11} className="text-[rgba(235,235,245,0.15)]" />
+                                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[rgba(255,255,255,0.03)] text-[rgba(235,235,245,0.2)] transition-colors group-hover:bg-[rgba(10,132,255,0.12)] group-hover:text-[#0A84FF]">
+                                  <Plus size={13} />
+                                </span>
                               )}
                             </div>
                           </button>
@@ -415,15 +502,15 @@ export default function IsTakipModule({ firma }: AppCtx) {
                                           </p>
                                         )}
                                       </div>
-                                      <div className="flex gap-0.5 shrink-0">
+                                      <div className="flex gap-1 shrink-0">
                                         <button onClick={() => setAciklamaModal({ isId: record.id, adimNo, value: aclm || '' })}
-                                          className="w-5 h-5 rounded flex items-center justify-center text-[rgba(235,235,245,0.3)] hover:text-[#FF9F0A] transition-colors">
-                                          <Pencil size={9} />
+                                          className="min-w-7 h-7 rounded-md flex items-center justify-center text-[rgba(235,235,245,0.3)] hover:text-[#FF9F0A] hover:bg-[rgba(255,159,10,0.12)] transition-colors">
+                                          <Pencil size={10} />
                                         </button>
                                         {aclm && (
                                           <button onClick={() => clearAciklama(record.id, adimNo)}
-                                            className="w-5 h-5 rounded flex items-center justify-center text-[rgba(235,235,245,0.3)] hover:text-[#FF453A] transition-colors">
-                                            <X size={9} />
+                                            className="min-w-7 h-7 rounded-md flex items-center justify-center text-[rgba(235,235,245,0.3)] hover:text-[#FF453A] hover:bg-[rgba(255,69,58,0.12)] transition-colors">
+                                            <X size={10} />
                                           </button>
                                         )}
                                       </div>
@@ -523,11 +610,15 @@ export default function IsTakipModule({ firma }: AppCtx) {
                                   {tamam ? <ToggleLeft size={11} /> : <ToggleRight size={11} />}
                                   {tamam ? 'Aktife Al' : 'Tamamlandı'}
                                 </button>
+                                <button onClick={() => setErteleModal(record)}
+                                   className={`min-h-9 flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-[10px] transition-all border ${record.hatirlatici_tarihi || record.hatirlatici_saati ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20 hover:bg-indigo-500/20' : 'text-[rgba(235,235,245,0.4)] border-transparent hover:text-white hover:bg-[rgba(60,60,67,0.3)]'}`}>
+                                   <BellRing size={12} /> {(record.hatirlatici_tarihi || record.hatirlatici_saati) ? (record.hatirlatici_saati || 'Hatırlatıcı') : 'Hatırlat'}
+                                </button>
                                 <button onClick={() => {
                                   setForm({ musteri_id: record.musteri_id || '', tip: record.tip, donem: record.donem, notlar: record.notlar || '' })
                                   setEditingId(record.id); setFormErr(''); setModal('edit')
-                                }} className="flex items-center gap-1 text-[10px] text-[rgba(235,235,245,0.4)] hover:text-white px-2 py-1.5 rounded-[8px] hover:bg-[rgba(60,60,67,0.3)] transition-all">
-                                  <Pencil size={10} /> Düzenle
+                                }} className="min-h-9 flex items-center gap-1.5 text-[11px] text-[rgba(235,235,245,0.4)] hover:text-white px-3 py-2 rounded-[10px] hover:bg-[rgba(60,60,67,0.3)] transition-all">
+                                  <Pencil size={12} /> Düzenle
                                 </button>
                                 <button onClick={() => setDeletingId(record.id)}
                                   className="flex items-center gap-1 text-[10px] text-[rgba(235,235,245,0.3)] hover:text-[#FF453A] px-2 py-1.5 rounded-[8px] hover:bg-[rgba(255,69,58,0.08)] transition-all ml-auto">
@@ -542,17 +633,17 @@ export default function IsTakipModule({ firma }: AppCtx) {
                   </div>
 
                   {/* Yıl altı: ekle */}
-                  <div className="px-3 py-2 border-t border-[rgba(60,60,67,0.2)]">
-                    <button
-                      onClick={() => {
-                        const firstDonem = getDonemler(yil, tipDef?.periyot ?? 'Aylık')[0]?.donem ?? String(yil)
-                        setForm({ musteri_id: selMusteri, tip: selTip as IsTip, donem: firstDonem, notlar: '' })
-                        setEditingId(null); setFormErr(''); setModal('add')
-                      }}
-                      className="w-full flex items-center justify-center gap-1 text-[10px] text-[rgba(235,235,245,0.25)] hover:text-[#0A84FF] py-1 transition-colors">
-                      <Plus size={10} /> {yil} ekle
-                    </button>
-                  </div>
+                    <div className="px-3 py-2 border-t border-[rgba(60,60,67,0.2)]">
+                      <button
+                        onClick={() => {
+                          const firstDonem = getDonemler(yil, tipDef?.periyot ?? 'Aylık')[0]?.donem ?? String(yil)
+                          setForm({ musteri_id: selMusteri, tip: selTip as IsTip, donem: firstDonem, notlar: '' })
+                          setEditingId(null); setFormErr(''); setModal('add')
+                        }}
+                        className="w-full min-h-9 flex items-center justify-center gap-1.5 text-[11px] text-[rgba(235,235,245,0.35)] hover:text-[#0A84FF] hover:bg-[rgba(10,132,255,0.08)] py-2 rounded-[10px] transition-colors">
+                        <Plus size={12} /> {yil} ekle
+                      </button>
+                    </div>
                 </div>
               )
             })}
@@ -560,6 +651,8 @@ export default function IsTakipModule({ firma }: AppCtx) {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* ── Modals ───────────────────────────────────────────────────────────── */}
       {modal && (
@@ -614,6 +707,25 @@ export default function IsTakipModule({ firma }: AppCtx) {
         <ConfirmModal title="İşi Sil"
           message="Bu işi ve tüm dökümanları silmek istediğinizden emin misiniz?"
           danger onConfirm={deleteIs} onCancel={() => setDeletingId(null)} />
+      )}
+
+      {/* ── Hatırlatıcı / Erteleme Modalı ──────────────────────────────────────── */}
+      {erteleModal && (
+        <Modal title="Hatırlatıcı Ayarla / Ertele" onClose={() => setErteleModal(null)} size="sm" footer={<><button onClick={() => setErteleModal(null)} className={cls.btnSecondary}>İptal</button><button onClick={saveErtele} disabled={saving} className={cls.btnPrimary}>{saving ? 'Ayarlanıyor...' : 'Ayarla'}</button></>}>
+          <div className="space-y-4">
+            <Field label="Yeni Tarih">
+              <input type="date" className={cls.input} value={erteleForm.tarih} onChange={e => setErteleForm(p => ({ ...p, tarih: e.target.value }))} autoFocus />
+            </Field>
+            <Field label="Yeni Saat">
+              <input type="time" className={cls.input} value={erteleForm.saat} onChange={e => setErteleForm(p => ({ ...p, saat: e.target.value }))} />
+            </Field>
+            {(erteleModal.hatirlatici_tarihi || erteleModal.hatirlatici_saati) && (
+              <button type="button" onClick={() => { clearErtele(erteleModal.id); setErteleModal(null) }} className="w-full text-xs text-red-400 hover:text-red-300 py-2 border border-dashed border-red-500/30 rounded-xl hover:bg-red-500/10 transition-colors">
+                Mevcut Ertelemeyi Temizle
+              </button>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   )

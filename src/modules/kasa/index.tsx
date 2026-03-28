@@ -1,493 +1,551 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Plus, ChevronLeft, ChevronRight, ArrowDownLeft, ArrowUpRight,
-  Wallet, TrendingUp, TrendingDown, Pencil, Trash2, X, Calendar,
-  Banknote, CreditCard, ArrowLeftRight, FileText,
+  ArrowDown,
+  ArrowUp,
+  Banknote,
+  CreditCard,
+  Download,
+  FileSpreadsheet,
+  Landmark,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Wallet,
+  Wallet2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { Modal, Field, ConfirmModal, cls, Loading, ErrorMsg } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
+import type { Musteri } from '@/types'
+import { ConfirmModal, ErrorMsg, Field, Loading, Modal, cls } from '@/components/ui'
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
-// ── Tipler ────────────────────────────────────────────────────────────────────
-interface KasaHareket {
+type KasaHareketi = {
   id: string
-  firma_id: string
-  tarih: string
-  tur: 'gelir' | 'gider'
-  kategori: string | null
-  aciklama: string
-  tutar: number
-  odeme_sekli: 'nakit' | 'havale' | 'kart' | 'cek' | 'diger'
   created_at: string
+  firma_id: string
+  user_id: string
+  musteri_id: string | null
+  tarih: string
+  aciklama: string
+  tur: 'gelir' | 'gider'
+  tutar: number
+  kategori: string | null
+  odeme_sekli: 'nakit' | 'banka' | 'kart' | 'avans' | 'diger'
 }
 
-const GELIR_KATEGORILER = ['Satış', 'Hizmet Bedeli', 'Kira Geliri', 'Tahsilat', 'Faiz', 'Diğer Gelir']
-const GIDER_KATEGORILER = ['Kira', 'Fatura', 'Maaş / Avans', 'Malzeme', 'Ulaşım', 'Yemek', 'Vergi / SGK', 'Kırtasiye', 'Diğer Gider']
+type OdemeSekli = 'nakit' | 'banka' | 'kart' | 'avans' | 'diger'
 
-const ODEME_SEKLI_LABEL: Record<string, string> = {
-  nakit: 'Nakit', havale: 'Havale / EFT', kart: 'Kart', cek: 'Çek', diger: 'Diğer',
+const ODEME_SEKLI_LABEL: Record<OdemeSekli, string> = {
+  nakit: 'Nakit',
+  banka: 'Banka',
+  kart: 'Kredi Kartı',
+  avans: 'Avans',
+  diger: 'Diğer',
 }
 
-const ODEME_ICON: Record<string, typeof Banknote> = {
-  nakit: Banknote, havale: ArrowLeftRight, kart: CreditCard, cek: FileText, diger: Wallet,
+function cleanTr(text: string) {
+  return String(text ?? '')
+    .replace(/İ/g, 'I').replace(/ı/g, 'i')
+    .replace(/Ş/g, 'S').replace(/ş/g, 's')
+    .replace(/Ğ/g, 'G').replace(/ğ/g, 'g')
+    .replace(/Ü/g, 'U').replace(/ü/g, 'u')
+    .replace(/Ö/g, 'O').replace(/ö/g, 'o')
+    .replace(/Ç/g, 'C').replace(/ç/g, 'c')
+    .replace(/·/g, '-')
+    .replace(/[“”]/g, '"')
 }
 
-const EMPTY_FORM = {
-  tur: 'gelir' as 'gelir' | 'gider',
+const OdemeIcon = ({ sekil, ...props }: { sekil: OdemeSekli, [key: string]: any }) => {
+  const ICONS: Record<OdemeSekli, typeof Wallet> = {
+    nakit: Banknote,
+    banka: Landmark,
+    kart: CreditCard,
+    avans: Wallet2,
+    diger: Wallet,
+  }
+  const Icon = ICONS[sekil] || Wallet
+  return <Icon {...props} />
+}
+
+const EMPTY_FORM: Partial<KasaHareketi> = {
+  tarih: new Date().toISOString().split('T')[0],
   aciklama: '',
-  tutar: '',
+  tur: 'gider',
+  tutar: 0,
   kategori: '',
-  odeme_sekli: 'nakit' as KasaHareket['odeme_sekli'],
-  tarih: new Date().toISOString().slice(0, 10),
+  odeme_sekli: 'nakit',
+  musteri_id: null,
 }
 
-function fmt(n: number) {
-  return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+export default function KasaModule({ firma, profil, navigate }: AppCtx) {
+  const [hareketler, setHareketler] = useState<KasaHareketi[]>([])
+  const [musteriler, setMusteriler] = useState<Musteri[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [modal, setModal] = useState<Partial<KasaHareketi> | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [dateRange, setDateRange] = useState(() => {
+    const today = new Date()
+    return {
+      start: format(startOfMonth(today), 'yyyy-MM-dd'),
+      end: format(endOfMonth(today), 'yyyy-MM-dd'),
+    }
+  })
 
-function gunLabel(iso: string) {
-  const d = new Date(iso + 'T12:00:00')
-  const today = new Date().toISOString().slice(0, 10)
-  if (iso === today) return 'Bugün'
-  return d.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })
-}
-
-function prevDay(iso: string) {
-  const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10)
-}
-function nextDay(iso: string) {
-  const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10)
-}
-
-// ── Bileşen ───────────────────────────────────────────────────────────────────
-export default function Kasa({ firma }: AppCtx) {
-  const [hareketler, setHareketler] = useState<KasaHareket[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState('')
-
-  const [tarih, setTarih]           = useState(new Date().toISOString().slice(0, 10))
-  const [view, setView]             = useState<'gun' | 'ay'>('gun')
-
-  const [modal, setModal]           = useState<'add' | 'edit' | null>(null)
-  const [form, setForm]             = useState({ ...EMPTY_FORM })
-  const [editingId, setEditingId]   = useState<string | null>(null)
-  const [saving, setSaving]         = useState(false)
-  const [formErr, setFormErr]       = useState('')
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  // Mevcut ayın başından yükle — hem günlük hem aylık görünüm için
-  useEffect(() => { load() }, [firma.id, tarih, view])
+  useEffect(() => {
+    load()
+  }, [firma.id])
 
   async function load() {
-    setLoading(true); setError('')
-    let query = supabase
-      .from('kasa_hareketleri')
-      .select('*')
-      .eq('firma_id', firma.id)
-      .order('tarih', { ascending: false })
-      .order('created_at', { ascending: false })
+    setLoading(true)
+    setError('')
+    const [hareketRes, musteriRes] = await Promise.all([
+      supabase.from('kasa_hareketleri').select('*').eq('firma_id', firma.id).order('tarih', { ascending: false }).order('created_at', { ascending: false }),
+      supabase.from('musteriler').select('id, ad, kisa_ad').eq('firma_id', firma.id).eq('aktif', true).order('ad'),
+    ])
 
-    if (view === 'gun') {
-      query = query.eq('tarih', tarih)
-    } else {
-      const ay = tarih.slice(0, 7)
-      query = query.gte('tarih', `${ay}-01`).lte('tarih', `${ay}-31`)
+    if (hareketRes.error) {
+      setError(hareketRes.error.message)
+      setLoading(false)
+      return
     }
 
-    const { data, error: e } = await query
-    if (e) { setError(e.message); setLoading(false); return }
-    setHareketler((data || []) as KasaHareket[])
+    setHareketler((hareketRes.data || []) as KasaHareketi[])
+    setMusteriler((musteriRes.data || []) as Musteri[])
     setLoading(false)
   }
 
   async function save() {
-    const tutarNum = parseFloat(form.tutar.replace(',', '.'))
-    if (!form.aciklama.trim()) { setFormErr('Açıklama zorunludur'); return }
-    if (isNaN(tutarNum) || tutarNum <= 0) { setFormErr('Geçerli bir tutar girin'); return }
-
-    setSaving(true); setFormErr('')
-    const payload = {
-      firma_id: firma.id,
-      tarih: form.tarih,
-      tur: form.tur,
-      kategori: form.kategori || null,
-      aciklama: form.aciklama.trim(),
-      tutar: tutarNum,
-      odeme_sekli: form.odeme_sekli,
+    if (!modal?.aciklama?.trim() || !modal.tarih || !modal.tutar) {
+      alert('Açıklama, tutar ve tarih zorunludur.')
+      return
     }
 
-    const { error: e } = modal === 'add'
-      ? await supabase.from('kasa_hareketleri').insert(payload)
-      : await supabase.from('kasa_hareketleri').update(payload).eq('id', editingId!)
+    setSaving(true)
+    const payload = {
+      firma_id: firma.id,
+      user_id: profil.id,
+      musteri_id: modal.musteri_id || null,
+      tarih: modal.tarih,
+      aciklama: modal.aciklama.trim(),
+      tur: modal.tur || 'gider',
+      tutar: Number(modal.tutar || 0),
+      kategori: modal.kategori || null,
+      odeme_sekli: modal.odeme_sekli || 'nakit',
+    }
+
+    const { error: saveError } = modal.id
+      ? await supabase.from('kasa_hareketleri').update(payload).eq('id', modal.id)
+      : await supabase.from('kasa_hareketleri').insert(payload)
 
     setSaving(false)
-    if (e) { setFormErr(e.message); return }
-    setModal(null); load()
+    if (saveError) {
+      alert(saveError.message)
+      return
+    }
+
+    setModal(null)
+    await load()
   }
 
   async function deleteHareket() {
-    await supabase.from('kasa_hareketleri').delete().eq('id', deletingId!)
-    setDeletingId(null); load()
+    if (!deleteId) return
+    await supabase.from('kasa_hareketleri').delete().eq('id', deleteId)
+    setDeleteId(null)
+    await load()
   }
 
-  // ── Hesaplamalar ──────────────────────────────────────────────────────────
-  const toplamGelir  = useMemo(() => hareketler.filter(h => h.tur === 'gelir').reduce((s, h) => s + h.tutar, 0), [hareketler])
-  const toplamGider  = useMemo(() => hareketler.filter(h => h.tur === 'gider').reduce((s, h) => s + h.tutar, 0), [hareketler])
-  const netBakiye    = toplamGelir - toplamGider
-
-  // Ay görünümü için günlere grupla
-  const gruplar = useMemo(() => {
-    if (view === 'gun') return { [tarih]: hareketler }
-    const map: Record<string, KasaHareket[]> = {}
-    for (const h of hareketler) {
-      if (!map[h.tarih]) map[h.tarih] = []
-      map[h.tarih].push(h)
-    }
-    return map
-  }, [hareketler, view, tarih])
-
-  const gunler = Object.keys(gruplar).sort((a, b) => b.localeCompare(a))
-
-  function openAdd() {
-    setForm({ ...EMPTY_FORM, tarih: view === 'gun' ? tarih : new Date().toISOString().slice(0, 10) })
-    setEditingId(null); setFormErr(''); setModal('add')
-  }
-
-  function openEdit(h: KasaHareket) {
-    setForm({
-      tur: h.tur, aciklama: h.aciklama,
-      tutar: String(h.tutar), kategori: h.kategori || '',
-      odeme_sekli: h.odeme_sekli, tarih: h.tarih,
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('tr-TR')
+    return hareketler.filter((item) => {
+      if (item.tarih < dateRange.start || item.tarih > dateRange.end) return false
+      if (!needle) return true
+      const musteri = musteriler.find((x) => x.id === item.musteri_id)
+      return [item.aciklama, item.kategori || '', String(item.tutar), musteri?.ad || '', musteri?.kisa_ad || ''].some((value) =>
+        value.toLocaleLowerCase('tr-TR').includes(needle)
+      )
     })
-    setEditingId(h.id); setFormErr(''); setModal('edit')
+  }, [hareketler, query, dateRange, musteriler])
+
+  const stats = useMemo(() => {
+    const gelir = filtered.filter((h) => h.tur === 'gelir').reduce((sum, h) => sum + Number(h.tutar || 0), 0)
+    const gider = filtered.filter((h) => h.tur === 'gider').reduce((sum, h) => sum + Number(h.tutar || 0), 0)
+    return { gelir, gider, bakiye: gelir - gider }
+  }, [filtered])
+
+  const grouped = useMemo(() => {
+    return filtered.reduce((acc, item) => {
+      const date = item.tarih
+      if (!acc[date]) acc[date] = []
+      acc[date].push(item)
+      return acc
+    }, {} as Record<string, KasaHareketi[]>)
+  }, [filtered])
+
+  const setDatePreset = (preset: 'this_month' | 'last_month') => {
+    const today = new Date()
+    const targetDate = preset === 'last_month' ? subMonths(today, 1) : today
+    setDateRange({
+      start: format(startOfMonth(targetDate), 'yyyy-MM-dd'),
+      end: format(endOfMonth(targetDate), 'yyyy-MM-dd'),
+    })
+  }
+
+  async function exportPDF() {
+    const jsPDFModule = await import('jspdf')
+    const autoTableModule = await import('jspdf-autotable')
+    const jsPDF = jsPDFModule.default
+    const autoTable = autoTableModule.default
+    const doc = new jsPDF('p') // Portrait
+
+    // Header
+    doc.setFillColor(15, 23, 42)
+    doc.rect(0, 0, doc.internal.pageSize.width, 30, 'F')
+    doc.setFont('Helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(16)
+    doc.text(cleanTr(firma.ad || 'Kasa Raporu'), 14, 18)
+    doc.setFont('Helvetica', 'normal')
+    doc.setFontSize(11)
+    doc.text(cleanTr(`KASA RAPORU: ${dateRange.start} - ${dateRange.end}`), 14, 25)
+
+    // Summary Cards
+    doc.setTextColor(36, 50, 70)
+    const summaryCards = [
+      { label: 'Toplam Gelir', value: new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(stats.gelir) },
+      { label: 'Toplam Gider', value: new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(stats.gider) },
+      { label: 'Net Bakiye', value: new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(stats.bakiye) },
+    ]
+    let summaryX = 14
+    summaryCards.forEach(card => {
+      doc.setFillColor(244, 247, 251)
+      doc.roundedRect(summaryX, 36, 60, 18, 3, 3, 'F')
+      doc.setFont('Helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text(cleanTr(card.label.toUpperCase()), summaryX + 4, 43)
+      doc.setFont('Helvetica', 'normal')
+      doc.setFontSize(11)
+      doc.text(cleanTr(card.value), summaryX + 4, 50)
+      summaryX += 64
+    })
+
+    autoTable(doc, {
+      startY: 62,
+      head: [['Tarih', 'Tür', 'Kategori', 'Açıklama', 'Ö.Şekli', 'Cari', 'Tutar']],
+      body: filtered.map((item) => {
+        const musteri = musteriler.find((x) => x.id === item.musteri_id)
+        return [
+          format(new Date(item.tarih + 'T00:00:00'), 'dd.MM.yyyy'),
+          item.tur === 'gelir' ? 'Gelir' : 'Gider',
+          cleanTr(item.kategori || '-'),
+          cleanTr(item.aciklama),
+          cleanTr(ODEME_SEKLI_LABEL[item.odeme_sekli as OdemeSekli] || '-'),
+          cleanTr(musteri?.kisa_ad || musteri?.ad || '-'),
+          `${item.tur === 'gelir' ? '+' : '-'} ${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2 }).format(Number(item.tutar || 0))} TL`,
+        ]
+      }),
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: 'bold' },
+      bodyStyles: { textColor: [36, 50, 70], lineColor: [220, 230, 245], lineWidth: 0.2, fontSize: 8, font: 'helvetica' },
+      alternateRowStyles: { fillColor: [248, 251, 253] },
+      margin: { left: 14, right: 14, bottom: 14 },
+      styles: { overflow: 'linebreak', cellPadding: 2.6, font: 'helvetica' },
+      didParseCell: function (data) {
+        if (data.column.index === 6 && data.cell.section === 'body') {
+          data.cell.styles.halign = 'right'
+        }
+      },
+      didDrawPage: (data) => {
+        doc.setFontSize(8)
+        doc.setTextColor(150)
+        doc.text(`Sayfa ${String(data.pageNumber)}`, data.settings.margin.left, doc.internal.pageSize.height - 8)
+        doc.text(`Rapor oluşturulma: ${new Date().toLocaleString('tr-TR')}`, doc.internal.pageSize.width - data.settings.margin.right, doc.internal.pageSize.height - 8, { align: 'right' })
+      },
+    })
+
+    doc.save(`Kasa-Raporu_${dateRange.start}_${dateRange.end}.pdf`)
+  }
+
+  async function exportExcel() {
+    const XLSX = await import('xlsx-js-style')
+
+    type S = Record<string, any>
+    const sc = (v: any, t: string, s: S = {}) => ({ v, t, s })
+    const border = (color = 'e2e8f0') => ({
+      top: { style: 'thin', color: { rgb: color } },
+      bottom: { style: 'thin', color: { rgb: color } },
+      left: { style: 'thin', color: { rgb: color } },
+      right: { style: 'thin', color: { rgb: color } },
+    })
+
+    const mainHeader = (v: string): S => sc(v, 's', { font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '166534' } }, alignment: { horizontal: 'center', vertical: 'center' } })
+    const subHeader = (v: string): S => sc(v, 's', { font: { sz: 10, color: { rgb: 'dcfce7' } }, fill: { fgColor: { rgb: '14532d' } }, alignment: { horizontal: 'center', vertical: 'center' } })
+    const colHead = (v: string, align: string = 'left'): S => sc(v, 's', { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '374151' } }, alignment: { horizontal: align, vertical: 'center' }, border: border('475569') })
+    const textCell = (v: string, align: 'left' | 'center' | 'right' = 'left'): S => sc(v, 's', { font: { sz: 10 }, alignment: { horizontal: align, vertical: 'center', wrapText: true }, border: border() })
+    const moneyCell = (v: number, type: 'gelir' | 'gider'): S => sc(v, 'n', { font: { sz: 10, color: { rgb: type === 'gelir' ? '15803d' : 'be123c' } }, numFmt: '#,##0.00" TL"', alignment: { horizontal: 'right', vertical: 'center' }, border: border() })
+    const totalMoneyCell = (v: number): S => sc(v, 'n', { font: { sz: 11, bold: true, color: { rgb: v >= 0 ? '15803d' : 'be123c' } }, fill: { fgColor: { rgb: 'f0fdf4' } }, numFmt: '#,##0.00" TL"', alignment: { horizontal: 'right', vertical: 'center' }, border: border('bbf7d0') })
+    const totalLabel = (v: string): S => sc(v, 's', { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'f0fdf4' } }, alignment: { horizontal: 'right', vertical: 'center' }, border: border('bbf7d0') })
+    const empty = (bg?: string): S => sc('', 's', bg ? { fill: { fgColor: { rgb: bg } } } : {})
+
+    const header = ['Tarih', 'Tür', 'Kategori', 'Açıklama', 'Ödeme Şekli', 'Cari', 'Tutar']
+    const dataRows = filtered.map((item) => {
+      const musteri = musteriler.find((x) => x.id === item.musteri_id)
+      return [
+        textCell(format(new Date(item.tarih + 'T00:00:00'), 'dd.MM.yyyy'), 'center'),
+        textCell(item.tur === 'gelir' ? 'Gelir' : 'Gider', 'center'),
+        textCell(item.kategori || '-'),
+        textCell(item.aciklama),
+        textCell(ODEME_SEKLI_LABEL[item.odeme_sekli as OdemeSekli] || item.odeme_sekli || '-', 'center'),
+        textCell(musteri?.ad || '-'),
+        moneyCell(Number(item.tutar || 0), item.tur as 'gelir' | 'gider'),
+      ]
+    })
+
+    const aoa = [
+      [mainHeader('KASA HAREKETLERİ RAPORU'), ...Array(header.length - 1).fill(empty('166534'))],
+      [subHeader(`${firma.ad} | ${dateRange.start} - ${dateRange.end}`), ...Array(header.length - 1).fill(empty('14532d'))],
+      [],
+      [colHead('Toplam Gelir'), totalMoneyCell(stats.gelir), colHead('Toplam Gider'), totalMoneyCell(stats.gider), colHead('Net Bakiye'), totalMoneyCell(stats.bakiye), empty()],
+      [],
+      header.map((h, i) => colHead(h, [0, 1, 4].includes(i) ? 'center' : i === 6 ? 'right' : 'left')),
+      ...dataRows,
+      [
+        ...Array(header.length - 2).fill(empty('f0fdf4')),
+        totalLabel('Genel Bakiye'),
+        totalMoneyCell(stats.bakiye),
+      ],
+    ]
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 18 }]
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 1 } },
+    ]
+    ws['!autofilter'] = { ref: `A6:${String.fromCharCode(65 + header.length - 1)}${6 + dataRows.length}` }
+    ws['!freeze'] = { xSplit: 0, ySplit: 6 }
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'KasaHareketleri')
+    XLSX.writeFile(wb, `Kasa-Raporu_${dateRange.start}_${dateRange.end}.xlsx`)
   }
 
   if (loading) return <Loading />
-  if (error)   return <ErrorMsg message={error} onRetry={load} />
+  if (error) return <ErrorMsg message={`${error}. Gerekirse kasa_fix.sql dosyasını Supabase üzerinde çalıştırın.`} onRetry={load} />
 
   return (
-    <div className="flex flex-col gap-0 -mx-3 md:-mx-5 -mt-3 md:-mt-5">
-
-      {/* ── Üst Bar ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-[rgba(60,60,67,0.36)] shrink-0 flex-wrap"
-        style={{ background: 'rgba(28,28,30,0.95)' }}>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-white flex-1 uppercase">
-          Kasa
-        </h1>
-
-        {/* Görünüm seçici */}
-        <div className="flex rounded-[10px] overflow-hidden border border-[rgba(60,60,67,0.5)]">
-          {(['gun', 'ay'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
-              className="px-4 py-2 text-xs font-semibold transition-all"
-              style={{
-                background: view === v ? '#0A84FF' : 'rgba(44,44,46,0.8)',
-                color: view === v ? '#fff' : 'rgba(235,235,245,0.5)',
-              }}>
-              {v === 'gun' ? 'Günlük' : 'Aylık'}
+    <div className="flex flex-col gap-6">
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-2xl">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-green-500/30 bg-green-500/15 text-green-300">
+              <Wallet size={20} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-white">Kasa</h1>
+              <p className="text-sm text-slate-400">Nakit, banka ve avans hareketlerini yönetin.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={exportPDF} className={cls.btnSecondary}>
+              <Download size={15} /> PDF
             </button>
-          ))}
-        </div>
-
-        <button onClick={openAdd} className={cls.btnPrimary}>
-          <Plus size={14} /> Yeni Kayıt
-        </button>
-      </div>
-
-      {/* ── Tarih Navigasyon ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(60,60,67,0.2)]"
-        style={{ background: '#1C1C1E' }}>
-        <button
-          onClick={() => setTarih(view === 'gun' ? prevDay(tarih) : (() => {
-            const d = new Date(tarih + '-01T12:00:00'); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7) + '-01'
-          })())}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-[rgba(235,235,245,0.5)] hover:text-white hover:bg-[rgba(60,60,67,0.5)] transition-all">
-          <ChevronLeft size={18} />
-        </button>
-
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <Calendar size={14} className="text-[#0A84FF]" />
-          <label className="relative cursor-pointer">
-            <span className="text-sm font-semibold text-white">
-              {view === 'gun'
-                ? gunLabel(tarih)
-                : new Date(tarih + 'T12:00:00').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
-              }
-            </span>
-            <input
-              type={view === 'gun' ? 'date' : 'month'}
-              value={view === 'gun' ? tarih : tarih.slice(0, 7)}
-              onChange={e => setTarih(view === 'gun' ? e.target.value : e.target.value + '-01')}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full"
-            />
-          </label>
-        </div>
-
-        <button
-          onClick={() => setTarih(view === 'gun' ? nextDay(tarih) : (() => {
-            const d = new Date(tarih + 'T12:00:00'); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7) + '-01'
-          })())}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-[rgba(235,235,245,0.5)] hover:text-white hover:bg-[rgba(60,60,67,0.5)] transition-all">
-          <ChevronRight size={18} />
-        </button>
-
-        {/* Bugüne dön */}
-        {tarih !== new Date().toISOString().slice(0, 10) && view === 'gun' && (
-          <button onClick={() => setTarih(new Date().toISOString().slice(0, 10))}
-            className="text-[10px] font-semibold text-[#0A84FF] px-2.5 py-1 rounded-full border border-[rgba(10,132,255,0.3)] hover:bg-[rgba(10,132,255,0.1)] transition-all">
-            Bugün
-          </button>
-        )}
-      </div>
-
-      {/* ── Özet Kartlar ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3 px-4 py-4" style={{ background: '#000000' }}>
-        {/* Gelir */}
-        <div className="rounded-2xl p-4 flex flex-col gap-2" style={{ background: 'rgba(48,209,88,0.1)', border: '1px solid rgba(48,209,88,0.2)' }}>
-          <div className="flex items-center gap-1.5">
-            <TrendingUp size={14} style={{ color: '#30D158' }} />
-            <span className="text-[11px] font-semibold text-[rgba(235,235,245,0.6)]">Gelir</span>
-          </div>
-          <p className="text-base sm:text-lg font-bold text-[#30D158] leading-none">
-            ₺{fmt(toplamGelir)}
-          </p>
-          <p className="text-[10px] text-[rgba(235,235,245,0.3)]">
-            {hareketler.filter(h => h.tur === 'gelir').length} işlem
-          </p>
-        </div>
-
-        {/* Gider */}
-        <div className="rounded-2xl p-4 flex flex-col gap-2" style={{ background: 'rgba(255,69,58,0.1)', border: '1px solid rgba(255,69,58,0.2)' }}>
-          <div className="flex items-center gap-1.5">
-            <TrendingDown size={14} style={{ color: '#FF453A' }} />
-            <span className="text-[11px] font-semibold text-[rgba(235,235,245,0.6)]">Gider</span>
-          </div>
-          <p className="text-base sm:text-lg font-bold text-[#FF453A] leading-none">
-            ₺{fmt(toplamGider)}
-          </p>
-          <p className="text-[10px] text-[rgba(235,235,245,0.3)]">
-            {hareketler.filter(h => h.tur === 'gider').length} işlem
-          </p>
-        </div>
-
-        {/* Net Bakiye */}
-        <div className="rounded-2xl p-4 flex flex-col gap-2" style={{
-          background: netBakiye >= 0 ? 'rgba(10,132,255,0.1)' : 'rgba(255,159,10,0.1)',
-          border: `1px solid ${netBakiye >= 0 ? 'rgba(10,132,255,0.2)' : 'rgba(255,159,10,0.2)'}`,
-        }}>
-          <div className="flex items-center gap-1.5">
-            <Wallet size={14} style={{ color: netBakiye >= 0 ? '#0A84FF' : '#FF9F0A' }} />
-            <span className="text-[11px] font-semibold text-[rgba(235,235,245,0.6)]">Net</span>
-          </div>
-          <p className="text-base sm:text-lg font-bold leading-none"
-            style={{ color: netBakiye >= 0 ? '#0A84FF' : '#FF9F0A' }}>
-            {netBakiye >= 0 ? '+' : ''}₺{fmt(netBakiye)}
-          </p>
-          <p className="text-[10px] text-[rgba(235,235,245,0.3)]">
-            {hareketler.length} toplam işlem
-          </p>
-        </div>
-      </div>
-
-      {/* ── Hareket Listesi ──────────────────────────────────────────────────── */}
-      <div className="px-4 pb-8 space-y-4" style={{ background: '#000000' }}>
-        {gunler.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-16">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-              style={{ background: 'rgba(60,60,67,0.3)' }}>
-              <Wallet size={28} className="text-[rgba(235,235,245,0.3)]" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-semibold text-[rgba(235,235,245,0.5)]">Kayıt yok</p>
-              <p className="text-xs text-[rgba(235,235,245,0.3)] mt-1">Yeni kayıt ekleyerek başlayın</p>
-            </div>
-            <button onClick={openAdd} className={cls.btnPrimary}>
-              <Plus size={14} /> Yeni Kayıt
+            <button onClick={exportExcel} className={cls.btnSecondary}>
+              <FileSpreadsheet size={15} /> Excel
+            </button>
+            <button onClick={() => setModal({ ...EMPTY_FORM })} className={cls.btnPrimary}>
+              <Plus size={15} /> Hareket Ekle
             </button>
           </div>
-        ) : (
-          gunler.map(gun => {
-            const gunHareketler = gruplar[gun]
-            const gunGelir = gunHareketler.filter(h => h.tur === 'gelir').reduce((s, h) => s + h.tutar, 0)
-            const gunGider = gunHareketler.filter(h => h.tur === 'gider').reduce((s, h) => s + h.tutar, 0)
-            return (
-              <div key={gun}>
-                {/* Gün başlığı — aylık görünümde göster */}
-                {view === 'ay' && (
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-[rgba(235,235,245,0.5)]">
-                      {new Date(gun + 'T12:00:00').toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] font-bold text-[#30D158]">+₺{fmt(gunGelir)}</span>
-                      <span className="text-[10px] font-bold text-[#FF453A]">-₺{fmt(gunGider)}</span>
-                    </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <SummaryCard label="Toplam Gelir" value={stats.gelir} tone="emerald" />
+        <SummaryCard label="Toplam Gider" value={stats.gider} tone="rose" />
+        <SummaryCard label="Net Bakiye" value={stats.bakiye} tone={stats.bakiye >= 0 ? 'emerald' : 'rose'} />
+      </div>
+
+      {/* Filters and List */}
+      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/50 shadow-2xl backdrop-blur-xl">
+        <div className="border-b border-white/5 p-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr] xl:grid-cols-[2fr_1fr_1fr_auto]">
+            <div className="relative">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Açıklama, kategori, tutar veya cari ara..."
+                className="w-full rounded-xl border border-white/10 bg-slate-950/50 py-3 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 transition-colors focus:border-blue-500"
+              />
+            </div>
+            <Field label="Başlangıç Tarihi">
+              <input type="date" className={cls.input} value={dateRange.start} onChange={(e) => setDateRange((p) => ({ ...p, start: e.target.value }))} />
+            </Field>
+            <Field label="Bitiş Tarihi">
+              <input type="date" className={cls.input} value={dateRange.end} onChange={(e) => setDateRange((p) => ({ ...p, end: e.target.value }))} />
+            </Field>
+            <div className="flex items-end gap-2">
+              <button onClick={() => setDatePreset('this_month')} className={cls.btnSecondary}>Bu Ay</button>
+              <button onClick={() => setDatePreset('last_month')} className={cls.btnSecondary}>Geçen Ay</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-2 sm:p-4">
+          {Object.keys(grouped).length === 0 ? (
+            <div className="py-16 text-center text-sm text-slate-500">Bu tarih aralığında hareket bulunamadı.</div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(grouped).map(([date, hareketler]) => (
+                <div key={date}>
+                  <div className="mb-3 px-2">
+                    <h3 className="text-sm font-bold text-white">{new Date(date + 'T00:00:00').toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
                   </div>
-                )}
+                  <div className="space-y-2">
+                    {hareketler.map((h) => {
+                      const isGelir = h.tur === 'gelir'
+                      const musteri = musteriler.find(m => m.id === h.musteri_id)
+                      return (
+                        <div key={h.id} className="flex items-center gap-4 rounded-2xl bg-slate-950/40 p-4 transition-colors hover:bg-slate-900">
+                          {/* Icon */}
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isGelir ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                            {isGelir ? <ArrowDown size={18} /> : <ArrowUp size={18} />}
+                          </div>
 
-                {/* İşlem kartları */}
-                <div className="rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.36)]"
-                  style={{ background: '#1C1C1E' }}>
-                  {gunHareketler.map((h, idx) => {
-                    const OdemeIcon = ODEME_ICON[h.odeme_sekli] ?? Banknote
-                    const isGelir = h.tur === 'gelir'
-                    return (
-                      <div key={h.id}
-                        className={`flex items-center gap-3 px-4 py-3.5 group transition-colors hover:bg-[rgba(255,255,255,0.03)] ${
-                          idx < gunHareketler.length - 1 ? 'border-b border-[rgba(60,60,67,0.2)]' : ''
-                        }`}>
-
-                        {/* Tür ikonu */}
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                          style={{ background: isGelir ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)' }}>
-                          {isGelir
-                            ? <ArrowDownLeft size={18} style={{ color: '#30D158' }} />
-                            : <ArrowUpRight  size={18} style={{ color: '#FF453A' }} />
-                          }
-                        </div>
-
-                        {/* Açıklama */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{h.aciklama}</p>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            {h.kategori && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                                style={{
-                                  background: isGelir ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)',
-                                  color: isGelir ? '#30D158' : '#FF453A',
-                                }}>
-                                {h.kategori}
-                              </span>
-                            )}
-                            <div className="flex items-center gap-1">
-                              <OdemeIcon size={10} className="text-[rgba(235,235,245,0.3)]" />
-                              <span className="text-[10px] text-[rgba(235,235,245,0.3)]">
-                                {ODEME_SEKLI_LABEL[h.odeme_sekli]}
-                              </span>
+                          {/* Açıklama */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">{h.aciklama}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {h.kategori && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                                  style={{
+                                    background: isGelir ? 'rgba(48,209,88,0.12)' : 'rgba(255,69,58,0.12)',
+                                    color: isGelir ? '#30D158' : '#FF453A',
+                                  }}>
+                                  {h.kategori}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <OdemeIcon sekil={h.odeme_sekli as OdemeSekli} size={10} className="text-[rgba(235,235,245,0.3)]" />
+                                <span className="text-[10px] text-[rgba(235,235,245,0.3)]">
+                                  {ODEME_SEKLI_LABEL[h.odeme_sekli as OdemeSekli]}
+                                </span>
+                              </div>
+                              {musteri && (
+                                <span className="text-[10px] text-[rgba(235,235,245,0.3)]">
+                                  Cari: {musteri.kisa_ad || musteri.ad}
+                                </span>
+                              )}
                             </div>
                           </div>
-                        </div>
 
-                        {/* Tutar */}
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          <p className="text-base font-bold"
-                            style={{ color: isGelir ? '#30D158' : '#FF453A' }}>
-                            {isGelir ? '+' : '-'}₺{fmt(h.tutar)}
-                          </p>
-                        </div>
+                          {/* Tutar */}
+                          <div className="text-right shrink-0">
+                            <p className={`text-base font-bold ${isGelir ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {isGelir ? '+' : '-'}
+                              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(h.tutar || 0))}
+                            </p>
+                          </div>
 
-                        {/* Aksiyon butonları */}
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <button onClick={() => openEdit(h)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[rgba(235,235,245,0.4)] hover:text-[#0A84FF] hover:bg-[rgba(10,132,255,0.1)] transition-all">
-                            <Pencil size={13} />
-                          </button>
-                          <button onClick={() => setDeletingId(h.id)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[rgba(235,235,245,0.4)] hover:text-[#FF453A] hover:bg-[rgba(255,69,58,0.1)] transition-all">
-                            <Trash2 size={13} />
-                          </button>
+                          {/* Actions */}
+                          <div className="flex items-center gap-1">
+                            <button
+  onClick={() => setModal(h)}
+  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+>
+  <Pencil size={14} />
+</button>
+
+<button
+  onClick={() => setDeleteId(h.id)}
+  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:bg-rose-500/10 hover:text-rose-400"
+>
+  <Trash2 size={14} />
+</button>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
-          })
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Yeni / Düzenle Modal ─────────────────────────────────────────────── */}
+      {/* Modal */}
       {modal && (
         <Modal
-          title={modal === 'add' ? 'Yeni Kasa Kaydı' : 'Kaydı Düzenle'}
+          title={modal.id ? 'Hareketi Düzenle' : 'Yeni Hareket Ekle'}
           onClose={() => setModal(null)}
-          size="md"
-          footer={<>
-            <button onClick={() => setModal(null)} className={cls.btnSecondary}>İptal</button>
-            <button onClick={save} disabled={saving} className={cls.btnPrimary}>
-              {saving ? 'Kaydediliyor...' : 'Kaydet'}
-            </button>
-          </>}>
-
-          <div className="space-y-4">
-            {/* Gelir / Gider toggle */}
-            <div>
-              <p className="text-xs font-semibold text-[rgba(235,235,245,0.5)] mb-2 uppercase tracking-wide">İşlem Türü</p>
-              <div className="flex rounded-[12px] overflow-hidden border border-[rgba(60,60,67,0.5)]">
-                {(['gelir', 'gider'] as const).map(t => (
-                  <button key={t} type="button"
-                    onClick={() => setForm(p => ({ ...p, tur: t, kategori: '' }))}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all"
-                    style={{
-                      background: form.tur === t
-                        ? t === 'gelir' ? 'rgba(48,209,88,0.2)' : 'rgba(255,69,58,0.2)'
-                        : 'rgba(44,44,46,0.6)',
-                      color: form.tur === t
-                        ? t === 'gelir' ? '#30D158' : '#FF453A'
-                        : 'rgba(235,235,245,0.4)',
-                      borderRight: t === 'gelir' ? '1px solid rgba(60,60,67,0.5)' : undefined,
-                    }}>
-                    {t === 'gelir'
-                      ? <><ArrowDownLeft size={16} /> Gelir</>
-                      : <><ArrowUpRight  size={16} /> Gider</>
-                    }
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <Field label="Açıklama" required error={formErr}>
-              <input className={cls.input} placeholder="Açıklama girin..." autoFocus
-                value={form.aciklama} onChange={e => setForm(p => ({ ...p, aciklama: e.target.value }))} />
+          size="lg"
+          footer={
+            <>
+              <button onClick={() => setModal(null)} className={cls.btnSecondary}>İptal</button>
+              <button onClick={save} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+            </>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Açıklama" required>
+              <input className={cls.input} value={modal.aciklama || ''} onChange={(e) => setModal((prev) => ({ ...prev!, aciklama: e.target.value }))} />
             </Field>
-
-            <Field label="Tutar (₺)" required>
-              <input className={cls.input} placeholder="0,00" type="number" min="0" step="0.01"
-                value={form.tutar} onChange={e => setForm(p => ({ ...p, tutar: e.target.value }))} />
+            <Field label="Tarih" required>
+              <input type="date" className={cls.input} value={modal.tarih || ''} onChange={(e) => setModal((prev) => ({ ...prev!, tarih: e.target.value }))} />
             </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Kategori">
-                <select className={cls.input} value={form.kategori}
-                  onChange={e => setForm(p => ({ ...p, kategori: e.target.value }))}>
-                  <option value="">— Seçin —</option>
-                  {(form.tur === 'gelir' ? GELIR_KATEGORILER : GIDER_KATEGORILER).map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Ödeme Şekli">
-                <select className={cls.input} value={form.odeme_sekli}
-                  onChange={e => setForm(p => ({ ...p, odeme_sekli: e.target.value as KasaHareket['odeme_sekli'] }))}>
-                  {Object.entries(ODEME_SEKLI_LABEL).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
+            <Field label="Tutar" required>
+              <input type="number" step="0.01" className={cls.input} value={modal.tutar || ''} onChange={(e) => setModal((prev) => ({ ...prev!, tutar: Number(e.target.value || 0) }))} />
+            </Field>
+            <Field label="İşlem Türü">
+              <select className={cls.input} value={modal.tur || 'gider'} onChange={(e) => setModal((prev) => ({ ...prev!, tur: e.target.value as 'gelir' | 'gider' }))}>
+                <option value="gider">Gider</option>
+                <option value="gelir">Gelir</option>
+              </select>
+            </Field>
+            <Field label="Kategori">
+              <input className={cls.input} value={modal.kategori || ''} onChange={(e) => setModal((prev) => ({ ...prev!, kategori: e.target.value }))} placeholder="Örn: Maaş, Vergi, Tedarikçi..." />
+            </Field>
+            <Field label="Ödeme Şekli">
+              <select className={cls.input} value={modal.odeme_sekli || 'nakit'} onChange={(e) => setModal((prev) => ({ ...prev!, odeme_sekli: e.target.value as OdemeSekli }))}>
+                {Object.entries(ODEME_SEKLI_LABEL).map(([key, value]) => <option key={key} value={key}>{value}</option>)}
+              </select>
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="İlişkili Müşteri (Opsiyonel)">
+                <select className={cls.input} value={modal.musteri_id || ''} onChange={(e) => setModal((prev) => ({ ...prev!, musteri_id: e.target.value || null }))}>
+                  <option value="">Müşteri Seç</option>
+                  {musteriler.map((item) => <option key={item.id} value={item.id}>{item.ad}</option>)}
                 </select>
               </Field>
             </div>
-
-            <Field label="Tarih">
-              <input className={cls.input} type="date"
-                value={form.tarih} onChange={e => setForm(p => ({ ...p, tarih: e.target.value }))} />
-            </Field>
           </div>
         </Modal>
       )}
 
-      {/* ── Sil Onay ─────────────────────────────────────────────────────────── */}
-      {deletingId && (
-        <ConfirmModal
-          title="Kaydı Sil"
-          message="Bu kasa kaydını silmek istediğinizden emin misiniz?"
-          danger
-          onConfirm={deleteHareket}
-          onCancel={() => setDeletingId(null)}
-        />
+      {deleteId && (
+        <ConfirmModal title="Hareketi Sil" message="Bu kasa hareketini silmek istediğinizden emin misiniz?" danger onConfirm={deleteHareket} onCancel={() => setDeleteId(null)} />
       )}
+    </div>
+  )
+}
+
+function SummaryCard({ label, value, tone }: { label: string; value: number; tone: 'emerald' | 'rose' }) {
+  const tones = {
+    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300',
+    rose: 'bg-rose-500/10 border-rose-500/20 text-rose-300',
+  }
+  return (
+    <div className={`rounded-2xl border px-5 py-4 ${tones[tone]}`}>
+      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="mt-2 text-2xl font-bold">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value)}</p>
     </div>
   )
 }

@@ -239,114 +239,353 @@ export default function KarZarar({ firma }: AppCtx) {
 
   // ── Export ────────────────────────────────────────────────────────────────
   async function handleExportExcel() {
-    const { utils, writeFile } = await import('xlsx')
-    const wb = utils.book_new()
-    const c = view === 'rapor' ? cumCalc : calc
-    const periodText = view === 'rapor' ? `${ayLabel(rangeStart)} - ${ayLabel(rangeEnd)}` : ayLabel(donem)
+    const XLSX = (await import('xlsx-js-style')).default
+    const c   = view === 'rapor' ? cumCalc : calc
+    const per = view === 'rapor' ? `${ayLabel(rangeStart)} - ${ayLabel(rangeEnd)}` : ayLabel(donem)
+    const wb  = XLSX.utils.book_new()
 
-    const kzRows = [
-      ['Kar / Zarar Tablosu'],
-      [`${firma.ad} — ${periodText}`],
-      [],
-      ['Kalem', 'Tutar (₺)'],
-      ['Net Satışlar', c.netSatis],
-      ['Toplam Alışlar & İşçilik', c.toplamAlis],
-      ['Satılan Mal Maliyeti (SMM)', c.smm],
-      ['Brüt Kar', c.brutKar],
-      ['Brüt Kar Marjı %', pct(c.brutKar, c.netSatis)],
-      ['Toplam GYG', c.toplamGyg],
-      ['Faaliyet Karı', c.faaliyetKari],
-      ['Faaliyet Karı Marjı %', pct(c.faaliyetKari, c.netSatis)],
-    ]
-
-    if (view === 'rapor' && rowCalcs.length > 0) {
-      const aylikRows = [
-        [],
-        ['Aylık Dağılım'],
-        ['Dönem', 'Net Satış (₺)', 'Malzeme (₺)', 'E-Fatura (₺)', 'E-Arşiv (₺)', 'UTTS (₺)', 'İşçilik (₺)', 'Toplam Alış (₺)', 'Brüt Kar (₺)', 'Toplam GYG (₺)', 'Faaliyet Karı (₺)'],
-        ...rowCalcs.map(r => [ayKisa(r.donem), r.netSatis, r.alis_malzeme, r.alis_efatura, r.alis_arsiv, r.alis_utts, r.alis_iscilik, r.toplamAlis, r.brutKar, r.toplamGyg, r.faaliyetKari]),
-        ['TOPLAM', cumCalc.netSatis, cumAlis.malzeme, cumAlis.efatura, cumAlis.arsiv, cumAlis.utts, cumAlis.iscilik, cumCalc.toplamAlis, cumCalc.brutKar, cumCalc.toplamGyg, cumCalc.faaliyetKari],
-      ]
-      const ws = utils.aoa_to_sheet([...kzRows, ...aylikRows])
-      ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 15 }]
-      utils.book_append_sheet(wb, ws, 'Kar Zarar')
-    } else {
-      const ws = utils.aoa_to_sheet(kzRows)
-      ws['!cols'] = [{ wch: 32 }, { wch: 18 }]
-      utils.book_append_sheet(wb, ws, 'Kar Zarar')
-    }
-
-    writeFile(wb, `KarZarar_${firma.ad}_${view === 'rapor' ? `${rangeStart}_${rangeEnd}` : donem}.xlsx`)
-  }
-
-  async function handleExportPDF() {
-    const { jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const c = view === 'rapor' ? cumCalc : calc
-    const periodText = view === 'rapor' ? `${ayLabel(rangeStart)} — ${ayLabel(rangeEnd)}` : ayLabel(donem)
-
-    // Başlık
-    doc.setFontSize(15); doc.setTextColor(20, 20, 20)
-    doc.text('KAR / ZARAR TABLOSU', pageWidth / 2, 18, { align: 'center' })
-    doc.setFontSize(9); doc.setTextColor(100, 100, 100)
-    doc.text(`${firma.ad}  |  ${periodText}`, pageWidth / 2, 25, { align: 'center' })
-
-    let y = 32
-
-    if (view === 'rapor' && rowCalcs.length > 0) {
-      const { default: jsPDFLandscape } = await import('jspdf')
-      const docL = new jsPDFLandscape({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-      const pw = docL.internal.pageSize.getWidth()
-      docL.setFontSize(13); docL.setTextColor(20, 20, 20)
-      docL.text('KAR / ZARAR — AYLIK DAĞILIM', pw / 2, 16, { align: 'center' })
-      docL.setFontSize(8); docL.setTextColor(100, 100, 100)
-      docL.text(`${firma.ad}  |  ${periodText}`, pw / 2, 22, { align: 'center' })
-      autoTable(docL, {
-        startY: 27,
-        head: [['Dönem', 'Net Satış', 'Malzeme', 'E-Fatura', 'E-Arşiv', 'UTTS', 'İşçilik', 'Top. Alış', 'Brüt Kar', 'Top. GYG', 'Faal. Karı']],
-        body: [
-          ...rowCalcs.map(r => [
-            ayKisa(r.donem), `₺${fmt(r.netSatis)}`,
-            `₺${fmt(r.alis_malzeme)}`, `₺${fmt(r.alis_efatura)}`, `₺${fmt(r.alis_arsiv)}`,
-            `₺${fmt(r.alis_utts)}`, `₺${fmt(r.alis_iscilik)}`,
-            `₺${fmt(r.toplamAlis)}`, `₺${fmt(r.brutKar)}`,
-            `₺${fmt(r.toplamGyg)}`, `₺${fmt(r.faaliyetKari)}`,
-          ]),
-          ['TOPLAM', `₺${fmt(cumCalc.netSatis)}`,
-            `₺${fmt(cumAlis.malzeme)}`, `₺${fmt(cumAlis.efatura)}`, `₺${fmt(cumAlis.arsiv)}`,
-            `₺${fmt(cumAlis.utts)}`, `₺${fmt(cumAlis.iscilik)}`,
-            `₺${fmt(cumCalc.toplamAlis)}`, `₺${fmt(cumCalc.brutKar)}`,
-            `₺${fmt(cumCalc.toplamGyg)}`, `₺${fmt(cumCalc.faaliyetKari)}`],
-        ],
-        styles: { fontSize: 7, cellPadding: 2 },
-        headStyles: { fillColor: [10, 132, 255], textColor: 255, fontStyle: 'bold' },
-        columnStyles: { 0: { halign: 'left' }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'right' }, 10: { halign: 'right' } },
-      })
-      docL.save(`KarZarar_${firma.ad}_AylikDagilim_${rangeStart}_${rangeEnd}.pdf`)
-      y = 200
-    }
-
-    doc.setFontSize(8); doc.setTextColor(60, 60, 60)
-    doc.text('Kar / Zarar Özeti', 14, y); y += 3
-    autoTable(doc, {
-      startY: y,
-      head: [['Kalem', 'Tutar']],
-      body: [
-        ['Net Satışlar', `₺${fmt(c.netSatis)}`],
-        ['Toplam Alışlar & İşçilik', `₺${fmt(c.toplamAlis)}`],
-        ['Satılan Mal Maliyeti (SMM)', `₺${fmt(c.smm)}`],
-        ['Brüt Kar', `₺${fmt(c.brutKar)}  (${pct(c.brutKar, c.netSatis)})`],
-        ['Toplam Genel Yönetim Giderleri', `₺${fmt(c.toplamGyg)}`],
-        ['Faaliyet Karı', `₺${fmt(c.faaliyetKari)}  (${pct(c.faaliyetKari, c.netSatis)})`],
-      ],
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [30, 30, 30], textColor: 255, fontStyle: 'bold' },
-      columnStyles: { 0: { halign: 'left', cellWidth: 100 }, 1: { halign: 'right' } },
+    // ── Stil yardımcıları ────────────────────────────────────────────────────
+    type S = Record<string, any>
+    const border = (color = 'D1D5DB') => ({
+      top:    { style: 'thin', color: { rgb: color } },
+      bottom: { style: 'thin', color: { rgb: color } },
+      left:   { style: 'thin', color: { rgb: color } },
+      right:  { style: 'thin', color: { rgb: color } },
+    })
+    const borderBottom = (color = 'D1D5DB', style = 'thin') => ({
+      bottom: { style, color: { rgb: color } },
     })
 
-    doc.save(`KarZarar_${firma.ad}_${view === 'rapor' ? `${rangeStart}_${rangeEnd}` : donem}.pdf`)
+    const sc = (v: any, t: string, s: S = {}) => ({ v, t, s })
+
+    const mainHeader = (v: string): S => sc(v, 's', {
+      font:      { bold: true, sz: 16, color: { rgb: 'FFFFFF' }, name: 'Calibri' },
+      fill:      { fgColor: { rgb: '0F172A' }, patternType: 'solid' },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+    })
+    const subHeader = (v: string): S => sc(v, 's', {
+      font:      { sz: 10, color: { rgb: '94A3B8' }, name: 'Calibri' },
+      fill:      { fgColor: { rgb: '1E293B' }, patternType: 'solid' },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    })
+    const sectionLabel = (v: string, bg: string, color: string): S => sc(v, 's', {
+      font:      { bold: true, sz: 9, color: { rgb: color }, name: 'Calibri' },
+      fill:      { fgColor: { rgb: bg }, patternType: 'solid' },
+      alignment: { horizontal: 'left', vertical: 'center', indent: 1 },
+      border:    borderBottom('CBD5E1', 'medium'),
+    })
+    const colHead = (v: string, align: string = 'right'): S => sc(v, 's', {
+      font:      { bold: true, sz: 9, color: { rgb: 'FFFFFF' }, name: 'Calibri' },
+      fill:      { fgColor: { rgb: '334155' }, patternType: 'solid' },
+      alignment: { horizontal: align, vertical: 'center' },
+      border:    border('475569'),
+    })
+    const label = (v: string, indent = false): S => sc(v, 's', {
+      font:      { sz: 10, color: { rgb: '374151' }, name: 'Calibri' },
+      alignment: { horizontal: 'left', vertical: 'center', indent: indent ? 2 : 1 },
+      border:    border(),
+    })
+    const money = (v: number, color = '1F2937', bold = false, bg?: string): S => sc(v, 'n', {
+      font:      { sz: 10, color: { rgb: color }, bold, name: 'Calibri' },
+      fill:      bg ? { fgColor: { rgb: bg }, patternType: 'solid' } : undefined,
+      numFmt:    '#,##0.00 ₺',
+      alignment: { horizontal: 'right', vertical: 'center' },
+      border:    border(),
+    })
+    const pctCell = (v: string, color = '64748B'): S => sc(v, 's', {
+      font:      { sz: 9, color: { rgb: color }, italic: true, name: 'Calibri' },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border:    border(),
+    })
+    const highlightRow = (lbl: string, val: number, marj: string, bg: string, fc: string) => [
+      sc(lbl, 's', { font: { bold: true, sz: 11, color: { rgb: fc }, name: 'Calibri' }, fill: { fgColor: { rgb: bg }, patternType: 'solid' }, alignment: { horizontal: 'left', vertical: 'center', indent: 1 }, border: border(fc + '40') }),
+      sc(val, 'n', { font: { bold: true, sz: 12, color: { rgb: fc }, name: 'Calibri' }, fill: { fgColor: { rgb: bg }, patternType: 'solid' }, numFmt: '#,##0.00 ₺', alignment: { horizontal: 'right', vertical: 'center' }, border: border(fc + '40') }),
+      sc(marj, 's', { font: { bold: true, sz: 9, color: { rgb: fc }, italic: true, name: 'Calibri' }, fill: { fgColor: { rgb: bg }, patternType: 'solid' }, alignment: { horizontal: 'center', vertical: 'center' }, border: border(fc + '40') }),
+    ]
+    const empty = (bg?: string): S => sc('', 's', bg ? { fill: { fgColor: { rgb: bg }, patternType: 'solid' } } : {})
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Sheet 1 — K/Z Özeti (3 sütun: Kalem | Tutar | Marj)
+    // ════════════════════════════════════════════════════════════════════════
+    const ozRows: any[][] = [
+      // Başlık
+      [mainHeader('KAR / ZARAR TABLOSU'), empty('0F172A'), empty('0F172A')],
+      [subHeader(firma.ad), subHeader(per), subHeader(new Date().toLocaleDateString('tr-TR', { day:'2-digit', month:'long', year:'numeric' }))],
+      [empty(), empty(), empty()],
+      // Sütun başlıkları
+      [colHead('KALEM', 'left'), colHead('TUTAR (₺)'), colHead('MARJ')],
+      // Gelirler
+      [sectionLabel('GELİRLER', 'EFF6FF', '1D4ED8'), empty('EFF6FF'), empty('EFF6FF')],
+      [...highlightRow('Net Satışlar', c.netSatis, '100%', 'DBEAFE', '1D4ED8')],
+      [empty(), empty(), empty()],
+      // Maliyet
+      [sectionLabel('SATIŞLARIN MALİYETİ', 'FFF7ED', 'B45309'), empty('FFF7ED'), empty('FFF7ED')],
+      [label('Toplam Alışlar & İşçilik', true), money(c.toplamAlis, '92400E'), pctCell('')],
+      [label('Satılan Mal Maliyeti (SMM)', true), money(c.smm, 'B45309', true), pctCell('')],
+      [...highlightRow('BRÜT KAR', c.brutKar, pct(c.brutKar, c.netSatis), c.brutKar >= 0 ? 'DCFCE7' : 'FEE2E2', c.brutKar >= 0 ? '15803D' : 'DC2626')],
+      [empty(), empty(), empty()],
+      // GYG
+      [sectionLabel('GENEL YÖNETİM GİDERLERİ', 'F5F3FF', '6D28D9'), empty('F5F3FF'), empty('F5F3FF')],
+      [label('Toplam GYG', true), money(c.toplamGyg, '6D28D9', true), pctCell('')],
+      [empty(), empty(), empty()],
+      // Sonuç
+      [...highlightRow('FAALİYET KARI', c.faaliyetKari, pct(c.faaliyetKari, c.netSatis), c.faaliyetKari >= 0 ? 'DBEAFE' : 'FEE2E2', c.faaliyetKari >= 0 ? '1D4ED8' : 'DC2626')],
+    ]
+
+    const ws1 = XLSX.utils.aoa_to_sheet(ozRows)
+    ws1['!cols']   = [{ wch: 36 }, { wch: 20 }, { wch: 12 }]
+    ws1['!rows']   = [{ hpt: 32 }, { hpt: 18 }, { hpt: 6 }, { hpt: 22 }]
+    ws1['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, // Ana başlık
+      { s: { r: 4, c: 0 }, e: { r: 4, c: 2 } }, // Gelirler section
+      { s: { r: 7, c: 0 }, e: { r: 7, c: 2 } }, // Maliyet section
+      { s: { r: 12, c: 0 }, e: { r: 12, c: 2 } }, // GYG section
+    ]
+    XLSX.utils.book_append_sheet(wb, ws1, 'K-Z Özeti')
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Sheet 2 — Aylık Dağılım (sadece rapor modunda)
+    // ════════════════════════════════════════════════════════════════════════
+    if (view === 'rapor' && rowCalcs.length > 0) {
+      const COLS = 11
+      const aylikHead = (v: string, bg: string, fc: string, align = 'right') => sc(v, 's', {
+        font:      { bold: true, sz: 9, color: { rgb: fc }, name: 'Calibri' },
+        fill:      { fgColor: { rgb: bg }, patternType: 'solid' },
+        alignment: { horizontal: align, vertical: 'center', wrapText: true },
+        border:    border('475569'),
+      })
+      const dataCell = (v: any, t: string, bg: string, color: string, bold = false, fmt = '#,##0.00 ₺') => sc(v, t, {
+        font:      { sz: 9, color: { rgb: color }, bold, name: 'Calibri' },
+        fill:      { fgColor: { rgb: bg }, patternType: 'solid' },
+        numFmt:    t === 'n' ? fmt : undefined,
+        alignment: { horizontal: t === 'n' ? 'right' : 'left', vertical: 'center' },
+        border:    border(),
+      })
+      const totalCell = (v: any, t: string, color: string, fmt = '#,##0.00 ₺') => sc(v, t, {
+        font:      { bold: true, sz: 10, color: { rgb: color }, name: 'Calibri' },
+        fill:      { fgColor: { rgb: 'EFF6FF' }, patternType: 'solid' },
+        numFmt:    t === 'n' ? fmt : undefined,
+        alignment: { horizontal: t === 'n' ? 'right' : 'left', vertical: 'center' },
+        border:    { top: { style: 'medium', color: { rgb: '3B82F6' } }, bottom: { style: 'medium', color: { rgb: '3B82F6' } }, left: { style: 'thin', color: { rgb: 'D1D5DB' } }, right: { style: 'thin', color: { rgb: 'D1D5DB' } } },
+      })
+
+      const ayRows: any[][] = [
+        // Başlık
+        [mainHeader('KAR / ZARAR — AYLIK DAĞILIM'), ...Array(COLS - 1).fill(empty('0F172A'))],
+        [subHeader(firma.ad), ...Array(COLS - 1).fill(subHeader(''))],
+        [subHeader(per), ...Array(COLS - 1).fill(subHeader(''))],
+        [empty(), ...Array(COLS - 1).fill(empty())],
+        // Sütun başlıkları — 3 renk grubu
+        [
+          aylikHead('DÖNEM',        '1E293B', 'FFFFFF', 'left'),
+          aylikHead('NET SATIŞ',    '1E3A5F', 'FFFFFF'),
+          aylikHead('MALZEME',      '7C2D12', 'FFFFFF'),
+          aylikHead('E-FATURA',     '7C2D12', 'FFFFFF'),
+          aylikHead('E-ARŞİV',      '7C2D12', 'FFFFFF'),
+          aylikHead('UTTS',         '7C2D12', 'FFFFFF'),
+          aylikHead('İŞÇİLİK',      '7C2D12', 'FFFFFF'),
+          aylikHead('TOP. ALIŞ',    '92400E', 'FFFFFF'),
+          aylikHead('BRÜT KAR',     '14532D', 'FFFFFF'),
+          aylikHead('TOPLAM GYG',   '4C1D95', 'FFFFFF'),
+          aylikHead('FAALİYET KARI','1E3A5F', 'FFD700'),
+        ],
+        // Veri satırları
+        ...rowCalcs.map((r, i) => {
+          const bg = i % 2 === 0 ? 'FFFFFF' : 'F8FAFC'
+          const fkColor = r.faaliyetKari >= 0 ? '15803D' : 'DC2626'
+          const bkColor = r.brutKar >= 0 ? '15803D' : 'DC2626'
+          return [
+            dataCell(ayKisa(r.donem), 's', bg, '1E293B', true),
+            dataCell(r.netSatis, 'n', bg, '1D4ED8', false),
+            dataCell(r.alis_malzeme, 'n', bg, '92400E', false),
+            dataCell(r.alis_efatura, 'n', bg, '92400E', false),
+            dataCell(r.alis_arsiv, 'n', bg, '92400E', false),
+            dataCell(r.alis_utts, 'n', bg, '92400E', false),
+            dataCell(r.alis_iscilik, 'n', bg, '92400E', false),
+            dataCell(r.toplamAlis, 'n', bg, 'B45309', true),
+            dataCell(r.brutKar, 'n', bg, bkColor, true),
+            dataCell(r.toplamGyg, 'n', bg, '6D28D9', false),
+            dataCell(r.faaliyetKari, 'n', bg, fkColor, true),
+          ]
+        }),
+        // Toplam satırı
+        [
+          totalCell('TOPLAM', 's', '0F172A'),
+          totalCell(cumCalc.netSatis, 'n', '1D4ED8'),
+          totalCell(cumAlis.malzeme, 'n', 'B45309'),
+          totalCell(cumAlis.efatura, 'n', 'B45309'),
+          totalCell(cumAlis.arsiv, 'n', 'B45309'),
+          totalCell(cumAlis.utts, 'n', 'B45309'),
+          totalCell(cumAlis.iscilik, 'n', 'B45309'),
+          totalCell(cumCalc.toplamAlis, 'n', 'B45309'),
+          totalCell(cumCalc.brutKar, 'n', cumCalc.brutKar >= 0 ? '15803D' : 'DC2626'),
+          totalCell(cumCalc.toplamGyg, 'n', '6D28D9'),
+          totalCell(cumCalc.faaliyetKari, 'n', cumCalc.faaliyetKari >= 0 ? '1D4ED8' : 'DC2626'),
+        ],
+      ]
+
+      const ws2 = XLSX.utils.aoa_to_sheet(ayRows)
+      ws2['!cols']   = [{ wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 16 }]
+      ws2['!rows']   = [{ hpt: 28 }, { hpt: 16 }, { hpt: 16 }, { hpt: 6 }, { hpt: 36 }]
+      ws2['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: COLS - 1 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: COLS - 1 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: COLS - 1 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: COLS - 1 } },
+      ]
+      ws2['!freeze'] = { xSplit: 1, ySplit: 5 } // Dönem kolonu + başlıklar donduruldu
+      XLSX.utils.book_append_sheet(wb, ws2, 'Aylık Dağılım')
+    }
+
+    XLSX.writeFile(wb, `KarZarar_${firma.ad}_${view === 'rapor' ? `${rangeStart}_${rangeEnd}` : donem}.xlsx`)
+  }
+
+  function handleExportPDF() {
+    const c   = view === 'rapor' ? cumCalc : calc
+    const per = view === 'rapor' ? `${ayLabel(rangeStart)} — ${ayLabel(rangeEnd)}` : ayLabel(donem)
+
+    const color = (v: number, pos = '#16a34a', neg = '#dc2626') => v >= 0 ? pos : neg
+
+    const kzRows = [
+      ['Net Satışlar',                  fmt(c.netSatis),    '100%'],
+      ['Toplam Alışlar & İşçilik',      fmt(c.toplamAlis),  ''],
+      ['Satılan Mal Maliyeti (SMM)',     fmt(c.smm),         ''],
+      ['Brüt Kar',                      fmt(c.brutKar),     pct(c.brutKar, c.netSatis)],
+      ['Genel Yönetim Giderleri (GYG)', fmt(c.toplamGyg),   ''],
+      ['Faaliyet Karı',                 fmt(c.faaliyetKari),pct(c.faaliyetKari, c.netSatis)],
+    ]
+    const kzColors = [
+      '#1d4ed8', '', '', color(c.brutKar), '#7c3aed', color(c.faaliyetKari),
+    ]
+
+    const aylikTable = view === 'rapor' && rowCalcs.length > 0 ? `
+      <h2 style="margin:32px 0 10px;font-size:13px;color:#1e293b;letter-spacing:.5px;border-bottom:2px solid #e2e8f0;padding-bottom:6px;">
+        AYLIK DAĞILIM
+      </h2>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;">
+        <thead>
+          <tr style="background:#1e293b;color:#fff;">
+            <th style="padding:7px 8px;text-align:left;">Dönem</th>
+            <th style="padding:7px 6px;text-align:right;">Net Satış</th>
+            <th style="padding:7px 6px;text-align:right;border-left:2px solid #f59e0b20;">Malzeme</th>
+            <th style="padding:7px 6px;text-align:right;">E-Fatura</th>
+            <th style="padding:7px 6px;text-align:right;">E-Arşiv</th>
+            <th style="padding:7px 6px;text-align:right;">UTTS</th>
+            <th style="padding:7px 6px;text-align:right;">İşçilik</th>
+            <th style="padding:7px 6px;text-align:right;border-left:2px solid #f59e0b40;">Top. Alış</th>
+            <th style="padding:7px 6px;text-align:right;">Brüt Kar</th>
+            <th style="padding:7px 6px;text-align:right;border-left:2px solid #7c3aed30;">GYG</th>
+            <th style="padding:7px 8px;text-align:right;border-left:2px solid #1d4ed830;">Faal. Karı</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowCalcs.map((r, i) => `
+            <tr style="background:${i % 2 ? '#f8fafc' : '#fff'};">
+              <td style="padding:6px 8px;font-weight:600;color:#1e293b;">${ayKisa(r.donem)}</td>
+              <td style="padding:6px 6px;text-align:right;color:#374151;">₺${fmt(r.netSatis)}</td>
+              <td style="padding:6px 6px;text-align:right;color:#92400e;border-left:2px solid #f59e0b15;">₺${fmt(r.alis_malzeme)}</td>
+              <td style="padding:6px 6px;text-align:right;color:#92400e;">₺${fmt(r.alis_efatura)}</td>
+              <td style="padding:6px 6px;text-align:right;color:#92400e;">₺${fmt(r.alis_arsiv)}</td>
+              <td style="padding:6px 6px;text-align:right;color:#92400e;">₺${fmt(r.alis_utts)}</td>
+              <td style="padding:6px 6px;text-align:right;color:#92400e;">₺${fmt(r.alis_iscilik)}</td>
+              <td style="padding:6px 6px;text-align:right;font-weight:600;color:#b45309;border-left:2px solid #f59e0b25;">₺${fmt(r.toplamAlis)}</td>
+              <td style="padding:6px 6px;text-align:right;font-weight:600;color:${color(r.brutKar)};">₺${fmt(Math.abs(r.brutKar))}</td>
+              <td style="padding:6px 6px;text-align:right;color:#6d28d9;border-left:2px solid #7c3aed20;">₺${fmt(r.toplamGyg)}</td>
+              <td style="padding:6px 8px;text-align:right;font-weight:700;color:${color(r.faaliyetKari)};border-left:2px solid #1d4ed820;">${r.faaliyetKari < 0 ? '-' : '+'}₺${fmt(Math.abs(r.faaliyetKari))}</td>
+            </tr>`).join('')}
+          <tr style="background:#eff6ff;border-top:2px solid #3b82f6;">
+            <td style="padding:7px 8px;font-weight:700;color:#1e293b;font-size:10px;">TOPLAM</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#1e293b;">₺${fmt(cumCalc.netSatis)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#b45309;border-left:2px solid #f59e0b15;">₺${fmt(cumAlis.malzeme)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#b45309;">₺${fmt(cumAlis.efatura)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#b45309;">₺${fmt(cumAlis.arsiv)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#b45309;">₺${fmt(cumAlis.utts)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#b45309;">₺${fmt(cumAlis.iscilik)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#b45309;border-left:2px solid #f59e0b25;">₺${fmt(cumCalc.toplamAlis)}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:${color(cumCalc.brutKar)};">₺${fmt(Math.abs(cumCalc.brutKar))}</td>
+            <td style="padding:7px 6px;text-align:right;font-weight:700;color:#6d28d9;border-left:2px solid #7c3aed20;">₺${fmt(cumCalc.toplamGyg)}</td>
+            <td style="padding:7px 8px;text-align:right;font-weight:700;font-size:11px;color:${color(cumCalc.faaliyetKari)};border-left:2px solid #1d4ed820;">${cumCalc.faaliyetKari < 0 ? '-' : '+'}₺${fmt(Math.abs(cumCalc.faaliyetKari))}</td>
+          </tr>
+        </tbody>
+      </table>` : ''
+
+    const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Kar/Zarar — ${firma.ad}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: #fff; padding: 28px 32px; font-size: 11px; }
+    @media print {
+      body { padding: 16px 20px; }
+      @page { margin: 12mm 14mm; size: A4 landscape; }
+    }
+    .header { display:flex; align-items:flex-start; justify-content:space-between; border-bottom: 3px solid #1e293b; padding-bottom: 14px; margin-bottom: 22px; }
+    .header-left h1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #0f172a; }
+    .header-left p  { font-size: 11px; color: #64748b; margin-top: 4px; }
+    .header-right   { text-align: right; }
+    .header-right .period { font-size: 12px; font-weight: 600; color: #1e293b; }
+    .header-right .date   { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+    h2 { font-size: 13px; color: #1e293b; letter-spacing: .5px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin: 32px 0 10px; }
+    .kz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .kz-table { width: 100%; border-collapse: collapse; }
+    .kz-table th { background: #1e293b; color: #fff; padding: 9px 12px; text-align: left; font-size: 10px; letter-spacing: .5px; }
+    .kz-table th:last-child { text-align: right; }
+    .kz-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
+    .kz-table td:last-child { text-align: right; font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .kz-table tr:nth-child(even) td { background: #f8fafc; }
+    .kz-table .separator td { border-top: 2px solid #e2e8f0; }
+    .kz-table .highlight td { background: #eff6ff !important; }
+    .kz-table .big td { padding: 10px 12px; }
+    .kz-table .big td:last-child { font-size: 15px; }
+    .badge { display: inline-block; font-size: 9px; color: #64748b; background: #f1f5f9; border-radius: 4px; padding: 1px 5px; margin-left: 6px; font-weight: 500; }
+    .footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 9px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>KAR / ZARAR TABLOSU</h1>
+      <p>${firma.ad}</p>
+    </div>
+    <div class="header-right">
+      <div class="period">${per}</div>
+      <div class="date">Oluşturulma: ${new Date().toLocaleDateString('tr-TR', { day:'2-digit', month:'long', year:'numeric' })}</div>
+    </div>
+  </div>
+
+  ${aylikTable}
+
+  <h2 style="margin-top:${view === 'rapor' && rowCalcs.length > 0 ? '32' : '0'}px;">KAR / ZARAR ÖZETİ</h2>
+  <table class="kz-table" style="max-width:520px;">
+    <thead><tr><th>Kalem</th><th>Tutar (₺)</th></tr></thead>
+    <tbody>
+      ${kzRows.map((row, i) => {
+        const clr = kzColors[i]
+        const isBig = i === 3 || i === 5
+        const isSep = i === 2 || i === 4
+        return `<tr class="${isBig ? 'big highlight' : ''}${isSep ? ' separator' : ''}">
+          <td style="color:#374151;">${row[0]}${row[2] ? `<span class="badge">${row[2]}</span>` : ''}</td>
+          <td style="color:${clr || '#374151'};">₺${row[1]}</td>
+        </tr>`
+      }).join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>${firma.ad} — Kar / Zarar Raporu</span>
+    <span>${per}</span>
+  </div>
+
+  <script>window.onload = () => { window.print() }<\/script>
+</body>
+</html>`
+
+    const w = window.open('', '_blank', 'width=1000,height=700')
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
   }
 
   // Aylık hesap (form'dan)
@@ -440,7 +679,7 @@ export default function KarZarar({ firma }: AppCtx) {
 
   // ── Aylık veri girişi formu ────────────────────────────────────────────────
   const GirişFormu = () => (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <InputCard title="Satışlar" color="#30D158">
         <NumRow label="Yurt İçi Satışlar"  value={form.satis_yurt_ici}  onChange={set('satis_yurt_ici')} />
         <NumRow label="Yurt Dışı Satışlar" value={form.satis_yurt_disi} onChange={set('satis_yurt_disi')} />

@@ -2,21 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── iOS Sistem Değişkenleri ──────────────────────────────────────────────── */
+/* ── Premium Glassmorphic Sistem Değişkenleri ─────────────────────────────── */
 :root {
-  --ios-bg:         #000000;
-  --ios-bg2:        #1C1C1E;
-  --ios-bg3:        #2C2C2E;
-  --ios-bg4:        #3A3A3C;
-  --ios-separator:  rgba(60,60,67,0.36);
-  --ios-blue:       #0A84FF;
-  --ios-green:      #30D158;
-  --ios-red:        #FF453A;
-  --ios-orange:     #FF9F0A;
-  --ios-label:      #FFFFFF;
-  --ios-label2:     rgba(235,235,245,0.6);
-  --ios-label3:     rgba(235,235,245,0.3);
-  --ios-fill:       rgba(120,120,128,0.2);
+  --surface-base:       #07111f;
+  --surface-elevated:   rgba(10, 23, 41, 0.72);
+  --surface-soft:       rgba(18, 32, 54, 0.68);
+  --surface-strong:     rgba(27, 44, 70, 0.82);
+  --surface-border:     rgba(162, 180, 206, 0.18);
+  --surface-border-2:   rgba(162, 180, 206, 0.28);
+  --brand-primary:      #4c8bf5;
+  --brand-primary-2:    #74a6ff;
+  --brand-success:      #34c38f;
+  --brand-danger:       #f87171;
+  --brand-warning:      #f5b942;
+  --text-primary:       #f5f7fb;
+  --text-secondary:     rgba(245, 247, 251, 0.78);
+  --text-muted:         rgba(230, 236, 245, 0.52);
+  --field-bg:           rgba(8, 18, 34, 0.82);
+  --field-border:       rgba(168, 185, 212, 0.22);
+  --field-focus:        rgba(116, 166, 255, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -27,10 +31,13 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
-               'Helvetica Neue', system-ui, sans-serif;
-  background: var(--ios-bg);
-  color: var(--ios-label);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(76, 139, 245, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(148, 163, 184, 0.1), transparent 22%),
+    linear-gradient(180deg, #0b1422 0%, #07111f 52%, #050c17 100%);
+  background-attachment: fixed;
+  color: var(--text-primary);
   margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
@@ -38,6 +45,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
+  line-height: 1.5;
 }
 
 /* iOS Safe Area */
@@ -54,7 +62,23 @@ button:active { transform: scale(0.97); }
 ::-webkit-scrollbar { width: 0; height: 0; }
 
 /* Select dark tema */
-select option { background-color: #2C2C2E; color: #FFFFFF; }
+select option { background-color: #102038; color: #F5F7FB; }
+
+input, select, textarea, button {
+  font: inherit;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.glass-panel {
+  background: var(--surface-elevated);
+  border: 1px solid var(--surface-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgba(2, 8, 23, 0.34);
+}
 
 /* iOS switch toggle animasyonu */
 .ios-toggle {

@@ -121,20 +121,26 @@ export interface GorevGecmis {
 }
 
 // ── Arşiv Dosya ───────────────────────────────────────────────────────────────
-export interface ArsivDosya {
+export type DokumanTipi = 'fatura' | 'sozlesme' | 'rapor' | 'irsaliye' | 'makbuz' | 'diger' | 'genel_evrak'
+export interface Dokuman {
   id: string
   firma_id: string
-  gorev_id?: string | null
-  klasor_yolu: string
+  proje_id?: string | null
+  musteri_id?: string | null
+  yukleyen_id?: string | null
+  sirket?: string | null
+  modul: DokumanTipi // Ana doküman tipi (fatura, sözleşme vb.)
+  kategori?: string | null // Ek kategori veya alt tip
+  bagli_tablo?: string | null
+  bagli_kayit_id?: string | null
   dosya_adi: string
   dosya_url: string
   mime_type?: string | null
-  boyut_byte?: number | null
+  dosya_boyutu?: number | null // new-panel-schema.sql'deki isim
+  aciklama?: string | null
   etiketler?: string[] | null
-  yukleyen_id?: string | null
   created_at: string
 }
-
 // ── Bordro Süreç ──────────────────────────────────────────────────────────────
 export type BordroAdimDurum = 'bekliyor' | 'tamamlandi'
 
@@ -162,6 +168,8 @@ export interface BordroSurec {
   odeme_aciklama?: string | null
   santiye_aciklama?: string | null
   notlar?: string | null
+  hatirlatici_tarihi?: string | null
+  hatirlatici_saati?: string | null
   created_at?: string
 }
 
@@ -175,60 +183,74 @@ export interface Hatirlatici {
   gonderildi_at?: string | null
 }
 
-// ── Yardımcı ──────────────────────────────────────────────────────────────────
-export const TIP_LABEL: Record<IsTip, string> = {
-  beyanname: 'Beyanname',
-  odeme: 'Ödeme',
-  bordro: 'Bordro',
-  mutabakat: 'Mutabakat',
-  edefter: 'E-Defter',
-  diger: 'Diğer',
+// ── Çekler ────────────────────────────────────────────────────────────────────
+export interface Cek {
+  id: string
+  firma_id: string
+  musteri_id: string | null
+  tip: 'alinan' | 'verilen'
+  cek_no: string
+  banka: string | null
+  tutar: number
+  keside_tarihi: string | null
+  vade_tarihi: string
+  durum: 'bekliyor' | 'tahsil_edildi' | 'odendi' | 'karsiliksiz' | 'iade_edildi' | 'ciro_edildi'
+  aciklama: string | null
+  hatirlatici_tarihi?: string | null
+  hatirlatici_saati?: string | null
+  hatirlat_gun_once?: number | null
+  tamamlandi_at?: string | null
+  created_at: string
 }
 
-export const PERIYOT_LABEL: Record<Periyot, string> = {
-  haftalik: 'Haftalık',
-  aylik: 'Aylık',
-  uc_aylik: '3 Aylık',
-  alti_aylik: '6 Aylık',
-  yillik: 'Yıllık',
-  tek_seferlik: 'Tek Seferlik',
+export type OdemePlanTuru = 'cek' | 'vergi' | 'sgk' | 'cari_hesap' | 'maas' | 'kredi'
+export type OdemePlanDurumu = 'bekliyor' | 'odendi' | 'ertelendi' | 'iptal'
+
+export interface OdemePlaniKaydi {
+  id: string
+  firma_id: string
+  musteri_id?: string | null
+  ekip_id?: string | null
+  baslik: string
+  tur: OdemePlanTuru
+  tutar: number
+  vade_tarihi: string
+  durum: OdemePlanDurumu
+  ilgili_kurum?: string | null
+  aciklama?: string | null
+  hatirlatici_tarihi?: string | null
+  hatirlatici_saati?: string | null
+  hatirlat_gun_once?: number | null
+  tamamlandi_at?: string | null
+  created_at?: string
 }
 
-export const DURUM_LABEL: Record<GorevDurum, string> = {
-  bekliyor: 'Bekliyor',
-  hazirlaniyor: 'Hazırlanıyor',
-  kontrolde: 'Kontrolde',
-  tamamlandi: 'Tamamlandı',
-  iptal: 'İptal',
-}
+// ── Aylık Maliyet Süreci (Periyodik İşler) ──────────────────────────────────
+export interface MaliyetSureci {
+  id: string
+  firma_id: string
+  donem: string
+  sorumlu_id?: string | null
+  teslim_gunu?: number | null
+  
+  efatura_kontrol: boolean
+  efatura_luca: boolean
+  
+  earsiv_kontrol: boolean
+  earsiv_luca: boolean
+  
+  utts_kontrol: boolean
+  utts_luca: boolean
+  
+  bordro_kontrol: boolean
+  bordro_luca: boolean
 
-export const ONCELIK_LABEL: Record<Oncelik, string> = {
-  dusuk: 'Düşük',
-  orta: 'Orta',
-  yuksek: 'Yüksek',
-  kritik: 'Kritik',
-}
+  satis_kontrol: boolean
+  satis_luca: boolean
 
-export const ONCELIK_COLOR: Record<Oncelik, string> = {
-  dusuk: 'bg-slate-100 text-slate-600',
-  orta: 'bg-blue-100 text-blue-700',
-  yuksek: 'bg-amber-100 text-amber-700',
-  kritik: 'bg-red-100 text-red-700',
-}
-
-export const DURUM_COLOR: Record<GorevDurum, string> = {
-  bekliyor: 'bg-slate-100 text-slate-600',
-  hazirlaniyor: 'bg-blue-100 text-blue-700',
-  kontrolde: 'bg-amber-100 text-amber-700',
-  tamamlandi: 'bg-emerald-100 text-emerald-700',
-  iptal: 'bg-red-100 text-red-600',
-}
-
-export const TARIH = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString('tr-TR') : '—'
-
-export function kalanGun(sonTarih: string): number {
-  const bugun = new Date(); bugun.setHours(0,0,0,0)
-  const son = new Date(sonTarih); son.setHours(0,0,0,0)
-  return Math.ceil((son.getTime() - bugun.getTime()) / 86400000)
+  durum: 'bekliyor' | 'tamamlandi'
+  notlar?: string | null
+  hatirlatici_tarihi?: string | null
+  hatirlatici_saati?: string | null
+  created_at: string
 }

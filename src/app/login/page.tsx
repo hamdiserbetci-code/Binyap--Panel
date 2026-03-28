@@ -38,8 +38,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="bg-white w-full max-w-sm rounded-2xl border border-slate-200 shadow-sm p-8">
-        {/* Logo */}
+      <div className="bg-white w-full max-w-sm rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center mb-3">
             <ClipboardList size={22} className="text-white" />

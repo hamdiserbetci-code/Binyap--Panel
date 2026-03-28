@@ -7,7 +7,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Temizlik
 DROP TABLE IF EXISTS hatirlaticilar CASCADE;
 DROP TABLE IF EXISTS arsiv_dosyalar CASCADE;
-DROP TABLE IF EXISTS gorev_gecmis CASCADE;
 DROP TABLE IF EXISTS bordro_surecler CASCADE;
 DROP TABLE IF EXISTS gorevler CASCADE;
 DROP TABLE IF EXISTS ekipler CASCADE;
@@ -161,25 +160,6 @@ CREATE TABLE gorev_gecmis (
 );
 
 -- =============================================================================
--- ARŞİV DOSYALAR
--- =============================================================================
-
-CREATE TABLE arsiv_dosyalar (
-    id              UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    firma_id        UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
-    musteri_id      UUID REFERENCES musteriler(id) ON DELETE SET NULL,
-    gorev_id        UUID REFERENCES gorevler(id) ON DELETE SET NULL,
-    klasor_yolu     TEXT NOT NULL,
-    dosya_adi       TEXT NOT NULL,
-    dosya_url       TEXT NOT NULL,
-    mime_type       TEXT,
-    boyut_byte      BIGINT,
-    etiketler       TEXT[] DEFAULT '{}',
-    yukleyen_id     UUID REFERENCES kullanici_profilleri(id) ON DELETE SET NULL,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- =============================================================================
 -- BORDRO SÜREÇ (proje + ekip + dönem bazında)
 -- =============================================================================
 
@@ -233,9 +213,6 @@ CREATE INDEX idx_proje_musteri    ON projeler(musteri_id);
 CREATE INDEX idx_ekip_proje       ON ekipler(proje_id);
 CREATE INDEX idx_bordro_proje     ON bordro_surecler(proje_id);
 CREATE INDEX idx_bordro_ekip      ON bordro_surecler(ekip_id);
-CREATE INDEX idx_arsiv_firma      ON arsiv_dosyalar(firma_id);
-CREATE INDEX idx_arsiv_musteri    ON arsiv_dosyalar(musteri_id);
-CREATE INDEX idx_arsiv_gorev      ON arsiv_dosyalar(gorev_id);
 CREATE INDEX idx_gecmis_gorev     ON gorev_gecmis(gorev_id);
 
 -- =============================================================================

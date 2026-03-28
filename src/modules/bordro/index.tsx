@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Plus, CheckCircle2, Clock, Pencil, Trash2, Users, Building2,
-  Upload, FileText, Download, X, FileSpreadsheet, Image,
+  Upload, FileText, Download, X, FileSpreadsheet, Image, BellRing, Bell,
   type LucideIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -73,9 +73,45 @@ export default function Bordro({ firma }: AppCtx) {
   const [dragOver, setDragOver]       = useState<string | null>(null)
   const [aciklamaModal, setAciklamaModal] = useState<{ adim: Adim; value: string } | null>(null)
   const [detayModal, setDetayModal]   = useState(false)
+  
+  const [erteleModal, setErteleModal] = useState<BordroSurec | null>(null)
+  const [erteleForm, setErteleForm]   = useState({ tarih: new Date().toISOString().split('T')[0], saat: '' })
+  
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => { load() }, [firma.id])
+
+  useEffect(() => {
+    timerRef.current = setInterval(checkReminders, 60_000)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [surecler])
+
+  function checkReminders() {
+    if (!('Notification' in window)) return
+    const now = new Date()
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const today = now.toISOString().split('T')[0]
+    surecler.forEach(s => {
+      if (s.hatirlatici_saati === hhmm && s.hatirlatici_tarihi === today) {
+        // Complete olup olmadığına da bakabiliriz.
+        const c = tamamCount(s)
+        if (c < 5) {
+          if (Notification.permission === 'granted') {
+            new Notification(`📌 Bordro Hatırlatıcısı`, {
+              body: `${s.proje?.ad || 'Proje'} - Dönem: ${donemLabel(s.donem)}`,
+              icon: '/favicon.ico',
+            })
+          }
+        }
+      }
+    })
+  }
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return
+    await Notification.requestPermission()
+  }
 
   async function load() {
     setLoading(true); setError('')
@@ -223,6 +259,25 @@ export default function Bordro({ firma }: AppCtx) {
     }
   }
 
+  async function saveErtele() {
+    if (!erteleModal) return
+    if (!erteleForm.tarih) return
+    if (!erteleForm.saat) return
+    setSaving(true)
+    const { error } = await supabase.from('bordro_surecler').update({
+      hatirlatici_tarihi: erteleForm.tarih,
+      hatirlatici_saati: erteleForm.saat
+    }).eq('id', erteleModal.id)
+    setSaving(false)
+    if (error) { alert(error.message); return }
+    setErteleModal(null); load()
+  }
+
+  async function clearErtele(id: string) {
+    await supabase.from('bordro_surecler').update({ hatirlatici_tarihi: null, hatirlatici_saati: null }).eq('id', id)
+    load()
+  }
+
   // ── Yıllar ──────────────────────────────────────────────────────────────────
   const sureclerForGrid = selProje
     ? surecler.filter(s => s.proje_id === selProje.id && (selEkip ? s.ekip_id === selEkip.id : !s.ekip_id))
@@ -243,6 +298,11 @@ export default function Bordro({ firma }: AppCtx) {
       <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-[rgba(60,60,67,0.36)] shrink-0"
         style={{ background: 'rgba(28,28,30,0.95)' }}>
         <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-white flex-1 uppercase">Bordro Süreci</h1>
+        {!('Notification' in window && Notification.permission === 'granted') && (
+          <button onClick={requestNotifPermission} className="flex items-center gap-2 text-[11px] font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-2 rounded-xl transition-all">
+            <BellRing size={14} /> İzin Ver
+          </button>
+        )}
         <button onClick={() => setProjeModal({ durum: 'aktif' })}
           className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-xs font-semibold text-white transition-all"
           style={{ background: '#0A84FF' }}>
@@ -390,12 +450,12 @@ export default function Bordro({ firma }: AppCtx) {
               </div>
 
               {/* Yıl Kartları */}
-              <div className="flex gap-3 min-w-max">
+              <div className="flex gap-4 w-full min-w-max">
                 {yillar.map(yil => {
                   const yilSurecler = sureclerForGrid.filter(s => s.donem.startsWith(String(yil)))
                   return (
-                    <div key={yil} className="rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.36)]"
-                      style={{ minWidth: '192px', background: '#1C1C1E' }}>
+                    <div key={yil} className="rounded-2xl overflow-hidden border border-[rgba(60,60,67,0.36)] flex-1"
+                      style={{ minWidth: '260px', background: '#1C1C1E' }}>
 
                       {/* Yıl başlığı */}
                       <div className="px-4 py-3 border-b border-[rgba(60,60,67,0.3)]"
@@ -459,11 +519,18 @@ export default function Bordro({ firma }: AppCtx) {
                                 })}
 
                                 {/* Dosyalar & Notlar butonu */}
-                                <button
-                                  onClick={() => setDetayModal(true)}
-                                  className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[10px] text-[10px] font-semibold transition-all border border-[rgba(60,60,67,0.4)] text-[rgba(235,235,245,0.35)] hover:text-white hover:border-[rgba(60,60,67,0.8)] hover:bg-[rgba(60,60,67,0.3)]">
-                                  <FileText size={10} /> Dosyalar & Notlar
-                                </button>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    onClick={() => setDetayModal(true)}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[10px] text-[10px] font-semibold transition-all border border-[rgba(60,60,67,0.4)] text-[rgba(235,235,245,0.35)] hover:text-white hover:border-[rgba(60,60,67,0.8)] hover:bg-[rgba(60,60,67,0.3)]">
+                                    <FileText size={10} /> Dosyalar
+                                  </button>
+                                  <button
+                                    onClick={() => setErteleModal(surec)}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-[10px] text-[10px] font-semibold transition-all border border-[rgba(60,60,67,0.4)] hover:border-indigo-500/50 hover:bg-indigo-500/20 ${(surec.hatirlatici_tarihi || surec.hatirlatici_saati) ? 'text-indigo-400 bg-indigo-500/10' : 'text-[rgba(235,235,245,0.35)] hover:text-white hover:bg-[rgba(60,60,67,0.3)]'}`}>
+                                    <BellRing size={10} /> {(surec.hatirlatici_tarihi || surec.hatirlatici_saati) ? (surec.hatirlatici_saati || 'Hatırlatıcı') : 'Hatırlat'}
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -670,6 +737,25 @@ export default function Bordro({ firma }: AppCtx) {
           <textarea className={`${cls.input} resize-none`} rows={4} placeholder="Bu adım için açıklama girin..." autoFocus
             value={aciklamaModal.value}
             onChange={e => setAciklamaModal(p => p ? { ...p, value: e.target.value } : p)} />
+        </Modal>
+      )}
+
+      {/* ── Hatırlatıcı / Erteleme Modalı ──────────────────────────────────────── */}
+      {erteleModal && (
+        <Modal title="Hatırlatıcı Ayarla / Ertele" onClose={() => setErteleModal(null)} size="sm" footer={<><button onClick={() => setErteleModal(null)} className={cls.btnSecondary}>İptal</button><button onClick={saveErtele} disabled={saving} className={cls.btnPrimary}>{saving ? 'Ayarlanıyor...' : 'Ayarla'}</button></>}>
+          <div className="space-y-4">
+            <Field label="Yeni Tarih">
+              <input type="date" className={cls.input} value={erteleForm.tarih} onChange={e => setErteleForm(p => ({ ...p, tarih: e.target.value }))} autoFocus />
+            </Field>
+            <Field label="Yeni Saat">
+              <input type="time" className={cls.input} value={erteleForm.saat} onChange={e => setErteleForm(p => ({ ...p, saat: e.target.value }))} />
+            </Field>
+            {(erteleModal.hatirlatici_tarihi || erteleModal.hatirlatici_saati) && (
+              <button type="button" onClick={() => { clearErtele(erteleModal.id); setErteleModal(null) }} className="w-full text-xs text-red-400 hover:text-red-300 py-2 border border-dashed border-red-500/30 rounded-xl hover:bg-red-500/10 transition-colors">
+                Mevcut Ertelemeyi Temizle
+              </button>
+            )}
+          </div>
         </Modal>
       )}
     </div>

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Loading, ErrorMsg, Modal, Field, ConfirmModal, cls } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 import type { Firma, KullaniciProfil, IsSablonu, IsTip, Periyot, Oncelik } from '@/types'
-import { TIP_LABEL, PERIYOT_LABEL } from '@/types'
+import { TIP_LABEL, PERIYOT_LABEL } from '@/lib/utils'
 
 type Tab = 'firma' | 'kullanici' | 'sablonlar' | 'profil'
 
