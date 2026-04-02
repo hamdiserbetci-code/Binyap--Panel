@@ -1,4 +1,4 @@
-import { IsTip, Periyot, GorevDurum, Oncelik, DokumanTipi } from '@/types'
+import { IsTip, Periyot, GorevDurum, Oncelik } from '@/types'
 
 export const TIP_LABEL: Record<IsTip, string> = {
   beyanname: 'Beyanname',
@@ -55,14 +55,4 @@ export function kalanGun(sonTarih: string): number {
   const bugun = new Date(); bugun.setHours(0,0,0,0)
   const son = new Date(sonTarih); son.setHours(0,0,0,0)
   return Math.ceil((son.getTime() - bugun.getTime()) / 86400000)
-}
-
-export const DOKUMAN_TIP_LABEL: Record<DokumanTipi, string> = {
-  fatura: 'Fatura',
-  sozlesme: 'Sözleşme',
-  rapor: 'Rapor',
-  irsaliye: 'İrsaliye',
-  makbuz: 'Makbuz',
-  diger: 'Diğer',
-  genel_evrak: 'Genel Evrak',
 }

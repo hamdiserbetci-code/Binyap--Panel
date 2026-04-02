@@ -225,6 +225,48 @@ export interface OdemePlaniKaydi {
   created_at?: string
 }
 
+// ── İcra Takibi ───────────────────────────────────────────────────────────────
+export type IcraDurum = 'aktif' | 'odendi' | 'kapali'
+export type IcraIsciDurumu = 'calisiyor' | 'ayrildi'
+
+export interface IcraTakibi {
+  id: string
+  firma_id: string
+  musteri_id?: string | null
+  musteri?: Musteri | null
+  borclu_adi: string
+  tc_no?: string | null
+  icra_dairesi_adi: string
+  dosya_no: string
+  tebligat_tarihi: string
+  alacakli_adi: string
+  borc_tutari: number
+  icra_dairesi_iban?: string | null
+  cevap_tarihi?: string | null
+  durum: IcraDurum
+  isci_durumu: IcraIsciDurumu
+  cikis_tarihi?: string | null
+  kep_no?: string | null
+  barkod_no?: string | null
+  tebligat_dosya_url?: string | null
+  tebligat_dosya_adi?: string | null
+  cevap_dosya_url?: string | null
+  cevap_dosya_adi?: string | null
+  notlar?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface IcraOdeme {
+  id: string
+  icra_id: string
+  firma_id: string
+  odeme_tarihi: string
+  tutar: number
+  aciklama?: string | null
+  created_at?: string
+}
+
 // ── Aylık Maliyet Süreci (Periyodik İşler) ──────────────────────────────────
 export interface MaliyetSureci {
   id: string

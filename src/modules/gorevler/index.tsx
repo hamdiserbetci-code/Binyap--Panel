@@ -99,6 +99,17 @@ export default function IsTakipModule({ firma, profil, navigate }: AppCtx) {
   useEffect(() => { load() }, [firma.id])
 
   useEffect(() => {
+    if (musteriler.length > 0 && !selMusteri) {
+      const binyapi = musteriler.find(m => m.kisa_ad === 'Binyapı' || m.ad.includes('Binyapı'))
+      if (binyapi) {
+        setSelMusteri(binyapi.id)
+      } else if (musteriler.length > 0) {
+        setSelMusteri(musteriler[0].id)
+      }
+    }
+  }, [musteriler, selMusteri])
+
+  useEffect(() => {
     timerRef.current = setInterval(checkReminders, 60_000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [isler])
@@ -281,7 +292,6 @@ export default function IsTakipModule({ firma, profil, navigate }: AppCtx) {
             value={selMusteri}
             onChange={e => { setSelMusteri(e.target.value); setSelCell(null) }}
             className="bg-[#2C2C2E] border border-[rgba(60,60,67,0.5)] text-white text-xs rounded-[10px] px-3 py-2 outline-none focus:border-[#0A84FF]">
-            <option value="">Tüm Firmalar</option>
             {musteriler.map(m => <option key={m.id} value={m.id}>{m.kisa_ad || m.ad}</option>)}
           </select>
         )}
@@ -307,7 +317,7 @@ export default function IsTakipModule({ firma, profil, navigate }: AppCtx) {
       </div>
 
       {mainTab === 'maliyet' ? (
-        <AylikMaliyetModule firma={firma} profil={profil} navigate={navigate} />
+        <AylikMaliyetModule firma={firma} profil={profil} navigate={navigate} musteriler={musteriler} selectedMusteri={selMusteri} />
       ) : (
         <>
           {/* ── Mobil Sekme ──────────────────────────────────────────────────────── */}

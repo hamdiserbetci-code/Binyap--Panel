@@ -22,7 +22,51 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { Cek, Musteri } from '@/types'
 import type { AppCtx } from '@/app/page'
-import { Modal, Field, ConfirmModal, cls, Loading } from '@/components/ui'
+
+const cls = {
+  btnPrimary: "flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-500 disabled:opacity-40",
+  btnSecondary: "flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-40",
+  input: "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-blue-500 focus:bg-white/10 transition-all font-medium",
+};
+
+const Modal = ({ title, onClose, children, footer, size = 'lg' }: { title: string, onClose: () => void, children: React.ReactNode, footer: React.ReactNode, size?: 'sm' | 'md' | 'lg' | 'xl' }) => {
+  const sizeClass = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl' }[size]
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full ${sizeClass}`} onClick={e => e.stopPropagation()}>
+        <h3 className="font-bold text-white text-lg p-5 border-b border-white/10">{title}</h3>
+        <div className="p-5 max-h-[80vh] overflow-y-auto">{children}</div>
+        <div className="flex justify-end gap-3 p-4 border-t border-white/10 bg-slate-950/50 rounded-b-2xl">
+          {footer}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ConfirmModal = ({ title, message, onConfirm, onCancel, danger }: { title: string, message: string, onConfirm: () => void, onCancel: () => void, danger?: boolean }) => (
+  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onCancel}>
+    <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <h3 className="font-bold text-white text-lg p-5">{title}</h3>
+      <p className="px-5 pb-5 text-slate-300">{message}</p>
+      <div className="flex justify-end gap-3 p-4 border-t border-white/10 bg-slate-950/50 rounded-b-2xl">
+        <button onClick={onCancel} className={cls.btnSecondary}>İptal</button>
+        <button onClick={onConfirm} className={danger ? "flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition-all hover:bg-red-500" : cls.btnPrimary}>
+          Onayla
+        </button>
+      </div>
+    </div>
+  </div>
+)
+
+const Field = ({ label, children, required }: { label: string, children: React.ReactNode, required?: boolean }) => (
+  <div>
+    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{label}{required && <span className="text-red-400">*</span>}</label>
+    {children}
+  </div>
+)
+
+const Loading = () => <div className="p-8 text-center text-white">Yükleniyor...</div>
 
 const DURUM_OPTS = [
   { val: 'bekliyor', label: 'Bekliyor', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Clock },

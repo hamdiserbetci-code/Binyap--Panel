@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BellRing, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Clock, FileSpreadsheet, FileText, Plus, Upload, User2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { AppCtx } from '@/app/page'
-import type { Dokuman, KullaniciProfil, MaliyetSureci } from '@/types'
+import type { Dokuman, KullaniciProfil, MaliyetSureci as MaliyetSureciBase, Musteri } from '@/types'
 import { cls, ErrorMsg, Field, Loading, Modal } from '@/components/ui'
 
 const RAPOR_TIPLERI = [
@@ -14,6 +14,10 @@ const RAPOR_TIPLERI = [
   { key: 'bordro', label: 'Aylik Bordro Icmal Raporu', accent: 'violet' },
   { key: 'satis', label: 'Aylik Satis Raporu', accent: 'rose' },
 ] as const
+
+interface MaliyetSureci extends MaliyetSureciBase {
+  musteri_id?: string | null;
+}
 
 type RaporKey = (typeof RAPOR_TIPLERI)[number]['key']
 type ReminderState = { id: string; tarih: string; saat: string; hasExisting: boolean }
@@ -103,7 +107,7 @@ function getNextMonth(donem: string) {
   return `${tarih.getFullYear()}-${String(tarih.getMonth() + 1).padStart(2, '0')}`
 }
 
-export default function AylikMaliyet({ firma, profil }: AppCtx) {
+export default function AylikMaliyet({ firma, profil, selectedMusteri }: AppCtx & { musteriler: Musteri[], selectedMusteri: string }) {
   const [surecler, setSurecler] = useState<MaliyetSureci[]>([])
   const [kullanicilar, setKullanicilar] = useState<KullaniciProfil[]>([])
   const [dosyaMap, setDosyaMap] = useState<Record<string, Dokuman[]>>({})
@@ -126,14 +130,19 @@ export default function AylikMaliyet({ firma, profil }: AppCtx) {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [surecler])
 
+  const filteredSurecler = useMemo(() => {
+    if (!selectedMusteri) return [];
+    return surecler.filter(s => s.musteri_id === selectedMusteri);
+  }, [surecler, selectedMusteri]);
+
   const summary = useMemo(() => {
-    const toplamDonem = surecler.length
-    const tamamlananDonem = surecler.filter((s) => getOverallStatus(s) === 'tamamlandi').length
+    const toplamDonem = filteredSurecler.length
+    const tamamlananDonem = filteredSurecler.filter((s) => getOverallStatus(s) === 'tamamlandi').length
     const bekleyenDonem = toplamDonem - tamamlananDonem
-    const aktifHatirlatma = surecler.filter((s) => s.hatirlatici_tarihi || s.hatirlatici_saati).length
-    const gecikenDonem = surecler.filter((s) => getGecikmeDurumu(s)).length
+    const aktifHatirlatma = filteredSurecler.filter((s) => s.hatirlatici_tarihi || s.hatirlatici_saati).length
+    const gecikenDonem = filteredSurecler.filter((s) => getGecikmeDurumu(s)).length
     return { toplamDonem, tamamlananDonem, bekleyenDonem, aktifHatirlatma, gecikenDonem }
-  }, [surecler])
+  }, [filteredSurecler])
 
   async function requestNotifPermission() {
     if (!('Notification' in window)) return
@@ -203,6 +212,7 @@ export default function AylikMaliyet({ firma, profil }: AppCtx) {
       donem: form.donem,
       sorumlu_id: form.sorumlu_id || null,
       teslim_gunu: form.teslim_gunu ? Number(form.teslim_gunu) : null,
+      musteri_id: selectedMusteri || null,
     })
     setSaving(false)
     if (insertError) {
@@ -216,7 +226,15 @@ export default function AylikMaliyet({ firma, profil }: AppCtx) {
   }
 
   async function cloneNextMonth(surec: MaliyetSureci) {
-    await createDonem({ donem: getNextMonth(surec.donem), sorumlu_id: surec.sorumlu_id || '', teslim_gunu: surec.teslim_gunu ? String(surec.teslim_gunu) : '' })
+    const { error: insertError } = await supabase.from('maliyet_surecler').insert({
+      firma_id: firma.id,
+      donem: getNextMonth(surec.donem),
+      sorumlu_id: surec.sorumlu_id || null,
+      teslim_gunu: surec.teslim_gunu,
+      musteri_id: surec.musteri_id || null,
+    })
+    if (insertError) { alert(insertError.message); return }
+    await load()
   }
 
   async function updateSurec(id: string, payload: Partial<MaliyetSureci>) {
@@ -339,14 +357,14 @@ export default function AylikMaliyet({ firma, profil }: AppCtx) {
         </div>
       </div>
       <input ref={fileRef} type="file" multiple accept={ACCEPTED_TYPES} className="hidden" onChange={uploadFile} />
-      {surecler.length === 0 ? (
+      {filteredSurecler.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-white/10 bg-slate-900/50 p-12 text-center">
-          <p className="text-base font-semibold text-white">Henuz aylik maliyet donemi olusturulmadi.</p>
-          <p className="mt-2 text-sm text-slate-400">Yeni bir donem kaydi acarak ilgili ayin maliyet toplama ve sonraki ay kapanis surecini baslatabilirsiniz.</p>
+          <p className="text-base font-semibold text-white">Bu müşteri için henüz aylık maliyet dönemi oluşturulmadı.</p>
+          <p className="mt-2 text-sm text-slate-400">Yeni bir dönem kaydı açarak ilgili ayın maliyet toplama ve sonraki ay kapanış sürecini başlatabilirsiniz.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {surecler.map((surec) => {
+          {filteredSurecler.map((surec) => {
             const isExpanded = expandedId === surec.id
             const tamamlanan = getCompletedCount(surec)
             const progress = (tamamlanan / RAPOR_TIPLERI.length) * 100

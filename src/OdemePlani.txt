@@ -1,17 +1,30 @@
 ﻿'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, OdemePlani, Firma } from '@/lib/supabase'
-import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
+import { supabase } from '@/lib/supabase'
+import type { OdemePlani, Firma } from '@/types'
 import { Plus, Pencil, Trash2, CheckCircle, AlertTriangle, Clock } from 'lucide-react'
 
-interface Props { userId: string; firma: Firma }
+import type { AppCtx } from '@/app/page'
+
+const inputCls = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 outline-none bg-white text-slate-800 placeholder:text-slate-400"
+const btnPrimary = "bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+const btnSecondary = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-sm font-medium"
+
+const FormField = ({ label, children, required }: { label: string, children: React.ReactNode, required?: boolean }) => (
+  <div>
+    <label className="block text-xs font-medium text-slate-600 mb-1.5">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+    {children}
+  </div>
+)
 
 const TUR_LABELS: Record<string, string> = { cek:'Çek', vergi:'Vergi', sgk:'SGK', maas:'Maaş', cari:'Cari Hesap', diger:'Diğer' }
 const TUR_COLORS: Record<string, string> = { cek:'bg-purple-50 text-purple-700 border-purple-200', vergi:'bg-red-50 text-red-700 border-red-200', sgk:'bg-orange-50 text-orange-700 border-orange-200', maas:'bg-blue-50 text-blue-700 border-blue-200', cari:'bg-teal-50 text-teal-700 border-teal-200', diger:'bg-slate-100 text-slate-600 border-slate-200' }
 const TUR_BG: Record<string, string> = { cek:'#7e22ce', vergi:'#b91c1c', sgk:'#c2410c', maas:'#1d4ed8', cari:'#0f766e', diger:'#475569' }
 const DURUM_COLORS: Record<string, string> = { beklemede:'bg-amber-50 text-amber-700', odendi:'bg-emerald-50 text-emerald-700', gecikti:'bg-red-50 text-red-600', iptal:'bg-slate-100 text-slate-500' }
 
-export default function OdemePlaniPage({ userId, firma }: Props) {
+export default function OdemePlaniPage({ firma, profil }: AppCtx) {
   const [odemeler, setOdemeler] = useState<OdemePlani[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
@@ -19,7 +32,7 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
   const [filtre, setFiltre] = useState('hepsi')
   const today = new Date().toISOString().split('T')[0]
 
-  const emptyForm = { baslik:'', tur:'vergi', tutar:'', vade_tarihi:'', durum:'beklemede', aciklama:'' }
+  const emptyForm = { baslik:'', tur:'vergi', tutar:'', vade_tarihi: today, durum:'beklemede', aciklama:'' }
   const [form, setForm] = useState(emptyForm)
 
   const fetch = useCallback(async () => {
@@ -39,7 +52,7 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
 
   async function handleSave() {
     if (!form.baslik || !form.tutar || !form.vade_tarihi) return
-    const data = { ...form, tutar:parseFloat(form.tutar), firma_id:firma.id, user_id:userId }
+    const data = { ...form, tutar:parseFloat(form.tutar), firma_id:firma.id, user_id:profil.auth_user_id, aciklama: form.aciklama || null }
     if (editing) await supabase.from('odeme_plani').update(data).eq('id', editing.id)
     else await supabase.from('odeme_plani').insert(data)
     setModal(false); fetch()
@@ -50,7 +63,7 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
     fetch()
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(id: number) {
     if (!confirm('Silmek istediğinize emin misiniz?')) return
     await supabase.from('odeme_plani').delete().eq('id', id)
     fetch()
@@ -185,42 +198,49 @@ export default function OdemePlaniPage({ userId, firma }: Props) {
       }
 
       {modal && (
-        <Modal title={editing ? 'Ödemeyi Düzenle' : 'Yeni Ödeme Ekle'} onClose={() => setModal(false)}
-          footer={<><button className={btnSecondary} onClick={()=>setModal(false)}>İptal</button><button className={btnPrimary} onClick={handleSave}>Kaydet</button></>}>
-          <div className="space-y-3">
-            <FormField label="Başlık" required>
-              <input className={inputCls} value={form.baslik} onChange={e=>setForm({...form,baslik:e.target.value})} placeholder="Ödeme açıklaması" />
-            </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Tür">
-                <select className={inputCls} value={form.tur} onChange={e=>setForm({...form,tur:e.target.value})}>
-                  {Object.entries(TUR_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
-                </select>
-              </FormField>
-              <FormField label="Tutar (₺)" required>
-                <input type="number" className={inputCls} value={form.tutar} onChange={e=>setForm({...form,tutar:e.target.value})} placeholder="0.00" />
-              </FormField>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-slate-800 text-lg p-5 border-b border-slate-100">{editing ? 'Ödemeyi Düzenle' : 'Yeni Ödeme Ekle'}</h3>
+            <div className="p-5">
+              <div className="space-y-4">
+                <FormField label="Başlık" required>
+                  <input className={inputCls} value={form.baslik} onChange={e => setForm({ ...form, baslik: e.target.value })} placeholder="Ödeme açıklaması" />
+                </FormField>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField label="Tür">
+                    <select className={inputCls} value={form.tur} onChange={e => setForm({ ...form, tur: e.target.value })}>
+                      {Object.entries(TUR_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </FormField>
+                  <FormField label="Tutar (₺)" required>
+                    <input type="number" className={inputCls} value={form.tutar} onChange={e => setForm({ ...form, tutar: e.target.value })} placeholder="0.00" />
+                  </FormField>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField label="Vade Tarihi" required>
+                    <input type="date" className={inputCls} value={form.vade_tarihi} onChange={e => setForm({ ...form, vade_tarihi: e.target.value })} />
+                  </FormField>
+                  <FormField label="Durum">
+                    <select className={inputCls} value={form.durum} onChange={e => setForm({ ...form, durum: e.target.value })}>
+                      <option value="beklemede">Beklemede</option>
+                      <option value="odendi">Ödendi</option>
+                      <option value="gecikti">Gecikti</option>
+                      <option value="iptal">İptal</option>
+                    </select>
+                  </FormField>
+                </div>
+                <FormField label="Açıklama">
+                  <input className={inputCls} value={form.aciklama} onChange={e => setForm({ ...form, aciklama: e.target.value })} placeholder="Opsiyonel not" />
+                </FormField>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Vade Tarihi" required>
-                <input type="date" className={inputCls} value={form.vade_tarihi} onChange={e=>setForm({...form,vade_tarihi:e.target.value})} />
-              </FormField>
-              <FormField label="Durum">
-                <select className={inputCls} value={form.durum} onChange={e=>setForm({...form,durum:e.target.value})}>
-                  <option value="beklemede">Beklemede</option>
-                  <option value="odendi">Ödendi</option>
-                  <option value="gecikti">Gecikti</option>
-                  <option value="iptal">İptal</option>
-                </select>
-              </FormField>
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+              <button className={btnSecondary} onClick={() => setModal(false)}>İptal</button>
+              <button className={btnPrimary} onClick={handleSave}>Kaydet</button>
             </div>
-            <FormField label="Açıklama">
-              <input className={inputCls} value={form.aciklama} onChange={e=>setForm({...form,aciklama:e.target.value})} placeholder="Opsiyonel not" />
-            </FormField>
           </div>
-        </Modal>
+        </div>
       )}
     </div>
   )
 }
-

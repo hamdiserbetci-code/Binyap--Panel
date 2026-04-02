@@ -1,0 +1,37 @@
+import { ReactNode } from "react";
+
+export default function StatCard({
+  title,
+  value,
+  icon,
+  trend,
+  trendColor,
+}: {
+  title: string;
+  value: string | number;
+  icon?: ReactNode;
+  trend?: string;
+  trendColor?: string;
+}) {
+  return (
+    <div className="bg-[#16181D] border border-[#2A2D34] rounded-xl p-5 shadow-lg flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[#A1A1AA] text-sm">{title}</span>
+        {icon && <div className="text-[#4C8BF5]">{icon}</div>}
+      </div>
+
+      <div className="text-3xl font-semibold text-white tracking-tight">
+        {value}
+      </div>
+
+      {trend && (
+        <span
+          className="text-sm font-medium"
+          style={{ color: trendColor || "#30D158" }}
+        >
+          {trend}
+        </span>
+      )}
+    </div>
+  );
+}

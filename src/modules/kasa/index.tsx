@@ -9,9 +9,7 @@ import {
   Download,
   FileSpreadsheet,
   Landmark,
-  Pencil,
   Plus,
-  Search,
   Trash2,
   Wallet,
   Wallet2,
@@ -20,17 +18,16 @@ import { supabase } from '@/lib/supabase'
 import type { AppCtx } from '@/app/page'
 import type { Musteri } from '@/types'
 import { ConfirmModal, ErrorMsg, Field, Loading, Modal, cls } from '@/components/ui'
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { format } from 'date-fns'
 
 type KasaHareketi = {
   id: string
   created_at: string
   firma_id: string
-  user_id: string
   musteri_id: string | null
   tarih: string
   aciklama: string
-  tur: 'gelir' | 'gider'
+  hareket_turu: 'gelir' | 'gider'
   tutar: number
   kategori: string | null
   odeme_sekli: 'nakit' | 'banka' | 'kart' | 'avans' | 'diger'
@@ -73,29 +70,21 @@ const OdemeIcon = ({ sekil, ...props }: { sekil: OdemeSekli, [key: string]: any 
 const EMPTY_FORM: Partial<KasaHareketi> = {
   tarih: new Date().toISOString().split('T')[0],
   aciklama: '',
-  tur: 'gider',
+  hareket_turu: 'gider',
   tutar: 0,
   kategori: '',
   odeme_sekli: 'nakit',
   musteri_id: null,
 }
 
-export default function KasaModule({ firma, profil, navigate }: AppCtx) {
+export default function KasaModule({ firma }: AppCtx) {
   const [hareketler, setHareketler] = useState<KasaHareketi[]>([])
   const [musteriler, setMusteriler] = useState<Musteri[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [query, setQuery] = useState('')
   const [modal, setModal] = useState<Partial<KasaHareketi> | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState(() => {
-    const today = new Date()
-    return {
-      start: format(startOfMonth(today), 'yyyy-MM-dd'),
-      end: format(endOfMonth(today), 'yyyy-MM-dd'),
-    }
-  })
 
   useEffect(() => {
     load()
@@ -129,11 +118,10 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
     setSaving(true)
     const payload = {
       firma_id: firma.id,
-      user_id: profil.id,
       musteri_id: modal.musteri_id || null,
       tarih: modal.tarih,
       aciklama: modal.aciklama.trim(),
-      tur: modal.tur || 'gider',
+      hareket_turu: modal.hareket_turu || 'gider',
       tutar: Number(modal.tutar || 0),
       kategori: modal.kategori || null,
       odeme_sekli: modal.odeme_sekli || 'nakit',
@@ -160,21 +148,11 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
     await load()
   }
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase('tr-TR')
-    return hareketler.filter((item) => {
-      if (item.tarih < dateRange.start || item.tarih > dateRange.end) return false
-      if (!needle) return true
-      const musteri = musteriler.find((x) => x.id === item.musteri_id)
-      return [item.aciklama, item.kategori || '', String(item.tutar), musteri?.ad || '', musteri?.kisa_ad || ''].some((value) =>
-        value.toLocaleLowerCase('tr-TR').includes(needle)
-      )
-    })
-  }, [hareketler, query, dateRange, musteriler])
+  const filtered = hareketler
 
   const stats = useMemo(() => {
-    const gelir = filtered.filter((h) => h.tur === 'gelir').reduce((sum, h) => sum + Number(h.tutar || 0), 0)
-    const gider = filtered.filter((h) => h.tur === 'gider').reduce((sum, h) => sum + Number(h.tutar || 0), 0)
+    const gelir = filtered.filter((h) => h.hareket_turu === 'gelir').reduce((sum, h) => sum + Number(h.tutar || 0), 0)
+    const gider = filtered.filter((h) => h.hareket_turu === 'gider').reduce((sum, h) => sum + Number(h.tutar || 0), 0)
     return { gelir, gider, bakiye: gelir - gider }
   }, [filtered])
 
@@ -187,16 +165,8 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
     }, {} as Record<string, KasaHareketi[]>)
   }, [filtered])
 
-  const setDatePreset = (preset: 'this_month' | 'last_month') => {
-    const today = new Date()
-    const targetDate = preset === 'last_month' ? subMonths(today, 1) : today
-    setDateRange({
-      start: format(startOfMonth(targetDate), 'yyyy-MM-dd'),
-      end: format(endOfMonth(targetDate), 'yyyy-MM-dd'),
-    })
-  }
-
-  async function exportPDF() {
+async function exportPDF() {
+  try {
     const jsPDFModule = await import('jspdf')
     const autoTableModule = await import('jspdf-autotable')
     const jsPDF = jsPDFModule.default
@@ -212,7 +182,7 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
     doc.text(cleanTr(firma.ad || 'Kasa Raporu'), 14, 18)
     doc.setFont('Helvetica', 'normal')
     doc.setFontSize(11)
-    doc.text(cleanTr(`KASA RAPORU: ${dateRange.start} - ${dateRange.end}`), 14, 25)
+    doc.text(cleanTr('KASA RAPORU'), 14, 25)
 
     // Summary Cards
     doc.setTextColor(36, 50, 70)
@@ -241,12 +211,12 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
         const musteri = musteriler.find((x) => x.id === item.musteri_id)
         return [
           format(new Date(item.tarih + 'T00:00:00'), 'dd.MM.yyyy'),
-          item.tur === 'gelir' ? 'Gelir' : 'Gider',
+          item.hareket_turu === 'gelir' ? 'Gelir' : 'Gider',
           cleanTr(item.kategori || '-'),
           cleanTr(item.aciklama),
           cleanTr(ODEME_SEKLI_LABEL[item.odeme_sekli as OdemeSekli] || '-'),
           cleanTr(musteri?.kisa_ad || musteri?.ad || '-'),
-          `${item.tur === 'gelir' ? '+' : '-'} ${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2 }).format(Number(item.tutar || 0))} TL`,
+          `${item.hareket_turu === 'gelir' ? '+' : '-'} ${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2 }).format(Number(item.tutar || 0))} TL`,
         ]
       }),
       theme: 'grid',
@@ -268,7 +238,11 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
       },
     })
 
-    doc.save(`Kasa-Raporu_${dateRange.start}_${dateRange.end}.pdf`)
+    doc.save(`Kasa-Raporu.pdf`)
+  } catch (err) {
+    console.error('PDF oluşturma hatası:', err)
+    alert('PDF oluşturulamadı: ' + (err instanceof Error ? err.message : String(err)))
+  }
   }
 
   async function exportExcel() {
@@ -297,18 +271,18 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
       const musteri = musteriler.find((x) => x.id === item.musteri_id)
       return [
         textCell(format(new Date(item.tarih + 'T00:00:00'), 'dd.MM.yyyy'), 'center'),
-        textCell(item.tur === 'gelir' ? 'Gelir' : 'Gider', 'center'),
+        textCell(item.hareket_turu === 'gelir' ? 'Gelir' : 'Gider', 'center'),
         textCell(item.kategori || '-'),
         textCell(item.aciklama),
         textCell(ODEME_SEKLI_LABEL[item.odeme_sekli as OdemeSekli] || item.odeme_sekli || '-', 'center'),
         textCell(musteri?.ad || '-'),
-        moneyCell(Number(item.tutar || 0), item.tur as 'gelir' | 'gider'),
+        moneyCell(Number(item.tutar || 0), item.hareket_turu as 'gelir' | 'gider'),
       ]
     })
 
     const aoa = [
       [mainHeader('KASA HAREKETLERİ RAPORU'), ...Array(header.length - 1).fill(empty('166534'))],
-      [subHeader(`${firma.ad} | ${dateRange.start} - ${dateRange.end}`), ...Array(header.length - 1).fill(empty('14532d'))],
+      [subHeader(`${firma.ad} | Tüm Kayıtlar`), ...Array(header.length - 1).fill(empty('14532d'))],
       [],
       [colHead('Toplam Gelir'), totalMoneyCell(stats.gelir), colHead('Toplam Gider'), totalMoneyCell(stats.gider), colHead('Net Bakiye'), totalMoneyCell(stats.bakiye), empty()],
       [],
@@ -332,7 +306,7 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'KasaHareketleri')
-    XLSX.writeFile(wb, `Kasa-Raporu_${dateRange.start}_${dateRange.end}.xlsx`)
+    XLSX.writeFile(wb, `Kasa-Raporu.xlsx`)
   }
 
   if (loading) return <Loading />
@@ -372,35 +346,11 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
         <SummaryCard label="Net Bakiye" value={stats.bakiye} tone={stats.bakiye >= 0 ? 'emerald' : 'rose'} />
       </div>
 
-      {/* Filters and List */}
+      {/* List */}
       <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/50 shadow-2xl backdrop-blur-xl">
-        <div className="border-b border-white/5 p-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr] xl:grid-cols-[2fr_1fr_1fr_auto]">
-            <div className="relative">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Açıklama, kategori, tutar veya cari ara..."
-                className="w-full rounded-xl border border-white/10 bg-slate-950/50 py-3 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 transition-colors focus:border-blue-500"
-              />
-            </div>
-            <Field label="Başlangıç Tarihi">
-              <input type="date" className={cls.input} value={dateRange.start} onChange={(e) => setDateRange((p) => ({ ...p, start: e.target.value }))} />
-            </Field>
-            <Field label="Bitiş Tarihi">
-              <input type="date" className={cls.input} value={dateRange.end} onChange={(e) => setDateRange((p) => ({ ...p, end: e.target.value }))} />
-            </Field>
-            <div className="flex items-end gap-2">
-              <button onClick={() => setDatePreset('this_month')} className={cls.btnSecondary}>Bu Ay</button>
-              <button onClick={() => setDatePreset('last_month')} className={cls.btnSecondary}>Geçen Ay</button>
-            </div>
-          </div>
-        </div>
-
         <div className="p-2 sm:p-4">
           {Object.keys(grouped).length === 0 ? (
-            <div className="py-16 text-center text-sm text-slate-500">Bu tarih aralığında hareket bulunamadı.</div>
+            <div className="py-16 text-center text-sm text-slate-500">Henüz kayıt bulunmuyor.</div>
           ) : (
             <div className="space-y-6">
               {Object.entries(grouped).map(([date, hareketler]) => (
@@ -410,10 +360,10 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
                   </div>
                   <div className="space-y-2">
                     {hareketler.map((h) => {
-                      const isGelir = h.tur === 'gelir'
+                      const isGelir = h.hareket_turu === 'gelir'
                       const musteri = musteriler.find(m => m.id === h.musteri_id)
                       return (
-                        <div key={h.id} className="flex items-center gap-4 rounded-2xl bg-slate-950/40 p-4 transition-colors hover:bg-slate-900">
+                        <div key={h.id} onClick={() => setModal(h)} className="flex cursor-pointer items-center gap-4 rounded-2xl bg-slate-950/40 p-4 transition-colors hover:bg-slate-900">
                           {/* Icon */}
                           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${isGelir ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                             {isGelir ? <ArrowDown size={18} /> : <ArrowUp size={18} />}
@@ -457,14 +407,7 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
                           {/* Actions */}
                           <div className="flex items-center gap-1">
                             <button
-  onClick={() => setModal(h)}
-  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
->
-  <Pencil size={14} />
-</button>
-
-<button
-  onClick={() => setDeleteId(h.id)}
+  onClick={(e) => { e.stopPropagation(); setDeleteId(h.id) }}
   className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition hover:bg-rose-500/10 hover:text-rose-400"
 >
   <Trash2 size={14} />
@@ -505,7 +448,7 @@ export default function KasaModule({ firma, profil, navigate }: AppCtx) {
               <input type="number" step="0.01" className={cls.input} value={modal.tutar || ''} onChange={(e) => setModal((prev) => ({ ...prev!, tutar: Number(e.target.value || 0) }))} />
             </Field>
             <Field label="İşlem Türü">
-              <select className={cls.input} value={modal.tur || 'gider'} onChange={(e) => setModal((prev) => ({ ...prev!, tur: e.target.value as 'gelir' | 'gider' }))}>
+              <select className={cls.input} value={modal.hareket_turu || 'gider'} onChange={(e) => setModal((prev) => ({ ...prev!, hareket_turu: e.target.value as 'gelir' | 'gider' }))}>
                 <option value="gider">Gider</option>
                 <option value="gelir">Gelir</option>
               </select>

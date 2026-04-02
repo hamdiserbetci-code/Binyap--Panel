@@ -3,12 +3,20 @@
 import { useEffect, useState, useRef } from 'react'
 import { Folder, File, Upload, Search, Download, Trash2, FolderOpen, Tag, X, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { Loading, ErrorMsg, ConfirmModal, cls, Modal, Field } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 import { type Dokuman, type Musteri, type Proje, type DokumanTipi } from '@/types'
-import { DOKUMAN_TIP_LABEL } from '@/lib/utils'
 
 const DOKUMAN_TIPLERI: DokumanTipi[] = ['fatura', 'sozlesme', 'rapor', 'irsaliye', 'makbuz', 'genel_evrak', 'diger']
+
+const DOKUMAN_TIP_LABEL: Record<DokumanTipi, string> = {
+  fatura: 'Fatura',
+  sozlesme: 'Sözleşme',
+  rapor: 'Rapor',
+  irsaliye: 'İrsaliye',
+  makbuz: 'Makbuz',
+  genel_evrak: 'Genel Evrak',
+  diger: 'Diğer',
+}
 
 function buildTree(dokumanlar: Dokuman[]) {
   const tree: Record<string, Dokuman[]> = {}
@@ -177,7 +185,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
 
       const { error: dbErr } = await supabase.from('dokumanlar').insert({
         firma_id: firma.id,
-        yukleyen_id: profil.id, // Assuming yukleyen_id exists in dokumanlar table
+        yukleyen_id: profil.auth_user_id,
         musteri_id: musteriIdToUse === 'none' ? null : musteriIdToUse, // Assuming musteri_id exists
         proje_id: projectIdToUse === 'none' ? null : projectIdToUse,
         modul: uploadFileType, // Using 'modul' for document type
@@ -272,8 +280,13 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
   const filteredProjeler = projeler.filter(p => filterMusteri === 'all' || p.musteri_id === filterMusteri);
   const filteredMusterilerForUpload = musteriler.filter(m => !uploadToProject || projeler.some(p => p.id === uploadToProject && p.musteri_id === m.id));
 
-  if (loading) return <Loading />
-  if (error) return <ErrorMsg message={error} onRetry={load} />
+  if (loading) return <div className="p-8 text-center text-white">Yükleniyor...</div>
+  if (error) return (
+    <div className="p-8 text-center text-red-400">
+      <p>Hata: {error}</p>
+      <button onClick={load} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded">Yeniden Dene</button>
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-0 -mx-3 md:-mx-5 -mt-3 md:-mt-5">
@@ -283,7 +296,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
         <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-white flex-1 uppercase">
           Dosya Yükleme
         </h1>
-        <button onClick={() => setUploadModalOpen(true)} className={cls.btnPrimary}>
+        <button onClick={() => setUploadModalOpen(true)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#0A84FF] rounded-lg hover:bg-[#007bff] transition-colors disabled:opacity-50">
           <Plus size={14} /> Dosya Yükle
         </button>
       </div>
@@ -318,17 +331,17 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
           {/* Araç çubuğu */}
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <select className={cls.input} value={filterMusteri} onChange={e => { setFilterMusteri(e.target.value); setFilterProje('all'); }}>
+              <select className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={filterMusteri} onChange={e => { setFilterMusteri(e.target.value); setFilterProje('all'); }}>
                 <option value="all">Tüm Müşteriler</option>
                 {musteriler.map(m => <option key={m.id} value={m.id}>{m.ad}</option>)}
               </select>
-              <select className={cls.input} value={filterProje} onChange={e => setFilterProje(e.target.value)} disabled={!filteredProjeler.length}>
+              <select className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={filterProje} onChange={e => setFilterProje(e.target.value)} disabled={!filteredProjeler.length}>
                 <option value="all">Tüm Projeler</option>
                 {filteredProjeler.map(p => (
                   <option key={p.id} value={p.id}>{p.ad}</option>
                 ))}
               </select>
-              <select className={cls.input} value={filterModul} onChange={e => setFilterModul(e.target.value)}>
+              <select className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={filterModul} onChange={e => setFilterModul(e.target.value)}>
                 <option value="all">Tüm Tipler</option>
                 {DOKUMAN_TIPLERI.map(tip => (
                   <option key={tip} value={tip}>{DOKUMAN_TIP_LABEL[tip]}</option>
@@ -337,7 +350,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
             </div>
             <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgba(235,235,245,0.4)]" />
-              <input className={`${cls.input} pl-9`} placeholder="Dosya veya açıklama ara..." value={search} onChange={e => setSearch(e.target.value)} />
+              <input className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all pl-9" placeholder="Dosya veya açıklama ara..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
           </div>
 
@@ -364,18 +377,18 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
               <table className="w-full">
                 <thead className="bg-[#2C2C2E] border-b border-[rgba(60,60,67,0.36)]">
                   <tr>
-                    <th className={cls.th}>Dosya Adı</th>
-                    <th className={`${cls.th} hidden sm:table-cell`}>Tip</th>
-                    <th className={`${cls.th} hidden md:table-cell`}>Klasör</th>
-                    <th className={`${cls.th} hidden lg:table-cell`}>Boyut</th>
-                    <th className={`${cls.th} hidden lg:table-cell`}>Tarih</th>
-                    <th className={cls.th}></th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(235,235,245,0.55)] uppercase tracking-wider">Dosya Adı</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(235,235,245,0.55)] uppercase tracking-wider hidden sm:table-cell">Tip</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(235,235,245,0.55)] uppercase tracking-wider hidden md:table-cell">Klasör</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(235,235,245,0.55)] uppercase tracking-wider hidden lg:table-cell">Boyut</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(235,235,245,0.55)] uppercase tracking-wider hidden lg:table-cell">Tarih</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[rgba(235,235,245,0.55)] uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[rgba(60,60,67,0.2)]">
                   {filteredDokumanlar.map(d => (
                     <tr key={d.id} className="hover:bg-[rgba(60,60,67,0.1)]">
-                      <td className={cls.td}>
+                      <td className="px-4 py-3 text-sm">
                         <div className="flex items-center gap-2">
                           <FileIcon mime={d.mime_type ?? null} />
                           <div>
@@ -390,11 +403,11 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
                           </div>
                         </div>
                       </td>
-                      <td className={`${cls.td} hidden sm:table-cell text-[rgba(235,235,245,0.7)] text-xs`}>{d.modul ? DOKUMAN_TIP_LABEL[d.modul] : '—'}</td>
-                      <td className={`${cls.td} hidden md:table-cell text-[rgba(235,235,245,0.4)] text-xs`}>{d.kategori || d.modul}</td>
-                      <td className={`${cls.td} hidden lg:table-cell text-[rgba(235,235,245,0.4)] text-xs`}>{formatBytes(d.dosya_boyutu ?? null)}</td>
-                      <td className={`${cls.td} hidden lg:table-cell text-[rgba(235,235,245,0.4)] text-xs`}>{new Date(d.created_at).toLocaleDateString('tr-TR')}</td>
-                      <td className={cls.td}>
+                      <td className="px-4 py-3 text-sm hidden sm:table-cell text-[rgba(235,235,245,0.7)] text-xs">{d.modul ? DOKUMAN_TIP_LABEL[d.modul] : '—'}</td>
+                      <td className="px-4 py-3 text-sm hidden md:table-cell text-[rgba(235,235,245,0.4)] text-xs">{d.kategori || d.modul}</td>
+                      <td className="px-4 py-3 text-sm hidden lg:table-cell text-[rgba(235,235,245,0.4)] text-xs">{formatBytes(d.dosya_boyutu ?? null)}</td>
+                      <td className="px-4 py-3 text-sm hidden lg:table-cell text-[rgba(235,235,245,0.4)] text-xs">{new Date(d.created_at).toLocaleDateString('tr-TR')}</td>
+                      <td className="px-4 py-3 text-sm">
                         <div className="flex items-center gap-1 justify-end">
                           <a href={d.dosya_url} target="_blank" rel="noreferrer"
                             className="w-7 h-7 rounded-lg hover:bg-[rgba(10,132,255,0.1)] flex items-center justify-center text-[rgba(235,235,245,0.4)] hover:text-[#0A84FF] transition-colors">
@@ -420,98 +433,106 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
       </div>
 
       {deleting && (
-        <ConfirmModal
-          title="Dokümanı Sil"
-          message={`"${deleting.dosya_adi}" silinecek. Bu işlem geri alınamaz.`}
-          danger
-          onConfirm={() => deleteDokuman(deleting)}
-          onCancel={() => setDeleting(null)}
-        />
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setDeleting(null)}>
+          <div className="bg-slate-800 rounded-lg p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-white text-lg">Dokümanı Sil</h3>
+            <p className="text-slate-300 my-4">{`"${deleting.dosya_adi}" adlı dosyayı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}</p>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg bg-slate-700 text-white font-semibold">İptal</button>
+              <button onClick={() => { deleteDokuman(deleting); setDeleting(null); }} className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold">Sil</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {editingFile && (
-        <Modal
-          title="Etiketleri Düzenle"
-          onClose={() => setEditingFile(null)}
-          size="md"
-          footer={<>
-            <button onClick={() => setEditingFile(null)} className={cls.btnSecondary}>İptal</button>
-            <button onClick={saveTags} disabled={savingTags} className={cls.btnPrimary}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setEditingFile(null)}>
+          <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-white text-lg p-4 border-b border-slate-700">Etiketleri Düzenle</h3>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-[rgba(235,235,245,0.7)] font-medium truncate">Dosya: <span className="text-white">{editingFile.dosya_adi}</span></p>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[rgba(235,235,245,0.5)]">Mevcut Etiketler</p>
+                {(editingFile.etiketler || []).length > 0 ? (
+                  <div className="flex flex-wrap gap-2 p-3 bg-[rgba(60,60,67,0.3)] rounded-lg border border-[rgba(60,60,67,0.36)]">
+                    {(editingFile.etiketler || []).map(tag => (
+                      <span key={tag} className="inline-flex items-center gap-1.5 bg-[rgba(60,60,67,0.5)] text-white px-2 py-0.5 rounded-full text-[10px] font-semibold">{tag}<button onClick={() => removeTag(editingFile, tag)} className="hover:text-[#FF453A]"><X size={10} /></button></span>
+                    ))}
+                  </div>
+                ) : <p className="text-xs text-[rgba(235,235,245,0.4)]">Henüz etiket yok.</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[rgba(235,235,245,0.5)] mb-1">Yeni Etiket Ekle</label>
+                <input className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="fatura, kdv, mart-2024" autoFocus />
+                <p className="text-xs text-slate-500 mt-1">Birden fazla etiket için virgül (,) kullanın.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-700">
+            <button onClick={() => setEditingFile(null)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[rgba(120,120,128,0.24)] rounded-lg hover:bg-[rgba(120,120,128,0.36)]">İptal</button>
+            <button onClick={saveTags} disabled={savingTags} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#0A84FF] rounded-lg hover:bg-[#007bff] transition-colors disabled:opacity-50">
               {savingTags ? 'Kaydediliyor...' : 'Kaydet'}
             </button>
-          </>}>
-          <div className="space-y-4">
-            <p className="text-sm text-[rgba(235,235,245,0.7)] font-medium truncate">Dosya: <span className="text-white">{editingFile.dosya_adi}</span></p>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-[rgba(235,235,245,0.5)]">Mevcut Etiketler</p>
-              {(editingFile.etiketler || []).length > 0 ? (
-                <div className="flex flex-wrap gap-2 p-3 bg-[rgba(60,60,67,0.3)] rounded-lg border border-[rgba(60,60,67,0.36)]">
-                  {(editingFile.etiketler || []).map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1.5 bg-[rgba(60,60,67,0.5)] text-white px-2 py-0.5 rounded-full text-[10px] font-semibold">{tag}<button onClick={() => removeTag(editingFile, tag)} className="hover:text-[#FF453A]"><X size={10} /></button></span>
-                  ))}
-                </div>
-              ) : <p className="text-xs text-[rgba(235,235,245,0.4)]">Henüz etiket yok.</p>}
             </div>
-            <Field label="Yeni Etiket Ekle" hint="Birden fazla etiket için virgül (,) kullanın.">
-              <input className={cls.input} value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="fatura, kdv, mart-2024" autoFocus />
-            </Field>
           </div>
-        </Modal>
+        </div>
       )}
 
       {/* Yükleme Modalı */}
       {uploadModalOpen && (
-        <Modal
-          title="Dosya Yükle"
-          onClose={() => setUploadModalOpen(false)}
-          size="md"
-          footer={<>
-            <button onClick={() => setUploadModalOpen(false)} className={cls.btnSecondary}>İptal</button>
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={cls.btnPrimary}>
-              {uploading ? 'Yükleniyor...' : 'Dosya Seç ve Yükle'}
-            </button>
-          </>}>
-          <div className="space-y-4">
-            <Field label="Dosya Tipi" required>
-              <select className={cls.input} value={uploadFileType} onChange={e => setUploadFileType(e.target.value as DokumanTipi)}>
-                {DOKUMAN_TIPLERI.map(tip => (
-                  <option key={tip} value={tip}>{DOKUMAN_TIP_LABEL[tip]}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Projeye Ait Mi?">
-              <select className={cls.input} value={uploadToProject || 'none'} onChange={e => setUploadToProject(e.target.value === 'none' ? null : e.target.value)}>
-                <option value="none">Hayır, bir projeye ait değil</option>
-                {projeler.map(p => (
-                  <option key={p.id} value={p.id}>{p.ad}</option>
-                ))}
-              </select>
-            </Field>
-            {!uploadToProject || uploadToProject === 'none' ? (
-              <Field label="Müşteri (Proje yoksa)">
-                <select className={cls.input} value={uploadToMusteri || 'none'} onChange={e => setUploadToMusteri(e.target.value === 'none' ? null : e.target.value)}>
-                  <option value="none">Genel Firma Dokümanı</option>
-                  {musteriler.map(m => (
-                    <option key={m.id} value={m.id}>{m.ad}</option>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center" onClick={() => setUploadModalOpen(false)}>
+          <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-white text-lg p-4 border-b border-slate-700">Dosya Yükle</h3>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[rgba(235,235,245,0.5)] mb-1">Dosya Tipi *</label>
+                <select className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={uploadFileType} onChange={e => setUploadFileType(e.target.value as DokumanTipi)}>
+                  {DOKUMAN_TIPLERI.map(tip => (
+                    <option key={tip} value={tip}>{DOKUMAN_TIP_LABEL[tip]}</option>
                   ))}
                 </select>
-              </Field>
-            ) : null}
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              ref={fileInputRef}
-              onChange={e => {
-                if (e.target.files) {
-                  handleUploadFiles(e.target.files);
-                  e.target.value = ''; // Aynı dosyayı tekrar seçebilmek için inputu temizle
-                }
-              }}
-            />
-            <p className="text-xs text-[rgba(235,235,245,0.4)]">Maksimum dosya boyutu 100 MB.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[rgba(235,235,245,0.5)] mb-1">Projeye Ait Mi?</label>
+                <select className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={uploadToProject || 'none'} onChange={e => setUploadToProject(e.target.value === 'none' ? null : e.target.value)}>
+                  <option value="none">Hayır, bir projeye ait değil</option>
+                  {projeler.map(p => (
+                    <option key={p.id} value={p.id}>{p.ad}</option>
+                  ))}
+                </select>
+              </div>
+              {!uploadToProject || uploadToProject === 'none' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-[rgba(235,235,245,0.5)] mb-1">Müşteri (Proje yoksa)</label>
+                  <select className="w-full bg-[#2C2C2E] border border-[rgba(60,60,67,0.36)] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[rgba(235,235,245,0.4)] outline-none focus:border-[#0A84FF] focus:bg-[#3A3A3C] transition-all" value={uploadToMusteri || 'none'} onChange={e => setUploadToMusteri(e.target.value === 'none' ? null : e.target.value)}>
+                    <option value="none">Genel Firma Dokümanı</option>
+                    {musteriler.map(m => (
+                      <option key={m.id} value={m.id}>{m.ad}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                ref={fileInputRef}
+                onChange={e => {
+                  if (e.target.files) {
+                    handleUploadFiles(e.target.files);
+                    e.target.value = ''; // Aynı dosyayı tekrar seçebilmek için inputu temizle
+                  }
+                }}
+              />
+              <p className="text-xs text-[rgba(235,235,245,0.4)]">Maksimum dosya boyutu 100 MB.</p>
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t border-slate-700">
+            <button onClick={() => setUploadModalOpen(false)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[rgba(120,120,128,0.24)] rounded-lg hover:bg-[rgba(120,120,128,0.36)]">İptal</button>
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#0A84FF] rounded-lg hover:bg-[#007bff] transition-colors disabled:opacity-50">
+              {uploading ? 'Yükleniyor...' : 'Dosya Seç ve Yükle'}
+            </button>
+            </div>
           </div>
-        </Modal>
+        </div>
       )}
     </div>
   )

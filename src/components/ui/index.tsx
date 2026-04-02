@@ -8,9 +8,9 @@ import { DURUM_COLOR, DURUM_LABEL, ONCELIK_COLOR, ONCELIK_LABEL, TIP_LABEL } fro
 // ── iOS Stil Sabitleri ─────────────────────────────────────────────────────
 export const cls = {
   input: [
-    'w-full rounded-xl border border-[rgba(168,185,212,0.2)] bg-[rgba(8,18,34,0.84)]',
-    'px-3.5 py-2.5 text-sm font-medium text-[rgba(245,247,251,0.96)] placeholder:text-[rgba(230,236,245,0.45)]',
-    'outline-none focus:border-[rgba(116,166,255,0.58)] focus:ring-2 focus:ring-[rgba(116,166,255,0.18)]',
+    'w-full rounded-lg border border-[rgba(168,185,212,0.18)] bg-[rgba(8,18,34,0.84)]',
+    'px-3 py-1.5 text-sm font-medium text-[rgba(245,247,251,0.96)] placeholder:text-[rgba(230,236,245,0.40)]',
+    'outline-none focus:border-[rgba(116,166,255,0.55)] focus:ring-1 focus:ring-[rgba(116,166,255,0.15)]',
     'transition-all disabled:opacity-40',
   ].join(' '),
 
@@ -23,34 +23,34 @@ export const cls = {
   btnPrimary: [
     'flex items-center justify-center gap-1.5',
     'bg-[linear-gradient(180deg,#5b93f7_0%,#447de5_100%)] hover:brightness-105 active:brightness-95',
-    'text-white px-4 py-2.5 rounded-xl text-sm font-semibold',
+    'text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold',
     'transition-all disabled:opacity-40 disabled:cursor-not-allowed',
-    'shadow-[0_10px_24px_rgba(68,125,229,0.25)]',
+    'shadow-[0_6px_16px_rgba(68,125,229,0.22)]',
   ].join(' '),
 
   btnSecondary: [
     'flex items-center justify-center gap-1.5',
     'bg-[rgba(18,32,54,0.72)] hover:bg-[rgba(27,44,70,0.82)]',
-    'text-[rgba(245,247,251,0.92)] px-4 py-2.5 rounded-xl text-sm font-semibold',
+    'text-[rgba(245,247,251,0.92)] px-3.5 py-1.5 rounded-lg text-sm font-semibold',
     'transition-all border border-[rgba(168,185,212,0.18)] backdrop-blur-md',
   ].join(' '),
 
   btnDanger: [
     'flex items-center justify-center gap-1.5',
     'bg-[#d9534f] hover:bg-[#e1635e]',
-    'text-white px-4 py-2.5 rounded-xl text-sm font-semibold',
+    'text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold',
     'transition-all',
   ].join(' '),
 
   btnGhost: [
-    'flex items-center justify-center gap-1.5',
+    'flex items-center justify-center gap-1',
     'text-[rgba(116,166,255,0.94)] hover:bg-[rgba(76,139,245,0.1)]',
-    'px-3 py-2 rounded-xl text-sm font-semibold transition-all',
+    'px-2 py-1.5 rounded-lg text-sm font-semibold transition-all',
   ].join(' '),
 
-  th: 'text-left px-4 py-3 text-[11px] font-semibold text-[rgba(230,236,245,0.56)] uppercase tracking-[0.16em] whitespace-nowrap',
-  td: 'px-4 py-3.5 text-sm text-[rgba(245,247,251,0.9)]',
-  card: 'rounded-2xl border border-[rgba(162,180,206,0.16)] bg-[rgba(10,23,41,0.72)] backdrop-blur-xl shadow-[0_18px_50px_rgba(2,8,23,0.34)]',
+  th: 'text-left px-3 py-2 text-[10px] font-bold text-[rgba(230,236,245,0.46)] uppercase tracking-[0.14em] whitespace-nowrap',
+  td: 'px-3 py-2 text-sm text-[rgba(245,247,251,0.9)]',
+  card: 'rounded-xl border border-[rgba(162,180,206,0.13)] bg-[rgba(10,23,41,0.72)] backdrop-blur-xl shadow-[0_8px_32px_rgba(2,8,23,0.28)]',
 }
 
 // ── Modal (iOS Bottom Sheet) ───────────────────────────────────────────────
@@ -84,20 +84,20 @@ export function Modal({ title, onClose, children, footer, size = 'md' }: {
         </div>
 
         {/* Başlık */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[rgba(162,180,206,0.14)] shrink-0">
-          <h2 className="text-base font-semibold text-[rgba(245,247,251,0.96)] tracking-tight">{title}</h2>
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[rgba(162,180,206,0.12)] shrink-0">
+          <h2 className="text-[15px] font-semibold text-[rgba(245,247,251,0.96)] tracking-tight">{title}</h2>
           <button onClick={onClose}
-            className="w-7 h-7 rounded-full bg-[rgba(18,32,54,0.75)] flex items-center justify-center text-[rgba(230,236,245,0.65)] hover:text-white transition-colors">
-            <X size={14} strokeWidth={2.5} />
+            className="w-6 h-6 rounded-full bg-[rgba(18,32,54,0.75)] flex items-center justify-center text-[rgba(230,236,245,0.65)] hover:text-white transition-colors">
+            <X size={13} strokeWidth={2.5} />
           </button>
         </div>
 
         {/* İçerik */}
-        <div className={`flex-1 overflow-y-auto p-5 ${!footer ? 'pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-5' : ''}`}>{children}</div>
+        <div className={`flex-1 overflow-y-auto p-4 ${!footer ? 'pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4' : ''}`}>{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-[rgba(162,180,206,0.14)] shrink-0">
+          <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-[rgba(162,180,206,0.12)] shrink-0">
             {footer}
           </div>
         )}
@@ -111,8 +111,8 @@ export function Field({ label, required, error, hint, children }: {
   label: string; required?: boolean; error?: string; hint?: string; children: React.ReactNode
 }) {
   return (
-    <div className="space-y-1.5">
-      <label className="block text-xs font-semibold text-[rgba(230,236,245,0.62)] uppercase tracking-[0.14em]">
+    <div className="space-y-1">
+      <label className="block text-[11px] font-semibold text-[rgba(230,236,245,0.55)] uppercase tracking-[0.12em]">
         {label}{required && <span className="text-[#FF453A] ml-0.5">*</span>}
       </label>
       {children}

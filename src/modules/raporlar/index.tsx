@@ -40,6 +40,8 @@ interface IsTakip {
 
 interface KasaHareket {
   id: string
+  musteri_id: string | null
+  kullanici_id: string | null
   tarih: string
   tur?: 'gelir' | 'gider'
   hareket_turu?: 'gelir' | 'gider'
@@ -327,7 +329,7 @@ export default function Raporlar({ firma }: AppCtx) {
   const [error, setError] = useState('')
   const [period, setPeriod] = useState('son3ay')
   const [reportType, setReportType] = useState<ReportType>('all')
-  const [selectedMusteri, setSelectedMusteri] = useState('all')
+  const [selectedMusteri, setSelectedMusteri] = useState('')
   const [selectedProje, setSelectedProje] = useState('all')
   const [selectedKullanici, setSelectedKullanici] = useState('all')
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all')
@@ -344,6 +346,17 @@ export default function Raporlar({ firma }: AppCtx) {
   const [exporting, setExporting] = useState<string | null>(null)
 
   useEffect(() => { load() }, [firma.id, period])
+
+  useEffect(() => {
+    if (musteriler.length > 0 && !selectedMusteri) {
+      const binyapi = musteriler.find(m => m.kisa_ad === 'Binyapı' || m.ad.includes('Binyapı'))
+      if (binyapi) {
+        setSelectedMusteri(binyapi.id)
+      } else if (musteriler.length > 0) {
+        setSelectedMusteri(musteriler[0].id)
+      }
+    }
+  }, [musteriler, selectedMusteri])
 
   async function load() {
     setLoading(true)
@@ -425,7 +438,7 @@ export default function Raporlar({ firma }: AppCtx) {
   const filteredIsTakip = useMemo(() => {
     return isTakip.filter((item) => {
       if (reportType !== 'all' && reportType !== 'periyodik') return false
-      if (selectedMusteri !== 'all' && item.musteri_id !== selectedMusteri) return false
+      if (selectedMusteri && item.musteri_id !== selectedMusteri) return false
       if (statusFilter === 'tamamlandi' && item.durum !== 'tamamlandi') return false
       if (statusFilter === 'bekleyen' && item.durum === 'tamamlandi') return false
       const musteri = musteriler.find((m) => m.id === item.musteri_id)
@@ -437,7 +450,7 @@ export default function Raporlar({ firma }: AppCtx) {
     return bordro.filter((item) => {
       if (reportType !== 'all' && reportType !== 'bordro') return false
       if (selectedProje !== 'all' && item.proje_id !== selectedProje) return false
-      if (selectedMusteri !== 'all') {
+      if (selectedMusteri) {
         const proje = projeler.find((p) => p.id === item.proje_id)
         if (proje?.musteri_id !== selectedMusteri) return false
       }
@@ -463,7 +476,7 @@ export default function Raporlar({ firma }: AppCtx) {
   const filteredCekler = useMemo(() => {
     return cekler.filter((item) => {
       if (reportType !== 'all' && reportType !== 'cekler') return false
-      if (selectedMusteri !== 'all' && item.musteri_id !== selectedMusteri) return false
+      if (selectedMusteri && item.musteri_id !== selectedMusteri) return false
       const isDone = item.durum !== 'bekliyor'
       if (statusFilter === 'tamamlandi' && !isDone) return false
       if (statusFilter === 'bekleyen' && isDone) return false
@@ -534,12 +547,16 @@ export default function Raporlar({ firma }: AppCtx) {
   const filteredKasa = useMemo(() => {
     return kasa.filter((item) => {
       if (reportType !== 'all' && reportType !== 'kasa') return false
+      if (selectedKullanici !== 'all' && item.kullanici_id !== selectedKullanici) return false
+      if (selectedMusteri && item.musteri_id !== selectedMusteri) return false
       const isIncome = (item.tur || item.hareket_turu) === 'gelir'
       if (statusFilter === 'tamamlandi' && !isIncome) return false
       if (statusFilter === 'bekleyen' && isIncome) return false
-      return includesSearch([item.kategori, item.aciklama, item.odeme_sekli, item.tur, item.hareket_turu], search)
+      const musteri = musteriler.find((m) => m.id === item.musteri_id)
+      const kullanici = kullanicilar.find((k) => k.id === item.kullanici_id)
+      return includesSearch([item.kategori, item.aciklama, item.odeme_sekli, item.tur, item.hareket_turu, musteri?.ad, musteri?.kisa_ad, kullanici?.ad_soyad], search)
     })
-  }, [kasa, reportType, search, statusFilter])
+  }, [kasa, musteriler, kullanicilar, reportType, search, selectedMusteri, selectedKullanici, statusFilter])
 
   const sheets = useMemo(() => {
     const gunlukSheet: ReportSheet = {
@@ -653,9 +670,11 @@ export default function Raporlar({ firma }: AppCtx) {
       title: 'Kasa Hareketleri Raporu',
       subtitle: `${firma.ad} · ${PERIOD_LABEL[period]} · Gelir ve gider hareketleri`,
       accent: '245B5A',
-      headers: ['Tarih', 'Tur', 'Kategori', 'Aciklama', 'Odeme Sekli', 'Tutar'],
+      headers: ['Tarih', 'Müşteri', 'Sorumlu', 'Tür', 'Kategori', 'Açıklama', 'Ödeme Şekli', 'Tutar'],
       rows: filteredKasa.map((item) => [
         formatDate(item.tarih),
+        musteriler.find((m) => m.id === item.musteri_id)?.kisa_ad || musteriler.find((m) => m.id === item.musteri_id)?.ad || '-',
+        kullanicilar.find((k) => k.id === item.kullanici_id)?.ad_soyad || '-',
         (item.tur || item.hareket_turu) === 'gelir' ? 'Gelir' : 'Gider',
         item.kategori || '-',
         item.aciklama || '-',
@@ -778,14 +797,13 @@ export default function Raporlar({ firma }: AppCtx) {
               {REPORT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <select className={cls.input} value={selectedMusteri} onChange={(e) => { setSelectedMusteri(e.target.value); setSelectedProje('all') }}>
-              <option value="all">Tum Musteriler</option>
               {musteriler.map((item) => <option key={item.id} value={item.id}>{item.kisa_ad || item.ad}</option>)}
             </select>
-            <select className={`${cls.input} ${reportType === 'gunluk' || reportType === 'maliyet' || reportType === 'kasa' ? 'opacity-60' : ''}`} value={selectedProje} onChange={(e) => setSelectedProje(e.target.value)} disabled={reportType === 'gunluk' || reportType === 'maliyet' || reportType === 'kasa'}>
+            <select className={`${cls.input} ${!['all', 'bordro'].includes(reportType) ? 'opacity-60' : ''}`} value={selectedProje} onChange={(e) => setSelectedProje(e.target.value)} disabled={!['all', 'bordro'].includes(reportType)}>
               <option value="all">Tum Projeler</option>
               {projeOptions.map((item) => <option key={item.id} value={item.id}>{item.ad}</option>)}
             </select>
-            <select className={`${cls.input} ${reportType !== 'all' && reportType !== 'maliyet' ? 'opacity-60' : ''}`} value={selectedKullanici} onChange={(e) => setSelectedKullanici(e.target.value)} disabled={reportType !== 'all' && reportType !== 'maliyet'}>
+            <select className={`${cls.input} ${!['all', 'maliyet', 'kasa'].includes(reportType) ? 'opacity-60' : ''}`} value={selectedKullanici} onChange={(e) => setSelectedKullanici(e.target.value)} disabled={!['all', 'maliyet', 'kasa'].includes(reportType)}>
               <option value="all">Tum Sorumlular</option>
               {kullanicilar.map((item) => <option key={item.id} value={item.id}>{item.ad_soyad || item.email}</option>)}
             </select>
