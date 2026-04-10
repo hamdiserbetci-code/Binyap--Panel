@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS efatura_surecler (
   id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   firma_id    UUID        NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
   sirket_id   UUID        REFERENCES sirketler(id) ON DELETE SET NULL,
-  tip         TEXT        NOT NULL CHECK (tip IN ('efatura', 'earsiv', 'edefter')),
+  tip         TEXT        NOT NULL CHECK (tip IN ('efatura', 'efatura_giden', 'earsiv_gelen', 'earsiv', 'edefter')),
   donem       TEXT        NOT NULL,   -- YYYY-MM
   durum       TEXT        NOT NULL DEFAULT 'bekliyor',
   fatura_sayisi INTEGER   DEFAULT 0,

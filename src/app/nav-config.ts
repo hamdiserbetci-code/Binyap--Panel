@@ -3,7 +3,7 @@ import {
   BarChart2, Settings,
   CalendarCheck, Wallet, TrendingUp,
   Landmark, CalendarClock, HardDrive, Scale,
-  FolderKanban, FileCheck, FileDigit,
+  FolderKanban, FileCheck,
 } from 'lucide-react'
 
 export const NAV = [
@@ -23,7 +23,6 @@ export const NAV = [
   
   // Vergi & Mevzuat
   { id: 'vergi',      label: 'Vergi Beyannameleri', icon: FileCheck,   group: 'Vergi',   color: 'from-emerald-700 to-emerald-900' },
-  { id: 'efatura',    label: 'E-Fatura / E-Defter', icon: FileDigit,   group: 'Vergi',   color: 'from-teal-700 to-teal-900' },
   
   // Analiz
   { id: 'raporlar',   label: 'Raporlar',        icon: BarChart2,       group: 'Analiz',  color: 'from-blue-600 to-blue-800' },

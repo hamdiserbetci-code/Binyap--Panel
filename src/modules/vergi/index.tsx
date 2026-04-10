@@ -241,7 +241,7 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
   }
 
   const efaturaFiltered = useMemo(() =>
-    surecler.filter(s => (s.tip === 'efatura' || s.tip === 'earsiv') && s.donem === surecDonem),
+    surecler.filter(s => ['efatura', 'efatura_giden', 'earsiv_gelen', 'earsiv'].includes(s.tip) && s.donem === surecDonem),
     [surecler, surecDonem])
 
   const edeferFiltered = useMemo(() =>
@@ -479,17 +479,20 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
             ekleLabel="Yeni E-Fatura/E-Arşiv Süreci"
           />
 
-          {/* İki sütun: E-Fatura + E-Arşiv */}
+          {/* 2x2 grid: E-Fatura Gelen / Giden + E-Arşiv Gelen / Giden */}
           <div className="grid gap-4 lg:grid-cols-2">
-            {(['efatura', 'earsiv'] as const).map(tip => {
+            {([
+              { tip: 'efatura',       label: 'E-Fatura Gelen',  color: 'text-blue-700 bg-blue-50 border-blue-200' },
+              { tip: 'efatura_giden', label: 'E-Fatura Giden',  color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+              { tip: 'earsiv_gelen',  label: 'E-Arşiv Gelen',   color: 'text-purple-700 bg-purple-50 border-purple-200' },
+              { tip: 'earsiv',        label: 'E-Arşiv Giden',   color: 'text-violet-700 bg-violet-50 border-violet-200' },
+            ] as const).map(({ tip, label, color }) => {
               const items = efaturaFiltered.filter(s => s.tip === tip)
-              const tipLabel = tip === 'efatura' ? 'E-Fatura (Gelen)' : 'E-Arşiv (Giden)'
-              const tipColor = tip === 'efatura' ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-purple-700 bg-purple-50 border-purple-200'
               return (
                 <div key={tip} className="bg-white border border-blue-100 rounded-2xl shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[12px] font-bold border ${tipColor}`}>
-                      <Receipt size={12} /> {tipLabel}
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[12px] font-bold border ${color}`}>
+                      <Receipt size={12} /> {label}
                     </span>
                     <button
                       onClick={() => setSurecModal({ tip, donem: surecDonem, durum: 'bekliyor', fatura_sayisi: 0, tutar: 0 })}
@@ -573,9 +576,14 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
       {/* ── Süreç Modal (E-Fatura / E-Arşiv / E-Defter) ─────────────────────── */}
       {surecModal && (
         <Modal
-          title={surecModal.id
-            ? (surecModal.tip === 'edefter' ? 'E-Defter Düzenle' : surecModal.tip === 'earsiv' ? 'E-Arşiv Düzenle' : 'E-Fatura Düzenle')
-            : (surecModal.tip === 'edefter' ? 'Yeni E-Defter Süreci' : surecModal.tip === 'earsiv' ? 'Yeni E-Arşiv Süreci' : 'Yeni E-Fatura Süreci')}
+          title={(() => {
+            const LABELS: Record<string, string> = {
+              efatura: 'E-Fatura Gelen', efatura_giden: 'E-Fatura Giden',
+              earsiv_gelen: 'E-Arşiv Gelen', earsiv: 'E-Arşiv Giden', edefter: 'E-Defter'
+            }
+            const l = LABELS[surecModal.tip || ''] || 'Süreç'
+            return surecModal.id ? `${l} Düzenle` : `Yeni ${l} Süreci`
+          })()}
           onClose={() => setSurecModal(null)}
           size="md"
           footer={
@@ -598,8 +606,10 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
             <div className="grid grid-cols-2 gap-4">
               <Field label="Tip" required>
                 <select className={cls.input} value={surecModal.tip || ''} onChange={e => setSurecModal(p => ({ ...p!, tip: e.target.value }))}>
-                  <option value="efatura">E-Fatura (Gelen)</option>
-                  <option value="earsiv">E-Arşiv (Giden)</option>
+                  <option value="efatura">E-Fatura Gelen</option>
+                  <option value="efatura_giden">E-Fatura Giden</option>
+                  <option value="earsiv_gelen">E-Arşiv Gelen</option>
+                  <option value="earsiv">E-Arşiv Giden</option>
                   <option value="edefter">E-Defter</option>
                 </select>
               </Field>
