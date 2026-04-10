@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import {
   FileCheck, Plus, Pencil, Trash2, Search, RefreshCw,
   CheckCircle2, Clock, AlertCircle, Receipt, BookOpen,
   ChevronRight, FileText, Upload, CheckCheck, Send, BadgeCheck,
-  ArrowRight, FileDown, Table2
+  ArrowRight, FileDown, Table2, FileUp, FileSpreadsheet
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cls, Modal, Field, Loading, ConfirmModal } from '@/components/ui'
@@ -101,6 +101,14 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
   const [modal, setModal]                 = useState<Partial<any> | null>(null)
   const [deleteId, setDeleteId]           = useState<string | null>(null)
   const [selFirmaId, setSelFirmaId]       = useState(firma.id)
+
+  // --- Import state ---
+  const [importModal, setImportModal]     = useState<'beyanname' | 'efatura' | 'edefter' | null>(null)
+  const [importRows, setImportRows]       = useState<any[]>([])
+  const [importErrors, setImportErrors]   = useState<string[]>([])
+  const [importing, setImporting]         = useState(false)
+  const excelInputRef                     = useRef<HTMLInputElement>(null)
+  const pdfInputRef                       = useRef<HTMLInputElement>(null)
 
   // --- Süreç (E-Fatura/E-Arşiv/E-Defter) state ---
   const [surecler, setSurecler]           = useState<any[]>([])
@@ -378,6 +386,108 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
     XLSX.writeFile(wb, `edefter-${surecDonem}.xlsx`)
   }
 
+  // ── Import fonksiyonları ────────────────────────────────────────────────────
+  function downloadTemplate(which: 'beyanname' | 'efatura' | 'edefter') {
+    const templates: Record<string, any[]> = {
+      beyanname: [{ 'Dönem': '2025-01', 'Tip': 'kdv', 'Şirket Kodu': 'ABC', 'Durum': 'bekliyor', 'Tahakkuk (₺)': 1500, 'Ödenen (₺)': 0, 'Son Tarih': '2025-02-28', 'Notlar': '' }],
+      efatura:   [{ 'Tip': 'efatura', 'Dönem': '2025-01', 'Şirket Kodu': 'ABC', 'Durum': 'bekliyor', 'Fatura Sayısı': 12, 'Tutar (₺)': 45000, 'Notlar': '' }],
+      edefter:   [{ 'Dönem': '2025-01', 'Şirket Kodu': 'ABC', 'Durum': 'bekliyor', 'Notlar': '' }],
+    }
+    const ws = XLSX.utils.json_to_sheet(templates[which])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Şablon')
+    XLSX.writeFile(wb, `sablon-${which}.xlsx`)
+  }
+
+  function parseExcelForImport(file: File, which: 'beyanname' | 'efatura' | 'edefter') {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        const errors: string[] = []
+
+        const mapped = rows.map((row, i) => {
+          const n = i + 2 // satır no (başlık = 1)
+          if (which === 'beyanname') {
+            const donem = String(row['Dönem'] || '').trim()
+            const tip = String(row['Tip'] || '').trim().toLowerCase()
+            if (!donem) errors.push(`Satır ${n}: Dönem boş`)
+            if (!Object.keys(TIP_LABEL).includes(tip)) errors.push(`Satır ${n}: Tip geçersiz (${tip})`)
+            const sirket = sirketler.find(s => s.kod === String(row['Şirket Kodu'] || '').trim())
+            return {
+              _preview: `${donem} / ${TIP_LABEL[tip as VergiTip] || tip} / ${row['Durum'] || 'bekliyor'}`,
+              firma_id: selFirmaId,
+              sirket_id: sirket?.id || null,
+              tip, donem,
+              son_tarih: row['Son Tarih'] ? String(row['Son Tarih']).trim() : getSonTarih(tip as VergiTip, donem),
+              durum: String(row['Durum'] || 'bekliyor').trim(),
+              tahakkuk_tutari: Number(row['Tahakkuk (₺)'] || 0),
+              odenen_tutar: Number(row['Ödenen (₺)'] || 0),
+              notlar: String(row['Notlar'] || '') || null,
+            }
+          } else {
+            const donem = which === 'efatura' ? String(row['Dönem'] || surecDonem).trim() : String(row['Dönem'] || surecDonem).trim()
+            const tip = which === 'efatura' ? String(row['Tip'] || 'efatura').trim().toLowerCase() : 'edefter'
+            const sirket = sirketler.find(s => s.kod === String(row['Şirket Kodu'] || '').trim())
+            return {
+              _preview: `${TIP_FULL[tip] || tip} / ${donem} / ${row['Durum'] || 'bekliyor'}`,
+              firma_id: surecSelFirmaId,
+              sirket_id: sirket?.id || null,
+              tip, donem,
+              durum: String(row['Durum'] || 'bekliyor').trim(),
+              fatura_sayisi: Number(row['Fatura Sayısı'] || 0),
+              tutar: Number(row['Tutar (₺)'] || 0),
+              notlar: String(row['Notlar'] || '') || null,
+            }
+          }
+        })
+
+        setImportErrors(errors)
+        setImportRows(mapped)
+        setImportModal(which)
+      } catch {
+        alert('Dosya okunamadı. Lütfen geçerli bir Excel dosyası seçin.')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  async function confirmImport() {
+    if (importRows.length === 0 || importErrors.length > 0) return
+    setImporting(true)
+    const table = importModal === 'beyanname' ? 'vergi_beyannameleri' : 'efatura_surecler'
+    const payload = importRows.map(({ _preview, ...rest }) => rest)
+    const { error } = await supabase.from(table).insert(payload)
+    setImporting(false)
+    if (error) { alert('İçe aktarma hatası: ' + error.message); return }
+    setImportModal(null); setImportRows([]); setImportErrors([])
+    await loadAll()
+  }
+
+  async function handlePDFImport(file: File, which: 'beyanname' | 'efatura' | 'edefter') {
+    const bucketName = 'dokumanlar'
+    const path = `vergi/${which}/${surecDonem}/${Date.now()}_${file.name}`
+    const { error } = await supabase.storage.from(bucketName).upload(path, file, { upsert: false })
+    if (error) { alert('Yükleme hatası: ' + error.message + '\n(Supabase storage bucket "dokumanlar" oluşturulmalı)'); return }
+    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(path)
+    // dokumanlar tablosuna kaydet
+    await supabase.from('dokumanlar').insert({
+      firma_id: which === 'beyanname' ? selFirmaId : surecSelFirmaId,
+      modul: 'vergi',
+      bagli_tablo: which === 'beyanname' ? 'vergi_beyannameleri' : 'efatura_surecler',
+      dosya_adi: file.name,
+      dosya_url: urlData.publicUrl,
+      mime_type: file.type,
+      dosya_boyutu: file.size,
+      kategori: which,
+      aciklama: `${which} — ${surecDonem}`,
+    })
+    alert(`✓ "${file.name}" başarıyla yüklendi ve dokumanlar'a kaydedildi.`)
+  }
+
   if (loading) return <Loading />
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -450,13 +560,32 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
               <option value="all">Tüm Tipler</option>
               {Object.entries(TIP_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
+            {/* Dışa aktar */}
             <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl overflow-hidden">
+              <span className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide">İndir</span>
               <button onClick={exportBeyannamePDF} title="PDF İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
                 <FileDown size={13} /> PDF
               </button>
               <div className="w-px h-5 bg-slate-200" />
               <button onClick={exportBeyannamExcel} title="Excel İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors">
                 <Table2 size={13} /> Excel
+              </button>
+            </div>
+            {/* İçe aktar */}
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl overflow-hidden">
+              <span className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Aktar</span>
+              <label title="Excel İçe Aktar" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer">
+                <FileSpreadsheet size={13} /> Excel
+                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) parseExcelForImport(f, 'beyanname'); e.target.value = '' }} />
+              </label>
+              <div className="w-px h-5 bg-slate-200" />
+              <label title="PDF Belgesi Yükle" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer">
+                <FileUp size={13} /> PDF
+                <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePDFImport(f, 'beyanname'); e.target.value = '' }} />
+              </label>
+              <div className="w-px h-5 bg-slate-200" />
+              <button onClick={() => downloadTemplate('beyanname')} className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-colors" title="Excel şablon indir">
+                <FileDown size={13} /> Şablon
               </button>
             </div>
             <button onClick={() => setModal({ tip: 'kdv', donem: getDonemStr(), durum: 'bekliyor', tahakkuk_tutari: 0, odenen_tutar: 0 })} className={cls.btnPrimary}>
@@ -618,6 +747,9 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
             ekleLabel="Yeni E-Fatura/E-Arşiv Süreci"
             onPDF={exportEfaturaPDF}
             onExcel={exportEfaturaExcel}
+            onExcelImport={(f) => parseExcelForImport(f, 'efatura')}
+            onPDFImport={(f) => handlePDFImport(f, 'efatura')}
+            onTemplate={() => downloadTemplate('efatura')}
           />
 
           {/* 2x2 grid: E-Fatura Gelen / Giden + E-Arşiv Gelen / Giden */}
@@ -681,6 +813,9 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
             ekleLabel="Yeni E-Defter Süreci"
             onPDF={exportEdeferPDF}
             onExcel={exportEdeferExcel}
+            onExcelImport={(f) => parseExcelForImport(f, 'edefter')}
+            onPDFImport={(f) => handlePDFImport(f, 'edefter')}
+            onTemplate={() => downloadTemplate('edefter')}
           />
 
           <div className="bg-white border border-blue-100 rounded-2xl shadow-sm overflow-hidden">
@@ -795,15 +930,70 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
       {surecDeleteId && (
         <ConfirmModal title="Süreci Sil" message="Bu süreç kaydı kalıcı olarak silinecektir." danger onConfirm={handleDeleteSurec} onCancel={() => setSurecDeleteId(null)} />
       )}
+
+      {/* ── Excel İçe Aktarma Modal ────────────────────────────────────────── */}
+      {importModal && importRows.length > 0 && (
+        <Modal
+          title={`Excel İçe Aktar — ${importModal === 'beyanname' ? 'Beyanname' : importModal === 'efatura' ? 'E-Fatura/E-Arşiv' : 'E-Defter'}`}
+          onClose={() => { setImportModal(null); setImportRows([]); setImportErrors([]) }}
+          size="xl"
+          footer={
+            <>
+              <button onClick={() => { setImportModal(null); setImportRows([]); setImportErrors([]) }} className={cls.btnSecondary}>İptal</button>
+              <button onClick={confirmImport} disabled={importing || importErrors.length > 0} className={cls.btnPrimary}>
+                {importing ? 'Aktarılıyor...' : `${importRows.length} Kaydı Aktar`}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {importErrors.length > 0 && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-1">
+                <p className="text-[12px] font-bold text-rose-700">Hata — Lütfen dosyayı düzeltin:</p>
+                {importErrors.map((e, i) => <p key={i} className="text-[12px] text-rose-600">{e}</p>)}
+              </div>
+            )}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 flex items-center justify-between">
+              <span className="text-[13px] text-blue-700 font-semibold">{importRows.length} kayıt önizleniyor</span>
+              <span className="text-[11px] text-blue-500">İlk 5 kayıt gösteriliyor</span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="w-full text-[12px] text-left">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">#</th>
+                    <th className="px-3 py-2 font-semibold">Önizleme</th>
+                    <th className="px-3 py-2 font-semibold">Firma</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {importRows.slice(0, 5).map((row, i) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                      <td className="px-3 py-2 text-slate-700 font-medium">{row._preview}</td>
+                      <td className="px-3 py-2 text-slate-400">{firmalar.find(f => f.id === row.firma_id)?.kisa_ad || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {importRows.length > 5 && (
+              <p className="text-[11px] text-slate-400 text-center">...ve {importRows.length - 5} kayıt daha</p>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
 
 // ── Alt bileşenler ─────────────────────────────────────────────────────────────
 
-function SurecTabBar({ donem, onDonemChange, onEkle, ekleLabel, onPDF, onExcel }: {
+function SurecTabBar({ donem, onDonemChange, onEkle, ekleLabel, onPDF, onExcel, onExcelImport, onPDFImport, onTemplate }: {
   donem: string; onDonemChange: (d: string) => void; onEkle: () => void; ekleLabel: string
   onPDF?: () => void; onExcel?: () => void
+  onExcelImport?: (file: File) => void; onPDFImport?: (file: File) => void
+  onTemplate?: () => void
 }) {
   return (
     <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 flex flex-wrap gap-3 items-center shadow-sm">
@@ -812,19 +1002,48 @@ function SurecTabBar({ donem, onDonemChange, onEkle, ekleLabel, onPDF, onExcel }
         <input type="month" value={donem} onChange={e => onDonemChange(e.target.value)}
           className="bg-slate-50 border border-blue-100 rounded-xl px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-blue-400" />
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2 flex-wrap">
+        {/* Dışa aktar */}
         {(onPDF || onExcel) && (
           <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
+            <span className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide">İndir</span>
             {onPDF && (
-              <button onClick={onPDF} title="PDF İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
+              <button onClick={onPDF} className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
                 <FileDown size={13} /> PDF
               </button>
             )}
             {onPDF && onExcel && <div className="w-px h-5 bg-slate-200" />}
             {onExcel && (
-              <button onClick={onExcel} title="Excel İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors">
+              <button onClick={onExcel} className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors">
                 <Table2 size={13} /> Excel
               </button>
+            )}
+          </div>
+        )}
+        {/* İçe aktar */}
+        {(onExcelImport || onPDFImport) && (
+          <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
+            <span className="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Aktar</span>
+            {onExcelImport && (
+              <label className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer" title="Excel şablon ile içe aktar">
+                <FileSpreadsheet size={13} /> Excel
+                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onExcelImport(f); e.target.value = '' }} />
+              </label>
+            )}
+            {onExcelImport && onPDFImport && <div className="w-px h-5 bg-slate-200" />}
+            {onPDFImport && (
+              <label className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer" title="PDF belgesi yükle">
+                <FileUp size={13} /> PDF
+                <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onPDFImport(f); e.target.value = '' }} />
+              </label>
+            )}
+            {onTemplate && (
+              <>
+                <div className="w-px h-5 bg-slate-200" />
+                <button onClick={onTemplate} className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-colors" title="Excel şablon indir">
+                  <FileDown size={13} /> Şablon
+                </button>
+              </>
             )}
           </div>
         )}
