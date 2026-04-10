@@ -10,7 +10,6 @@ import type { AppCtx } from '@/app/page'
 
 // ── Yedeklenecek tablolar ─────────────────────────────────────────────────────
 const TABLES = [
-  { key: 'musteriler',       label: 'Müşteriler',        group: 'Yönetim' },
   { key: 'projeler',         label: 'Projeler',           group: 'Yönetim' },
   { key: 'gorevler',         label: 'Periyodik İşler',    group: 'Yönetim' },
   { key: 'ekipler',          label: 'Ekipler',            group: 'Yönetim' },
@@ -39,7 +38,7 @@ function cleanTr(text: string) {
     .replace(/Ç/g, 'C').replace(/ç/g, 'c')
 }
 
-export default function YedekModule({ firma }: AppCtx) {
+export default function YedekModule({ firma, firmaIds }: AppCtx) {
   const [statuses, setStatuses] = useState<Record<string, TableStatus>>({})
   const [selected, setSelected] = useState<Set<TableKey>>(
     new Set(TABLES.map(t => t.key))
@@ -70,7 +69,7 @@ export default function YedekModule({ firma }: AppCtx) {
     const { data, error } = await supabase
       .from(key as any)
       .select('*')
-      .eq('firma_id', firma.id)
+      .in('firma_id', firmaIds)
       .order('created_at', { ascending: true })
 
     if (error) throw new Error(error.message)
@@ -244,7 +243,7 @@ export default function YedekModule({ firma }: AppCtx) {
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-xl backdrop-blur-2xl">
+      <div className="rounded-[24px] border border-blue-100 bg-white/5 p-5 shadow-2xl backdrop-blur-2xl relative overflow-hidden">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/15 text-blue-300">
@@ -264,18 +263,26 @@ export default function YedekModule({ firma }: AppCtx) {
             <button
               onClick={() => runBackup('json')}
               disabled={running || selected.size === 0}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-40"
+              className="group flex items-center gap-2 px-1.5 py-1.5 pr-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-blue-100 transition-all duration-300 disabled:opacity-50"
             >
-              {running ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-              JSON
+              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shadow-lg border border-slate-200 bg-gradient-to-b from-amber-500 to-orange-600 relative overflow-hidden">
+                 <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent opacity-50 pointer-events-none" />
+                 <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                 {running ? <Loader2 size={14} className="animate-spin text-white drop-shadow-md relative z-10" /> : <Download size={14} className="text-white drop-shadow-md relative z-10" />}
+              </div>
+              <span className="text-xs font-semibold text-amber-400 tracking-wide">JSON</span>
             </button>
             <button
               onClick={() => runBackup('excel')}
               disabled={running || selected.size === 0}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-500 disabled:opacity-40"
+              className="group flex items-center gap-2 px-1.5 py-1.5 pr-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-blue-100 transition-all duration-300 disabled:opacity-50"
             >
-              {running ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
-              Excel
+              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shadow-lg border border-slate-200 bg-gradient-to-b from-emerald-500 to-green-600 relative overflow-hidden">
+                 <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent opacity-50 pointer-events-none" />
+                 <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                 {running ? <Loader2 size={14} className="animate-spin text-white drop-shadow-md relative z-10" /> : <FileSpreadsheet size={14} className="text-white drop-shadow-md relative z-10" />}
+              </div>
+              <span className="text-xs font-semibold text-emerald-400 tracking-wide">Excel</span>
             </button>
           </div>
         </div>
@@ -283,7 +290,7 @@ export default function YedekModule({ firma }: AppCtx) {
 
       {/* Progress bar */}
       {running && (
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 px-5 py-4">
+        <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white/90 px-5 py-4">
           <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
             <span>Yedekleniyor...</span>
             <span>{doneCount} / {selected.size} tablo</span>
@@ -298,9 +305,9 @@ export default function YedekModule({ firma }: AppCtx) {
       )}
 
       {/* Table selection */}
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/50 shadow-2xl backdrop-blur-xl">
+      <div className="overflow-hidden rounded-[24px] border border-blue-100 bg-white/5 shadow-2xl backdrop-blur-2xl relative">
         {/* Topbar */}
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-3">
             <Database size={16} className="text-slate-400" />
             <span className="text-sm font-semibold text-white">Yedeklenecek Tablolar</span>
@@ -334,7 +341,7 @@ export default function YedekModule({ firma }: AppCtx) {
                       className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-all ${
                         isSelected
                           ? 'border-blue-500/30 bg-blue-500/10'
-                          : 'border-white/5 bg-white/5 opacity-50'
+                          : 'border-slate-100 bg-white/5 opacity-50'
                       }`}
                     >
                       <input
@@ -371,7 +378,7 @@ export default function YedekModule({ firma }: AppCtx) {
 
         {/* Footer stats — after backup */}
         {doneCount > 0 && !running && (
-          <div className="border-t border-white/5 px-5 py-4">
+          <div className="border-t border-slate-100 px-5 py-4">
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-2">
                 <RefreshCw size={14} className="text-emerald-400" />

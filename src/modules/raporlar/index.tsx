@@ -5,7 +5,7 @@ import { BarChart3, CalendarRange, Download, FileSpreadsheet, FileText, Landmark
 import { supabase } from '@/lib/supabase'
 import { cls, ErrorMsg, Loading } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
-import type { BordroSurec, Cek, KullaniciProfil, MaliyetSureci, Musteri, Proje } from '@/types'
+import type { BordroSurec, Cek, KullaniciProfil, MaliyetSureci, Proje } from '@/types'
 
 type ReportType = 'all' | 'gunluk' | 'periyodik' | 'bordro' | 'maliyet' | 'cekler' | 'kasa'
 
@@ -324,12 +324,11 @@ async function exportStyledPdf(fileName: string, sheet: ReportSheet) {
   doc.save(`${fileName}.pdf`)
 }
 
-export default function Raporlar({ firma }: AppCtx) {
+export default function Raporlar({ firma, firmaIds }: AppCtx) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [period, setPeriod] = useState('son3ay')
   const [reportType, setReportType] = useState<ReportType>('all')
-  const [selectedMusteri, setSelectedMusteri] = useState('')
   const [selectedProje, setSelectedProje] = useState('all')
   const [selectedKullanici, setSelectedKullanici] = useState('all')
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all')
@@ -340,23 +339,11 @@ export default function Raporlar({ firma }: AppCtx) {
   const [maliyet, setMaliyet] = useState<MaliyetSureci[]>([])
   const [cekler, setCekler] = useState<Cek[]>([])
   const [kasa, setKasa] = useState<KasaHareket[]>([])
-  const [musteriler, setMusteriler] = useState<Musteri[]>([])
   const [projeler, setProjeler] = useState<Proje[]>([])
   const [kullanicilar, setKullanicilar] = useState<KullaniciProfil[]>([])
   const [exporting, setExporting] = useState<string | null>(null)
 
-  useEffect(() => { load() }, [firma.id, period])
-
-  useEffect(() => {
-    if (musteriler.length > 0 && !selectedMusteri) {
-      const binyapi = musteriler.find(m => m.kisa_ad === 'Binyapı' || m.ad.includes('Binyapı'))
-      if (binyapi) {
-        setSelectedMusteri(binyapi.id)
-      } else if (musteriler.length > 0) {
-        setSelectedMusteri(musteriler[0].id)
-      }
-    }
-  }, [musteriler, selectedMusteri])
+  useEffect(() => { load() }, [firmaIds.join(','), period])
 
   async function load() {
     setLoading(true)
@@ -371,19 +358,17 @@ export default function Raporlar({ firma }: AppCtx) {
         maliyetRes,
         cekRes,
         kasaRes,
-        musteriRes,
         projeRes,
         kullaniciRes,
       ] = await Promise.all([
-        supabase.from('gunluk_isler').select('*').eq('firma_id', firma.id).gte('tarih', periodStartIso).order('tarih', { ascending: false }),
-        supabase.from('is_takip').select('*').eq('firma_id', firma.id).order('donem', { ascending: false }),
-        supabase.from('bordro_surecler').select('*').eq('firma_id', firma.id).order('donem', { ascending: false }),
-        supabase.from('maliyet_surecler').select('*').eq('firma_id', firma.id).order('donem', { ascending: false }),
-        supabase.from('cekler').select('*').eq('firma_id', firma.id).gte('vade_tarihi', periodStartIso).order('vade_tarihi', { ascending: false }),
-        supabase.from('kasa_hareketleri').select('*').eq('firma_id', firma.id).gte('tarih', periodStartIso).order('tarih', { ascending: false }),
-        supabase.from('musteriler').select('*').eq('firma_id', firma.id).order('ad'),
-        supabase.from('projeler').select('*').eq('firma_id', firma.id).order('ad'),
-        supabase.from('kullanici_profilleri').select('*').eq('firma_id', firma.id).eq('aktif', true).order('ad_soyad'),
+        supabase.from('gunluk_isler').select('*').in('firma_id', firmaIds).gte('tarih', periodStartIso).order('tarih', { ascending: false }),
+        supabase.from('is_takip').select('*').in('firma_id', firmaIds).order('donem', { ascending: false }),
+        supabase.from('bordro_surecler').select('*').in('firma_id', firmaIds).order('donem', { ascending: false }),
+        supabase.from('maliyet_surecler').select('*').in('firma_id', firmaIds).order('donem', { ascending: false }),
+        supabase.from('cekler').select('*').in('firma_id', firmaIds).gte('vade_tarihi', periodStartIso).order('vade_tarihi', { ascending: false }),
+        supabase.from('kasa_hareketleri').select('*').in('firma_id', firmaIds).gte('tarih', periodStartIso).order('tarih', { ascending: false }),
+        supabase.from('projeler').select('*').in('firma_id', firmaIds).order('ad'),
+        supabase.from('kullanici_profilleri').select('*').in('firma_id', firmaIds).eq('aktif', true).order('ad_soyad'),
       ])
 
       const firstError = [
@@ -393,7 +378,6 @@ export default function Raporlar({ firma }: AppCtx) {
         maliyetRes.error,
         cekRes.error,
         kasaRes.error,
-        musteriRes.error,
         projeRes.error,
         kullaniciRes.error,
       ].find(Boolean)
@@ -411,7 +395,6 @@ export default function Raporlar({ firma }: AppCtx) {
       setMaliyet(((maliyetRes.data || []) as MaliyetSureci[]).filter((item) => donemFilter(item.donem)))
       setCekler((cekRes.data || []) as Cek[])
       setKasa((kasaRes.data || []) as KasaHareket[])
-      setMusteriler((musteriRes.data || []) as Musteri[])
       setProjeler((projeRes.data || []) as Proje[])
       setKullanicilar((kullaniciRes.data || []) as KullaniciProfil[])
     } catch (e: any) {
@@ -421,10 +404,7 @@ export default function Raporlar({ firma }: AppCtx) {
     }
   }
 
-  const projeOptions = useMemo(() => {
-    if (selectedMusteri === 'all') return projeler
-    return projeler.filter((item) => item.musteri_id === selectedMusteri)
-  }, [projeler, selectedMusteri])
+  const projeOptions = projeler
 
   const filteredGunluk = useMemo(() => {
     return gunluk.filter((item) => {
@@ -438,29 +418,23 @@ export default function Raporlar({ firma }: AppCtx) {
   const filteredIsTakip = useMemo(() => {
     return isTakip.filter((item) => {
       if (reportType !== 'all' && reportType !== 'periyodik') return false
-      if (selectedMusteri && item.musteri_id !== selectedMusteri) return false
       if (statusFilter === 'tamamlandi' && item.durum !== 'tamamlandi') return false
       if (statusFilter === 'bekleyen' && item.durum === 'tamamlandi') return false
-      const musteri = musteriler.find((m) => m.id === item.musteri_id)
-      return includesSearch([item.tip, item.donem, item.notlar, musteri?.ad, musteri?.kisa_ad], search)
+      return includesSearch([item.tip, item.donem, item.notlar], search)
     })
-  }, [isTakip, musteriler, reportType, search, selectedMusteri, statusFilter])
+  }, [isTakip, reportType, search, statusFilter])
 
   const filteredBordro = useMemo(() => {
     return bordro.filter((item) => {
       if (reportType !== 'all' && reportType !== 'bordro') return false
       if (selectedProje !== 'all' && item.proje_id !== selectedProje) return false
-      if (selectedMusteri) {
-        const proje = projeler.find((p) => p.id === item.proje_id)
-        if (proje?.musteri_id !== selectedMusteri) return false
-      }
       const isDone = [item.puantaj_durum, item.bordro_durum, item.teyit_durum, item.odeme_durum, item.santiye_durum].every((step) => step === 'tamamlandi')
       if (statusFilter === 'tamamlandi' && !isDone) return false
       if (statusFilter === 'bekleyen' && isDone) return false
       const proje = projeler.find((p) => p.id === item.proje_id)
       return includesSearch([item.donem, item.notlar, proje?.ad], search)
     })
-  }, [bordro, projeler, reportType, search, selectedMusteri, selectedProje, statusFilter])
+  }, [bordro, projeler, reportType, search, selectedProje, statusFilter])
 
   const filteredMaliyet = useMemo(() => {
     return maliyet.filter((item) => {
@@ -476,87 +450,47 @@ export default function Raporlar({ firma }: AppCtx) {
   const filteredCekler = useMemo(() => {
     return cekler.filter((item) => {
       if (reportType !== 'all' && reportType !== 'cekler') return false
-      if (selectedMusteri && item.musteri_id !== selectedMusteri) return false
-      const isDone = item.durum !== 'bekliyor'
+      const isDone = item.durum !== 'odenecek'
       if (statusFilter === 'tamamlandi' && !isDone) return false
       if (statusFilter === 'bekleyen' && isDone) return false
-      const musteri = musteriler.find((m) => m.id === item.musteri_id)
-      return includesSearch([item.cek_no, item.banka, item.aciklama, item.durum, musteri?.ad, musteri?.kisa_ad], search)
+      return includesSearch([item.cek_no, item.banka, item.cari_hesap, item.aciklama, item.durum], search)
     })
-  }, [cekler, musteriler, reportType, search, selectedMusteri, statusFilter])
+  }, [cekler, reportType, search, statusFilter])
 
   const cekReportRows = useMemo(() => {
-    const grouped = new Map<string, Cek[]>()
-
-    filteredCekler.forEach((item) => {
-      const musteriAdi =
-        musteriler.find((m) => m.id === item.musteri_id)?.kisa_ad ||
-        musteriler.find((m) => m.id === item.musteri_id)?.ad ||
-        'Diger'
-
-      if (!grouped.has(musteriAdi)) grouped.set(musteriAdi, [])
-      grouped.get(musteriAdi)?.push(item)
-    })
-
-    const rows: (string | number)[][] = []
-
-    Array.from(grouped.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
-      .forEach(([musteriAdi, items]) => {
-        items.forEach((item) => {
-          rows.push([
-            item.tip === 'alinan' ? 'Alinan' : 'Verilen',
-            musteriAdi,
-            item.cek_no,
-            item.banka || '-',
-            formatDate(item.vade_tarihi),
-            item.durum,
-            item.tutar,
-            item.aciklama || '-',
-          ])
-        })
-
-        rows.push([
-          '',
-          `${musteriAdi} Ara Toplam`,
-          '',
-          '',
-          '',
-          '',
-          items.reduce((sum, item) => sum + Number(item.tutar || 0), 0),
-          '',
-        ])
-      })
+    const rows: (string | number)[][] = filteredCekler.map((item) => [
+      item.tip === 'alinan' ? 'Alinan' : 'Verilen',
+      item.cek_no,
+      item.banka || '-',
+      formatDate(item.vade_tarihi),
+      item.durum,
+      item.tutar,
+      item.cari_hesap || '-',
+      item.aciklama || '-',
+    ])
 
     if (rows.length > 0) {
       rows.push([
-        '',
-        'Genel Toplam',
-        '',
-        '',
-        '',
-        '',
+        'Genel Toplam', '', '', '', '',
         filteredCekler.reduce((sum, item) => sum + Number(item.tutar || 0), 0),
-        '',
+        '', '',
       ])
     }
 
     return rows
-  }, [filteredCekler, musteriler])
+  }, [filteredCekler])
 
   const filteredKasa = useMemo(() => {
     return kasa.filter((item) => {
       if (reportType !== 'all' && reportType !== 'kasa') return false
       if (selectedKullanici !== 'all' && item.kullanici_id !== selectedKullanici) return false
-      if (selectedMusteri && item.musteri_id !== selectedMusteri) return false
       const isIncome = (item.tur || item.hareket_turu) === 'gelir'
       if (statusFilter === 'tamamlandi' && !isIncome) return false
       if (statusFilter === 'bekleyen' && isIncome) return false
-      const musteri = musteriler.find((m) => m.id === item.musteri_id)
       const kullanici = kullanicilar.find((k) => k.id === item.kullanici_id)
-      return includesSearch([item.kategori, item.aciklama, item.odeme_sekli, item.tur, item.hareket_turu, musteri?.ad, musteri?.kisa_ad, kullanici?.ad_soyad], search)
+      return includesSearch([item.kategori, item.aciklama, item.odeme_sekli, item.tur, item.hareket_turu, kullanici?.ad_soyad], search)
     })
-  }, [kasa, musteriler, kullanicilar, reportType, search, selectedMusteri, selectedKullanici, statusFilter])
+  }, [kasa, kullanicilar, reportType, search, selectedKullanici, statusFilter])
 
   const sheets = useMemo(() => {
     const gunlukSheet: ReportSheet = {
@@ -585,10 +519,9 @@ export default function Raporlar({ firma }: AppCtx) {
       title: 'Periyodik Isler Raporu',
       subtitle: `${firma.ad} · ${PERIOD_LABEL[period]} · Beyanname ve takip surecleri`,
       accent: '315BA8',
-      headers: ['Donem', 'Musteri', 'Is Tipi', 'Adim 1', 'Adim 2', 'Genel Durum', 'Hatirlatma', 'Not'],
+      headers: ['Donem', 'Is Tipi', 'Adim 1', 'Adim 2', 'Genel Durum', 'Hatirlatma', 'Not'],
       rows: filteredIsTakip.map((item) => [
         item.donem,
-        musteriler.find((m) => m.id === item.musteri_id)?.kisa_ad || musteriler.find((m) => m.id === item.musteri_id)?.ad || '-',
         IS_TIP_LABEL[item.tip] || item.tip,
         item.adim1_durum === 'tamamlandi' ? `Tamamlandi (${formatDate(item.adim1_tarihi)})` : 'Bekliyor',
         item.adim2_durum === 'tamamlandi' ? `Tamamlandi (${formatDate(item.adim2_tarihi)})` : 'Bekliyor',
@@ -612,11 +545,11 @@ export default function Raporlar({ firma }: AppCtx) {
       rows: filteredBordro.map((item) => [
         item.donem,
         projeler.find((p) => p.id === item.proje_id)?.ad || '-',
-        item.puantaj_durum,
-        item.bordro_durum,
-        item.teyit_durum,
-        item.odeme_durum,
-        item.santiye_durum,
+        item.puantaj_durum || '-',
+        item.bordro_durum || '-',
+        item.teyit_durum || '-',
+        item.odeme_durum || '-',
+        item.santiye_durum || '-',
         item.notlar || '-',
       ]),
       summary: [
@@ -655,13 +588,13 @@ export default function Raporlar({ firma }: AppCtx) {
       title: 'Cek Takibi Raporu',
       subtitle: `${firma.ad} · ${PERIOD_LABEL[period]} · Alinan ve verilen cek hareketleri`,
       accent: '996C1F',
-      headers: ['Tip', 'Musteri', 'Cek No', 'Banka', 'Vade Tarihi', 'Durum', 'Tutar', 'Aciklama'],
+      headers: ['Tip', 'Cek No', 'Banka', 'Vade Tarihi', 'Durum', 'Tutar', 'Cari Hesap', 'Aciklama'],
       rows: cekReportRows,
       summary: [
         { label: 'Toplam Cek', value: filteredCekler.length },
         { label: 'Genel Toplam', value: MONEY.format(filteredCekler.reduce((sum, item) => sum + Number(item.tutar || 0), 0)) + ' TL' },
-        { label: 'Bekleyen Tutar', value: MONEY.format(filteredCekler.filter((item) => item.durum === 'bekliyor').reduce((sum, item) => sum + Number(item.tutar || 0), 0)) + ' TL' },
-        { label: 'Islem Gormus', value: filteredCekler.filter((item) => item.durum !== 'bekliyor').length },
+        { label: 'Bekleyen Tutar', value: MONEY.format(filteredCekler.filter((item) => item.durum === 'odenecek').reduce((sum, item) => sum + Number(item.tutar || 0), 0)) + ' TL' },
+        { label: 'Islem Gormus', value: filteredCekler.filter((item) => item.durum !== 'odenecek').length },
       ],
     }
 
@@ -670,10 +603,9 @@ export default function Raporlar({ firma }: AppCtx) {
       title: 'Kasa Hareketleri Raporu',
       subtitle: `${firma.ad} · ${PERIOD_LABEL[period]} · Gelir ve gider hareketleri`,
       accent: '245B5A',
-      headers: ['Tarih', 'Müşteri', 'Sorumlu', 'Tür', 'Kategori', 'Açıklama', 'Ödeme Şekli', 'Tutar'],
+      headers: ['Tarih', 'Sorumlu', 'Tür', 'Kategori', 'Açıklama', 'Ödeme Şekli', 'Tutar'],
       rows: filteredKasa.map((item) => [
         formatDate(item.tarih),
-        musteriler.find((m) => m.id === item.musteri_id)?.kisa_ad || musteriler.find((m) => m.id === item.musteri_id)?.ad || '-',
         kullanicilar.find((k) => k.id === item.kullanici_id)?.ad_soyad || '-',
         (item.tur || item.hareket_turu) === 'gelir' ? 'Gelir' : 'Gider',
         item.kategori || '-',
@@ -689,7 +621,7 @@ export default function Raporlar({ firma }: AppCtx) {
     }
 
     return [gunlukSheet, periyodikSheet, bordroSheet, maliyetSheet, cekSheet, kasaSheet]
-  }, [cekReportRows, filteredBordro, filteredCekler, filteredGunluk, filteredIsTakip, filteredKasa, filteredMaliyet, firma.ad, kullanicilar, musteriler, period, projeler])
+  }, [cekReportRows, filteredBordro, filteredCekler, filteredGunluk, filteredIsTakip, filteredKasa, filteredMaliyet, firma.ad, kullanicilar, period, projeler])
 
   const cards: ReportCard[] = useMemo(() => {
     const iconMap = {
@@ -750,9 +682,9 @@ export default function Raporlar({ firma }: AppCtx) {
       <div className="glass-panel rounded-3xl p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[rgba(116,166,255,0.82)]">Rapor Merkezi</p>
-            <h1 className="mt-2 text-2xl font-bold text-white">Profesyonel Excel ve PDF surec raporlari</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[rgba(230,236,245,0.72)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Rapor Merkezi</p>
+            <h1 className="mt-2 text-2xl font-bold text-slate-800">Profesyonel Excel ve PDF surec raporlari</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               Tum surecler icin kurumsal formatta disa aktarim alin. Tek bir Excel dosyasi icinde tum surecler ayri sheet olarak olusturulur;
               ayrica her surec icin ozel PDF ve Excel ciktilari uretilir.
             </p>
@@ -772,15 +704,14 @@ export default function Raporlar({ firma }: AppCtx) {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-lg font-bold text-white">Gelismis Filtreler</h2>
-              <p className="mt-1 text-sm text-[rgba(230,236,245,0.64)]">
+              <h2 className="text-lg font-bold text-slate-800">Gelismis Filtreler</h2>
+              <p className="mt-1 text-sm text-slate-600">
                 Raporlari surec turu, musteri, proje, sorumlu, durum ve serbest arama kriterlerine gore daraltin.
               </p>
             </div>
             <button
               onClick={() => {
                 setReportType('all')
-                setSelectedMusteri('all')
                 setSelectedProje('all')
                 setSelectedKullanici('all')
                 setStatusFilter('all')
@@ -795,9 +726,6 @@ export default function Raporlar({ firma }: AppCtx) {
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <select className={cls.input} value={reportType} onChange={(e) => setReportType(e.target.value as ReportType)}>
               {REPORT_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <select className={cls.input} value={selectedMusteri} onChange={(e) => { setSelectedMusteri(e.target.value); setSelectedProje('all') }}>
-              {musteriler.map((item) => <option key={item.id} value={item.id}>{item.kisa_ad || item.ad}</option>)}
             </select>
             <select className={`${cls.input} ${!['all', 'bordro'].includes(reportType) ? 'opacity-60' : ''}`} value={selectedProje} onChange={(e) => setSelectedProje(e.target.value)} disabled={!['all', 'bordro'].includes(reportType)}>
               <option value="all">Tum Projeler</option>
@@ -814,21 +742,21 @@ export default function Raporlar({ firma }: AppCtx) {
           </div>
 
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
-            <div className="rounded-2xl border border-[rgba(162,180,206,0.14)] bg-[rgba(8,18,34,0.52)] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[rgba(155,176,206,0.64)]">Secili Surec</p>
-              <p className="mt-2 text-sm font-semibold text-white">{REPORT_TYPE_OPTIONS.find((item) => item.value === reportType)?.label}</p>
+            <div className="rounded-2xl border border-blue-100 bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Secili Surec</p>
+              <p className="mt-2 text-sm font-semibold text-slate-800">{REPORT_TYPE_OPTIONS.find((item) => item.value === reportType)?.label}</p>
             </div>
-            <div className="rounded-2xl border border-[rgba(162,180,206,0.14)] bg-[rgba(8,18,34,0.52)] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[rgba(155,176,206,0.64)]">Gorunen Sheet</p>
-              <p className="mt-2 text-sm font-semibold text-white">{visibleSheets.length}</p>
+            <div className="rounded-2xl border border-blue-100 bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Gorunen Sheet</p>
+              <p className="mt-2 text-sm font-semibold text-slate-800">{visibleSheets.length}</p>
             </div>
-            <div className="rounded-2xl border border-[rgba(162,180,206,0.14)] bg-[rgba(8,18,34,0.52)] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[rgba(155,176,206,0.64)]">Toplam Kayit</p>
-              <p className="mt-2 text-sm font-semibold text-white">{totalVisibleRows}</p>
+            <div className="rounded-2xl border border-blue-100 bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Toplam Kayit</p>
+              <p className="mt-2 text-sm font-semibold text-slate-800">{totalVisibleRows}</p>
             </div>
-            <div className="rounded-2xl border border-[rgba(162,180,206,0.14)] bg-[rgba(8,18,34,0.52)] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[rgba(155,176,206,0.64)]">Durum Filtresi</p>
-              <p className="mt-2 text-sm font-semibold text-white">{STATUS_OPTIONS.find((item) => item.value === statusFilter)?.label}</p>
+            <div className="rounded-2xl border border-blue-100 bg-white p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Durum Filtresi</p>
+              <p className="mt-2 text-sm font-semibold text-slate-800">{STATUS_OPTIONS.find((item) => item.value === statusFilter)?.label}</p>
             </div>
           </div>
         </div>
@@ -844,10 +772,10 @@ export default function Raporlar({ firma }: AppCtx) {
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: `#${card.accent}20`, border: `1px solid #${card.accent}35` }}>
                     <Icon size={22} style={{ color: `#${card.accent}` }} />
                   </div>
-                  <h3 className="text-lg font-bold text-white">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[rgba(230,236,245,0.68)]">{card.description}</p>
+                  <h3 className="text-lg font-bold text-slate-800">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
                 </div>
-                <span className="rounded-full border border-[rgba(162,180,206,0.16)] bg-[rgba(18,32,54,0.72)] px-3 py-1 text-xs font-semibold text-[rgba(245,247,251,0.85)]">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
                   {card.count} satir
                 </span>
               </div>
@@ -865,12 +793,12 @@ export default function Raporlar({ firma }: AppCtx) {
       </div>
 
       <div className="glass-panel rounded-3xl p-5 sm:p-6">
-        <h2 className="text-lg font-bold text-white">Rapor Kapsami</h2>
+        <h2 className="text-lg font-bold text-slate-800">Rapor Kapsami</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visibleSheets.map((sheet) => (
-            <div key={sheet.key} className="rounded-2xl border border-[rgba(162,180,206,0.14)] bg-[rgba(8,18,34,0.52)] p-4">
-              <p className="text-sm font-semibold text-white">{sheet.title}</p>
-              <p className="mt-1 text-xs text-[rgba(230,236,245,0.56)]">{sheet.rows.length} kayit · {sheet.headers.length} kolon</p>
+            <div key={sheet.key} className="rounded-2xl border border-blue-100 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-800">{sheet.title}</p>
+              <p className="mt-1 text-xs text-slate-500">{sheet.rows.length} kayit · {sheet.headers.length} kolon</p>
             </div>
           ))}
         </div>

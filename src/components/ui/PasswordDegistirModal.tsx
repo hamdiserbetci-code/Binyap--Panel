@@ -16,7 +16,7 @@ const FormField = ({ label, children, required }: { label: string, children: Rea
 )
 
 const Modal = ({ title, onClose, children, footer }: { title: string, onClose: () => void, children: React.ReactNode, footer: React.ReactNode }) => (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <h3 className="font-bold text-slate-800 text-lg p-5 border-b border-slate-100">{title}</h3>
         <div className="p-5">{children}</div>

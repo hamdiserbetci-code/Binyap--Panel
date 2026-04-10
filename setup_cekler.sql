@@ -5,10 +5,11 @@ CREATE TABLE IF NOT EXISTS cekler (
     tip TEXT NOT NULL CHECK (tip IN ('alinan', 'verilen')),
     cek_no TEXT NOT NULL,
     banka TEXT,
+    cari_hesap TEXT,
     tutar NUMERIC(12,2) NOT NULL DEFAULT 0,
     keside_tarihi DATE,
     vade_tarihi DATE NOT NULL,
-    durum TEXT NOT NULL DEFAULT 'bekliyor' CHECK (durum IN ('bekliyor', 'tahsil_edildi', 'odendi', 'karsiliksiz', 'iade_edildi', 'ciro_edildi')),
+    durum TEXT NOT NULL DEFAULT 'odenecek' CHECK (durum IN ('odenecek', 'odendi')),
     aciklama TEXT,
     hatirlatici_tarihi DATE,
     hatirlatici_saati TEXT,
@@ -21,6 +22,7 @@ ALTER TABLE cekler ADD COLUMN IF NOT EXISTS hatirlatici_tarihi DATE;
 ALTER TABLE cekler ADD COLUMN IF NOT EXISTS hatirlatici_saati TEXT;
 ALTER TABLE cekler ADD COLUMN IF NOT EXISTS hatirlat_gun_once INTEGER DEFAULT 1;
 ALTER TABLE cekler ADD COLUMN IF NOT EXISTS tamamlandi_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE cekler ADD COLUMN IF NOT EXISTS cari_hesap TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_cekler_firma ON cekler(firma_id);
 CREATE INDEX IF NOT EXISTS idx_cekler_vade ON cekler(vade_tarihi);

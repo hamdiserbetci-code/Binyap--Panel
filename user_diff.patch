@@ -1,0 +1,160 @@
+diff --git a/src/components/ik/BordroPage.tsx b/src/components/ik/BordroPage.tsx
+index c9d4898..f016b2d 100644
+--- a/src/components/ik/BordroPage.tsx
++++ b/src/components/ik/BordroPage.tsx
+@@ -130,78 +130,82 @@ export default function BordroPage({ firma, userId }: Props) {
+     setEkipSaving(true); setEkipError('')
+     const { error } = editingEkip
+       ? await supabase.from('ekipler').update({ ad: ekipForm.ad, proje_id: ekipForm.proje_id }).eq('id', editingEkip.id)
+       : await supabase.from('ekipler').insert({ firma_id: firma.id, proje_id: ekipForm.proje_id, ad: ekipForm.ad })
+     if (error) { setEkipError(error.message); setEkipSaving(false); return }
+     setEkipModal(false); fetchAll(); setEkipSaving(false)
+   }
+   async function delEkip(id: string) {
+     if (!confirm('Ekip ve ilgili kayýtlar silinecek. Emin misiniz?')) return
+     await supabase.from('bordro').delete().eq('ekip_id', id)
+     await supabase.from('puantajlar').delete().eq('ekip_id', id)
+     await supabase.from('ekipler').delete().eq('id', id)
+     fetchAll()
+   }
+ 
+   // ==== PUANTAJ ====
+   function openPuantajModal(projeId?: string, ekipId?: string) {
+     setPuantajForm({ proje_id: projeId || '', ekip_id: ekipId || '', donem: selectedDonem })
+     setPuantajFile(null); setPuantajError(''); setPuantajModal(true)
+   }
++  
++  // Dosyayý base64'e çevir
++  function fileToBase64(file: File): Promise<string> {
++    return new Promise((resolve, reject) => {
++      const reader = new FileReader()
++      reader.readAsDataURL(file)
++      reader.onload = () => resolve(reader.result as string)
++      reader.onerror = reject
++    })
++  }
++  
+   async function uploadPuantaj() {
+     if (!puantajFile || !puantajForm.proje_id || !puantajForm.ekip_id) {
+       setPuantajError('Proje, ekip ve dosya zorunludur.'); return
+     }
+     setPuantajUploading(true); setPuantajError('')
+-    const tip = dosyaTipiBelirle(puantajFile)
+-    // Dosya adýný temizle: boþluk -> _, özel karakterleri kaldýr
+-    const temizAd = puantajFile.name
+-      .replace(/\s+/g, '_')
+-      .replace(/[^a-zA-Z0-9._-]/g, '')
+-    const dosyaYolu = ${firma.id}//_
+-
+-    const { error: uploadError } = await supabase.storage
+-      .from('puantajlar')
+-      .upload(dosyaYolu, puantajFile, { upsert: true })
+-
+-    if (uploadError) {
+-      setPuantajError(uploadError.message); setPuantajUploading(false); return
++    
++    try {
++      const tip = dosyaTipiBelirle(puantajFile)
++      // Dosyayý base64'e çevir
++      const base64Data = await fileToBase64(puantajFile)
++      
++      // Base64 veriyi veritabanýna kaydet
++      const { error: dbError } = await supabase.from('puantajlar').insert({
++        firma_id: firma.id,
++        proje_id: puantajForm.proje_id,
++        ekip_id: puantajForm.ekip_id,
++        donem: puantajForm.donem,
++        dosya_adi: puantajFile.name,
++        dosya_url: base64Data, // base64 data URL
++        dosya_tipi: tip,
++      })
++      if (dbError) { setPuantajError(dbError.message); setPuantajUploading(false); return }
++      setPuantajModal(false); fetchAll(); setPuantajUploading(false)
++    } catch (err: any) {
++      setPuantajError(err.message || 'Dosya yüklenirken hata oluþtu')
++      setPuantajUploading(false)
+     }
+-
+-    const { data: urlData } = supabase.storage.from('puantajlar').getPublicUrl(dosyaYolu)
+-    const { error: dbError } = await supabase.from('puantajlar').insert({
+-      firma_id: firma.id,
+-      proje_id: puantajForm.proje_id,
+-      ekip_id: puantajForm.ekip_id,
+-      donem: puantajForm.donem,
+-      dosya_adi: puantajFile.name,
+-      dosya_url: urlData.publicUrl,
+-      dosya_tipi: tip,
+-    })
+-    if (dbError) { setPuantajError(dbError.message); setPuantajUploading(false); return }
+-    setPuantajModal(false); fetchAll(); setPuantajUploading(false)
+   }
+-  async function delPuantaj(id: string, dosyaUrl: string) {
++  
++  async function delPuantaj(id: string) {
+     if (!confirm('Dosya silinsin mi?')) return
+-    // Storage'dan sil
+-    const path = dosyaUrl.split('/puantajlar/')[1]
+-    if (path) await supabase.storage.from('puantajlar').remove([path])
+     await supabase.from('puantajlar').delete().eq('id', id)
+     fetchAll()
+   }
+ 
+   // ==== BORDRO ====
+   const calcNet = (f: any) => {
+     const b = parseFloat(f.brut)||0, s = parseFloat(f.sgk_isci)||0
+     const v = parseFloat(f.vergi)||0, a = parseFloat(f.avans)||0, k = parseFloat(f.kesinti)||0
+     return Math.round((b - s - v - a - k) * 100) / 100
+   }
+   function openBordroModal(item?: Bordro) {
+     setEditingBordro(item || null)
+     setBordroForm(item ? {
+       proje_id: item.proje_id, ekip_id: item.ekip_id, donem: item.donem,
+       brut: String(item.brut), sgk_isci: String(item.sgk_isci),
+       sgk_isveren: String(item.sgk_isveren), vergi: String(item.vergi),
+       avans: String(item.avans), kesinti: String(item.kesinti),
+     } : { ...emptyBordro, donem: selectedDonem })
+     setBordroError(''); setBordroModal(true)
+   }
+@@ -419,41 +423,41 @@ export default function BordroPage({ firma, userId }: Props) {
+                             </button>
+                           </div>
+                           {ekipDosyalar.length === 0 ? (
+                             <p className="text-center text-slate-300 text-xs py-4">Bu ekip için dosya yok</p>
+                           ) : (
+                             <div className="divide-y divide-slate-50">
+                               {ekipDosyalar.map(d => (
+                                 <div key={d.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/50">
+                                   <div className="flex items-center gap-2 min-w-0">
+                                     {dosyaIkonu(d.dosya_tipi)}
+                                     <span className="text-sm text-slate-700 truncate max-w-[300px]">{d.dosya_adi}</span>
+                                     <span className="text-[10px] text-slate-400 flex-shrink-0">
+                                       {new Date(d.yuklenme_tarihi).toLocaleDateString('tr-TR')}
+                                     </span>
+                                   </div>
+                                   <div className="flex items-center gap-1 flex-shrink-0">
+                                     <a href={d.dosya_url} target="_blank" rel="noopener noreferrer"
+                                       className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500">
+                                       <ExternalLink size={12}/>
+                                     </a>
+-                                    <button onClick={() => delPuantaj(d.id, d.dosya_url)}
++                                    <button onClick={() => delPuantaj(d.id)}
+                                       className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500">
+                                       <Trash2 size={12}/>
+                                     </button>
+                                   </div>
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+                         </div>
+                       )
+                     })}
+                   </div>
+                 )}
+               </div>
+             )
+          })}
+        </div>
+      )}
+ 
+      {/* == BORDRO == */}

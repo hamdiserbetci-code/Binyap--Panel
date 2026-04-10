@@ -46,19 +46,19 @@ ALTER TABLE maliyet_surecler ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "kullanici_kendi_firmasi_maliyet_secer" ON maliyet_surecler;
 CREATE POLICY "kullanici_kendi_firmasi_maliyet_secer" ON maliyet_surecler FOR SELECT
-USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
+USING (auth.role() = 'authenticated' AND firma_id = current_firma_id());
 
 DROP POLICY IF EXISTS "kullanici_kendi_firmasi_maliyet_ekler" ON maliyet_surecler;
 CREATE POLICY "kullanici_kendi_firmasi_maliyet_ekler" ON maliyet_surecler FOR INSERT
-WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
+WITH CHECK (auth.role() = 'authenticated' AND firma_id = current_firma_id());
 
 DROP POLICY IF EXISTS "kullanici_kendi_firmasi_maliyet_gunceller" ON maliyet_surecler;
 CREATE POLICY "kullanici_kendi_firmasi_maliyet_gunceller" ON maliyet_surecler FOR UPDATE
-USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
+USING (auth.role() = 'authenticated' AND firma_id = current_firma_id());
 
 DROP POLICY IF EXISTS "kullanici_kendi_firmasi_maliyet_siler" ON maliyet_surecler;
 CREATE POLICY "kullanici_kendi_firmasi_maliyet_siler" ON maliyet_surecler FOR DELETE
-USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
+USING (auth.role() = 'authenticated' AND firma_id = current_firma_id());
 
 -- Yetkiler
 GRANT ALL ON TABLE maliyet_surecler TO authenticated;

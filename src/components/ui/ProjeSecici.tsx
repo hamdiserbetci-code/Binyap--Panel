@@ -38,17 +38,12 @@ export default function ProjeSecici({ firmaId, onSelect }: ProjeSeciciProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor="proje-secici" className="text-sm font-medium text-[rgba(235,235,245,0.7)]">
+      <label htmlFor="proje-secici" className="text-sm font-medium text-slate-600">
         Proje:
       </label>
       <select
         id="proje-secici"
-        className={[
-          'w-full rounded-lg border border-[rgba(168,185,212,0.18)] bg-[rgba(8,18,34,0.84)]',
-          'px-3 py-1.5 text-sm font-medium text-[rgba(245,247,251,0.96)] placeholder:text-[rgba(230,236,245,0.40)]',
-          'outline-none focus:border-[rgba(116,166,255,0.55)] focus:ring-1 focus:ring-[rgba(116,166,255,0.15)]',
-          'transition-all disabled:opacity-40',
-        ].join(' ')}
+        className="w-full rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20 transition-all disabled:opacity-40"
         value={seciliProje ?? ''}
         onChange={handleProjeChange}
       >

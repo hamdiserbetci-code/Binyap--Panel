@@ -4,7 +4,9 @@
       "Bash(npm run:*)",
       "Bash(npx tsc:*)",
       "Bash(vercel --version)",
-      "Bash(node -e \"const d=require\\(''''/dev/stdin''''\\);console.log\\(''''main:'''',d.main,''''module:'''',d.module,''''exports:'''',JSON.stringify\\(d.exports,null,2\\)\\)\")"
+      "Bash(node -e \"const d=require\\(''''/dev/stdin''''\\);console.log\\(''''main:'''',d.main,''''module:'''',d.module,''''exports:'''',JSON.stringify\\(d.exports,null,2\\)\\)\")",
+      "Bash(vercel --prod)",
+      "Bash(node -e ':*)"
     ]
   }
 }

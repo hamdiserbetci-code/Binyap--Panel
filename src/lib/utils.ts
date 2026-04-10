@@ -1,4 +1,4 @@
-import { IsTip, Periyot, GorevDurum, Oncelik } from '@/types'
+import { IsTip, Periyot, GorevDurum, Oncelik, DokumanTipi } from '@/types'
 
 export const TIP_LABEL: Record<IsTip, string> = {
   beyanname: 'Beyanname',
@@ -46,6 +46,16 @@ export const DURUM_COLOR: Record<GorevDurum, string> = {
   kontrolde: 'bg-amber-100 text-amber-700',
   tamamlandi: 'bg-emerald-100 text-emerald-700',
   iptal: 'bg-red-100 text-red-600',
+}
+
+export const DOKUMAN_TIP_LABEL: Record<DokumanTipi, string> = {
+  fatura: 'Fatura',
+  sozlesme: 'Sözleşme',
+  rapor: 'Rapor',
+  irsaliye: 'İrsaliye',
+  makbuz: 'Makbuz',
+  genel_evrak: 'Genel Evrak',
+  diger: 'Diğer',
 }
 
 export const TARIH = (d: string | null | undefined) =>

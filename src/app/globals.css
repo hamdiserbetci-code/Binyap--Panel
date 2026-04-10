@@ -2,155 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Premium Glassmorphic Sistem Değişkenleri ─────────────────────────────── */
 :root {
-  --surface-base:       #07111f;
-  --surface-elevated:   rgba(10, 23, 41, 0.72);
-  --surface-soft:       rgba(18, 32, 54, 0.68);
-  --surface-strong:     rgba(27, 44, 70, 0.82);
-  --surface-border:     rgba(162, 180, 206, 0.18);
-  --surface-border-2:   rgba(162, 180, 206, 0.28);
-  --brand-primary:      #4c8bf5;
-  --brand-primary-2:    #74a6ff;
-  --brand-success:      #34c38f;
-  --brand-danger:       #f87171;
-  --brand-warning:      #f5b942;
-  --text-primary:       #f5f7fb;
-  --text-secondary:     rgba(245, 247, 251, 0.78);
-  --text-muted:         rgba(230, 236, 245, 0.52);
-  --field-bg:           rgba(8, 18, 34, 0.82);
-  --field-border:       rgba(168, 185, 212, 0.22);
-  --field-focus:        rgba(116, 166, 255, 0.45);
+  /* Light Ice-Blue Theme */
+  --surface-base:       #52BDE0;
+  --surface-elevated:   rgba(255, 255, 255, 0.92);
+  --surface-soft:       rgba(235, 245, 251, 0.85);
+  --surface-border:     rgba(59, 130, 246, 0.15);
+  --surface-border-strong: rgba(59, 130, 246, 0.3);
+
+  /* Brand Accents */
+  --brand-primary:      #3b82f6; /* blue-500 */
+  --brand-secondary:    #8b5cf6; /* violet-500 */
+  --brand-success:      #10b981; /* emerald-500 */
+  --brand-danger:       #ef4444; /* red-500 */
+  --brand-warning:      #f59e0b; /* amber-500 */
+
+  /* Text Colors */
+  --text-primary:       #1e293b; /* slate-800 */
+  --text-secondary:     #475569; /* slate-600 */
+  --text-muted:         #94a3b8; /* slate-400 */
 }
-html,
-body {
+
+html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+  background-color: var(--surface-base);
+  color: var(--text-primary);
 }
 
 body {
-  background: #f8fafc;
-  color: #0f172a;
-  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-th,
-td {
-  vertical-align: middle;
-}
-
-:root {
-  --app-bg: #f8fafc;
-  --card-bg: #ffffff;
-  --line: #e2e8f0;
-  --text: #0f172a;
-  --muted: #64748b;
-}
-* { box-sizing: border-box; }
-
-html {
-  -webkit-text-size-adjust: 100%;
-  font-size: 16px;
-}
-
-body {
-  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(76, 139, 245, 0.18), transparent 28%),
-    radial-gradient(circle at top right, rgba(148, 163, 184, 0.1), transparent 22%),
-    linear-gradient(180deg, #0b1422 0%, #07111f 52%, #050c17 100%);
-  background-attachment: fixed;
-  color: var(--text-primary);
-  margin: 0;
+  background: #52BDE0;
   min-height: 100vh;
   min-height: 100dvh;
-  overscroll-behavior: none;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.01em;
-  line-height: 1.5;
 }
 
-/* iOS Safe Area */
-.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
-.safe-area-pt { padding-top: env(safe-area-inset-top, 0px); }
-
-/* iOS tap highlight kaldır */
-* { -webkit-tap-highlight-color: transparent; }
-
-/* Aktif buton efekti */
-button:active { transform: scale(0.97); }
-
-/* Scrollbar — iOS'ta görünmez */
-::-webkit-scrollbar { width: 0; height: 0; }
-
-/* Select dark tema */
-select option { background-color: #102038; color: #F5F7FB; }
-
-input, select, textarea, button {
-  font: inherit;
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
-input::placeholder, textarea::placeholder {
-  color: var(--text-muted);
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.2);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.4);
 }
 
+.custom-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59,130,246,0.2) transparent;
+}
+
+/* Glass Panels — light version */
 .glass-panel {
-  background: var(--surface-elevated);
-  border: 1px solid var(--surface-border);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 18px 50px rgba(2, 8, 23, 0.34);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 4px 24px rgba(59, 130, 246, 0.08);
 }
 
-/* iOS switch toggle animasyonu */
-.ios-toggle {
-  transition: background-color 0.2s ease;
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* iOS Liste separator */
-.ios-list-item + .ios-list-item {
-  border-top: 1px solid var(--ios-separator);
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1);
 }
 
-/* Bottom sheet modal için */
-.ios-sheet-enter {
-  animation: sheetUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+/* Modern inputs & selects */
+input, select, textarea {
+  color-scheme: light;
 }
 
-@keyframes sheetUp {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
+/* Custom Animations */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Page content fade-in */
-.ios-fade {
-  animation: iosFade 0.25s ease;
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes iosFade {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+.animate-slide-down  { animation: slideDown  0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-scale  { animation: fadeInScale 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+.slide-in-right { animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.slide-in-up    { animation: slideInUp    0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.toast-in       { animation: toastIn      0.2s  cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* Sub-pixel rendering tricks for crisp text */
+.crisp-text {
+  text-shadow: 0 0 1px rgba(30,41,59,0.05);
 }

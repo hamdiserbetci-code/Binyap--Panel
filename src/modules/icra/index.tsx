@@ -4,19 +4,19 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus, Trash2, Pencil, FileDown, Search, CreditCard,
   ChevronDown, ChevronUp, AlertCircle, FileText,
-  Upload, X, Download, FileIcon,
+  Upload, X, Download, FileIcon, BellRing,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { AppCtx } from '@/app/page'
-import type { IcraTakibi, IcraOdeme, Musteri, IcraDurum, IcraIsciDurumu } from '@/types'
+import type { IcraTakibi, IcraOdeme, IcraDurum, IcraIsciDurumu } from '@/types'
 import { format } from 'date-fns'
 // ─── Yardımcı ────────────────────────────────────────────────────────────────
 const cls = {
-  btnPrimary: "flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all hover:bg-blue-500 disabled:opacity-40",
-  btnSecondary: "flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20 disabled:opacity-40",
-  btnGhost: "flex items-center justify-center text-slate-400 hover:bg-white/10 p-1.5 rounded-xl transition-all",
-  card: "rounded-3xl border border-white/10 bg-slate-900/50 shadow-2xl backdrop-blur-xl",
-  input: "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-blue-500 focus:bg-white/10 transition-all font-medium",
+  btnPrimary: "flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-105 hover:bg-blue-500 disabled:opacity-40 disabled:hover:scale-100",
+  btnSecondary: "flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-40",
+  btnGhost: "flex items-center justify-center text-slate-500 hover:bg-slate-100 p-1.5 rounded-xl transition-all",
+  card: "rounded-2xl border border-blue-100 bg-white shadow-sm",
+  input: "w-full bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20 transition-all font-medium",
   th: "px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider",
   td: "px-4 py-4",
 };
@@ -24,11 +24,11 @@ const cls = {
 const Modal = ({ title, onClose, children, footer, size = 'lg' }: { title: string, onClose: () => void, children: React.ReactNode, footer: React.ReactNode, size?: 'sm' | 'md' | 'lg' | 'xl' }) => {
   const sizeClass = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl' }[size]
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className={`bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full ${sizeClass}`} onClick={e => e.stopPropagation()}>
-        <h3 className="font-bold text-white text-lg p-5 border-b border-white/10">{title}</h3>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`bg-white border border-blue-100 rounded-2xl shadow-2xl w-full ${sizeClass}`} onClick={e => e.stopPropagation()}>
+        <h3 className="font-bold text-slate-800 text-lg p-5 border-b border-blue-100">{title}</h3>
         <div className="p-5 max-h-[80vh] overflow-y-auto">{children}</div>
-        <div className="flex justify-end gap-3 p-4 border-t border-white/10 bg-slate-950/50 rounded-b-2xl">
+        <div className="flex justify-end gap-3 p-4 border-t border-blue-100 bg-slate-50 rounded-b-2xl">
           {footer}
         </div>
       </div>
@@ -37,13 +37,13 @@ const Modal = ({ title, onClose, children, footer, size = 'lg' }: { title: strin
 }
 
 const ConfirmModal = ({ title, message, onConfirm, onCancel, danger }: { title: string, message: string, onConfirm: () => void, onCancel: () => void, danger?: boolean }) => (
-  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onCancel}>
-    <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-      <h3 className="font-bold text-white text-lg p-5">{title}</h3>
-      <p className="px-5 pb-5 text-slate-300">{message}</p>
-      <div className="flex justify-end gap-3 p-4 border-t border-white/10 bg-slate-950/50 rounded-b-2xl">
+  <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onCancel}>
+    <div className="bg-white border border-blue-100 rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <h3 className="font-bold text-slate-800 text-lg p-5">{title}</h3>
+      <p className="px-5 pb-5 text-slate-500">{message}</p>
+      <div className="flex justify-end gap-3 p-4 border-t border-blue-100 bg-slate-50 rounded-b-2xl">
         <button onClick={onCancel} className={cls.btnSecondary}>İptal</button>
-        <button onClick={onConfirm} className={danger ? "flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition-all hover:bg-red-500" : cls.btnPrimary}>
+        <button onClick={onConfirm} className={danger ? "flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-105 hover:bg-red-500" : cls.btnPrimary}>
           Onayla
         </button>
       </div>
@@ -59,7 +59,7 @@ const Field = ({ label, children, hint, required }: { label: string, children: R
   </div>
 )
 
-const Loading = () => <div className="p-8 text-center text-white">Yükleniyor...</div>
+const Loading = () => <div className="p-8 text-center text-slate-500">Yükleniyor...</div>
 const ErrorMsg = ({ message, onRetry }: { message: string, onRetry: () => void }) => (
   <div className="p-8 text-center text-red-400">
     <p>Hata: {message}</p>
@@ -87,19 +87,22 @@ const ISCI_STYLE: Record<IcraIsciDurumu, string> = {
   ayrildi:   'bg-red-500/15 text-red-400 border border-red-500/25',
 }
 
-const ACCEPT = '.doc,.docx,.xls,.xlsx,.pdf'
+const ACCEPT = '.doc,.docx,.xls,.xlsx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf'
 
 type IcraForm = Omit<IcraTakibi, 'id' | 'firma_id' | 'created_at' | 'updated_at' | 'musteri'>
 type OdemeForm = Omit<IcraOdeme, 'id' | 'icra_id' | 'firma_id' | 'created_at'>
 type CevapForm = {
-  cevap_veren_id: string   // musteri seçilirse ID, yoksa boş
-  cevap_veren: string      // manuel giriş
-  isveren_id: string
+  cevap_veren: string
   isveren: string
   isci_durumu: 'devam' | 'cikti'
   cikis_tarihi: string
   maas_tutari: string
   aciklamalar: string
+}
+
+interface IcraTakibiExt extends IcraTakibi {
+  hatirlatici_tarihi?: string | null;
+  hatirlatici_saati?: string | null;
 }
 
 const EMPTY_FORM: IcraForm = {
@@ -125,16 +128,17 @@ function fileExt(name: string) {
 }
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
-export default function IcraModule({ firma }: AppCtx) {
-  const [kayitlar, setKayitlar]   = useState<IcraTakibi[]>([])
+export default function IcraModule({ firma, firmalar, firmaIds }: AppCtx) {
+  const [kayitlar, setKayitlar]   = useState<IcraTakibiExt[]>([])
+  const [dosyaMap, setDosyaMap]   = useState<Record<string, any[]>>({})
   const [odemeler, setOdemeler]   = useState<Record<string, IcraOdeme[]>>({})
-  const [musteriler, setMusteriler] = useState<Musteri[]>([])
+
   const [loading, setLoading]     = useState(true)
   const [err, setErr]             = useState('')
   const [saving, setSaving]       = useState(false)
 
   // Modal — kayıt
-  const [modal, setModal]         = useState<{ id?: string; form: IcraForm } | null>(null)
+  const [modal, setModal]         = useState<{ id?: string; form: IcraForm, firma_id?: string } | null>(null)
   const [modalErr, setModalErr]   = useState('')
   const [deleteId, setDeleteId]   = useState<string | null>(null)
 
@@ -145,13 +149,21 @@ export default function IcraModule({ firma }: AppCtx) {
   const tebligatRef = useRef<HTMLInputElement>(null)
   const cevapRef    = useRef<HTMLInputElement>(null)
 
+  const [selFirmaId, setSelFirmaId] = useState(firma.id)
+
   // Modal — ödeme
-  const [odemeModal, setOdemeModal] = useState<{ icraId: string; form: OdemeForm } | null>(null)
+  const [odemeModal, setOdemeModal] = useState<{ kayit: IcraTakibiExt; form: OdemeForm } | null>(null)
   const [odemeDeleteId, setOdemeDeleteId] = useState<{ icraId: string; odemeId: string } | null>(null)
 
   // Modal — cevap yazısı
   const [cevapModal, setCevapModal] = useState<{ kayit: IcraTakibi; form: CevapForm } | null>(null)
   const [isGeneratingCevap, setIsGeneratingCevap] = useState(false)
+
+  const [reminderModal, setReminderModal] = useState<{ id: string; tarih: string; saat: string; hasExisting: boolean } | null>(null)
+  const [uploadingItem, setUploadingItem] = useState<string | null>(null)
+  const [evrakModal, setEvrakModal] = useState<{ icraId: string; kategori: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Genişletilmiş satır
   const [expanded, setExpanded]   = useState<string | null>(null)
@@ -165,29 +177,34 @@ export default function IcraModule({ firma }: AppCtx) {
   const load = useCallback(async () => {
     setLoading(true); setErr('')
     try {
-      const [icraRes, musteriRes] = await Promise.all([
-        supabase.from('icra_takibi')
-          .select('*, musteri:musteriler(id, ad, kisa_ad)')
-          .eq('firma_id', firma.id)
-          .order('tebligat_tarihi', { ascending: false }),
-        supabase.from('musteriler')
-          .select('id, ad, kisa_ad').eq('firma_id', firma.id).eq('aktif', true).order('ad'),
-      ])
+      const icraRes = await supabase.from('icra_takibi')
+        .select('*')
+        .in('firma_id', firmaIds)
+        .order('tebligat_tarihi', { ascending: false })
       if (icraRes.error) throw icraRes.error
-      setKayitlar((icraRes.data || []) as IcraTakibi[])
-      setMusteriler((musteriRes.data || []) as Musteri[])
+      setKayitlar((icraRes.data || []) as IcraTakibiExt[])
 
       const ids = (icraRes.data || []).map((x: any) => x.id)
       if (ids.length) {
-        const { data: od } = await supabase.from('icra_odemeler')
-          .select('*').in('icra_id', ids).order('odeme_tarihi', { ascending: false })
-        if (od) {
+        const [od, docs] = await Promise.all([
+          supabase.from('icra_odemeler').select('*').in('icra_id', ids).order('odeme_tarihi', { ascending: false }),
+          supabase.from('dokumanlar').select('*').in('firma_id', firmaIds).eq('bagli_tablo', 'icra_takibi').in('bagli_kayit_id', ids)
+        ])
+        if (od.data) {
           const map: Record<string, IcraOdeme[]> = {}
-          od.forEach((o: IcraOdeme) => {
+          od.data.forEach((o: IcraOdeme) => {
             if (!map[o.icra_id]) map[o.icra_id] = []
             map[o.icra_id].push(o)
           })
           setOdemeler(map)
+        }
+        if (docs.data) {
+          const dMap: Record<string, any[]> = {}
+          docs.data.forEach((d: any) => {
+            if (!dMap[d.bagli_kayit_id]) dMap[d.bagli_kayit_id] = []
+            dMap[d.bagli_kayit_id].push(d)
+          })
+          setDosyaMap(dMap)
         }
       }
     } catch (e: any) { setErr(e?.message || 'Veri yüklenemedi') }
@@ -195,6 +212,26 @@ export default function IcraModule({ firma }: AppCtx) {
   }, [firma.id])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
+      const now = new Date()
+      const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      const d = now.toISOString().split('T')[0]
+      kayitlar.forEach(k => {
+        if (k.hatirlatici_tarihi === d && k.hatirlatici_saati === hhmm && k.durum === 'aktif') {
+          new Notification('İcra Takibi Hatırlatıcısı', { body: `${k.dosya_no} numaralı dosya için hatırlatma: ${k.borclu_adi}`, icon: '/favicon.ico' })
+        }
+      })
+    }, 60000)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [kayitlar])
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return
+    await Notification.requestPermission()
+  }
 
   // ─── Hesaplamalar ──────────────────────────────────────────────────────────
   const odemeToplamı = (id: string) => (odemeler[id] || []).reduce((s, o) => s + o.tutar, 0)
@@ -213,6 +250,43 @@ export default function IcraModule({ firma }: AppCtx) {
   async function deleteFile(url: string) {
     const path = url.split('/dokumanlar/')[1]
     if (path) await supabase.storage.from('dokumanlar').remove([path])
+  }
+
+  async function uploadGenericFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files
+    const icraId = evrakModal?.icraId || uploadingItem
+    if (!files?.length || !icraId) return
+    const kategori = evrakModal?.kategori || 'diger'
+    setSaving(true)
+    for (const file of Array.from(files)) {
+      const ext = file.name.split('.').pop()
+      const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`
+      const path = `${firma.id}/icra_ek/${icraId}/${safeName}`
+      const { error: storageError } = await supabase.storage.from('dokumanlar').upload(path, file)
+      if (storageError) { alert(storageError.message); continue }
+      const { data: urlData } = supabase.storage.from('dokumanlar').getPublicUrl(path)
+      await supabase.from('dokumanlar').insert({
+        firma_id: firma.id, modul: 'icra_takibi', bagli_tablo: 'icra_takibi',
+        bagli_kayit_id: icraId, dosya_adi: file.name, dosya_url: urlData.publicUrl,
+        mime_type: file.type || null, dosya_boyutu: file.size || null,
+        kategori,
+      })
+    }
+    setSaving(false)
+    setUploadingItem(null)
+    setEvrakModal(null)
+    if (fileRef.current) fileRef.current.value = ''
+    await load()
+  }
+
+  async function deleteExtraDoc(d: any) {
+    if (!confirm('Bu evrak silinecek, onaylıyor musunuz?')) return
+    setSaving(true)
+    const path = d.dosya_url.split('/dokumanlar/')[1]
+    if (path) await supabase.storage.from('dokumanlar').remove([path])
+    await supabase.from('dokumanlar').delete().eq('id', d.id)
+    setSaving(false)
+    load()
   }
 
   // ─── Dosyayı kaldır (kayıttan) ────────────────────────────────────────────
@@ -238,6 +312,7 @@ export default function IcraModule({ firma }: AppCtx) {
     setModalErr(''); setPendingTebligat(null); setPendingCevap(null)
     setModal({
       id: k.id,
+      firma_id: k.firma_id,
       form: {
         musteri_id: k.musteri_id ?? null, borclu_adi: k.borclu_adi, tc_no: k.tc_no ?? '',
         icra_dairesi_adi: k.icra_dairesi_adi, dosya_no: k.dosya_no,
@@ -269,8 +344,12 @@ export default function IcraModule({ firma }: AppCtx) {
 
     setSaving(true); setUploading(false); setModalErr('')
 
+    const firmaIdToSave = modal.id ? modal.firma_id : selFirmaId;
+    const firmaToSave = firmalar.find(frm => frm.id === firmaIdToSave);
+    const sirketAdi = firmaToSave?.kisa_ad === 'BİNYAPI' ? 'BİNYAPI' : 'ETM';
+
     const basePayload = {
-      firma_id: firma.id,
+      firma_id: firmaIdToSave,
       musteri_id: f.musteri_id || null,
       borclu_adi: f.borclu_adi.trim(),
       tc_no: f.tc_no?.trim() || null,
@@ -287,6 +366,7 @@ export default function IcraModule({ firma }: AppCtx) {
       kep_no: f.kep_no?.trim() || null,
       barkod_no: f.barkod_no?.trim() || null,
       notlar: f.notlar?.trim() || null,
+      sirket: sirketAdi,
       updated_at: new Date().toISOString(),
     }
 
@@ -341,16 +421,18 @@ export default function IcraModule({ firma }: AppCtx) {
   }
 
   // ─── CRUD — ödemeler ──────────────────────────────────────────────────────
-  function openOdemeModal(icraId: string) {
-    setOdemeModal({ icraId, form: { odeme_tarihi: today(), tutar: 0, aciklama: '' } })
+  function openOdemeModal(kayit: IcraTakibiExt) {
+    setOdemeModal({ kayit, form: { odeme_tarihi: today(), tutar: 0, aciklama: '' } })
   }
   async function saveOdeme() {
     if (!odemeModal) return
-    const { icraId, form } = odemeModal
+    const { kayit, form } = odemeModal
     if (!form.odeme_tarihi || form.tutar <= 0) return
     setSaving(true)
     const { error } = await supabase.from('icra_odemeler').insert({
-      icra_id: icraId, firma_id: firma.id,
+      icra_id: kayit.id,
+      firma_id: kayit.firma_id,
+      sirket: (kayit as any).sirket || 'ETM',
       odeme_tarihi: form.odeme_tarihi, tutar: Number(form.tutar),
       aciklama: form.aciklama?.trim() || null,
     })
@@ -363,15 +445,28 @@ export default function IcraModule({ firma }: AppCtx) {
     setOdemeDeleteId(null); load()
   }
 
+  async function saveReminder() {
+    if (!reminderModal?.tarih || !reminderModal?.saat) return
+    setSaving(true)
+    const { error } = await supabase.from('icra_takibi').update({ hatirlatici_tarihi: reminderModal.tarih, hatirlatici_saati: reminderModal.saat }).eq('id', reminderModal.id)
+    setSaving(false)
+    if (!error) { setReminderModal(null); load() }
+  }
+
+  async function clearReminder(id: string) {
+    setSaving(true)
+    const { error } = await supabase.from('icra_takibi').update({ hatirlatici_tarihi: null, hatirlatici_saati: null }).eq('id', id)
+    setSaving(false)
+    if (!error) { setReminderModal(null); load() }
+  }
+
   // ─── Cevap Yazısı (Word) ──────────────────────────────────────────────────
   function openCevapModal(k: IcraTakibi) {
     setCevapModal({
       kayit: k,
       form: {
-        cevap_veren_id: '',
         cevap_veren: '',
-        isveren_id: k.musteri_id || '',
-        isveren: musteriler.find(m => m.id === k.musteri_id)?.ad || firma.ad,
+        isveren: firma.ad,
         isci_durumu: k.isci_durumu === 'ayrildi' ? 'cikti' : 'devam',
         cikis_tarihi: k.cikis_tarihi || '',
         maas_tutari: '',
@@ -390,41 +485,38 @@ export default function IcraModule({ firma }: AppCtx) {
     const maas = parseFloat(form.maas_tutari) || 0
     const kesinti = maas > 0 ? (maas / 4).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺' : '............'
 
-    const isverenMusteri = musteriler.find(m => m.id === form.isveren_id)
     const isverenAd = form.isveren
-    const isverenKisaAd = isverenMusteri?.kisa_ad || isverenAd
+    const isverenKisaAd = isverenAd
 
     // Logo: ETM mi yoksa genel mi?
     const isEtm = /etm/i.test(isverenKisaAd || '')
     const logoHtml = isEtm
-      ? `<table style="border-collapse:collapse;width:310pt;line-height:1">
+      ? `<table style="border-collapse:collapse;width:220pt;line-height:1">
            <tr>
-             <td style="width:6pt;background:#C8922A;padding:0;font-size:1pt">&nbsp;</td>
-             <td style="background:#0B1C38;padding:10pt 20pt 10pt 16pt;vertical-align:middle">
-               <p style="margin:0;font-family:'Arial Black',Arial,sans-serif;font-size:28pt;font-weight:900;color:#FFFFFF;letter-spacing:7pt;line-height:1">ETM</p>
-               <p style="margin:3pt 0 0 0;font-family:Arial,sans-serif;font-size:6.5pt;font-weight:bold;color:#C8922A;letter-spacing:2.5pt;line-height:1">MALİ MÜŞAVİRLİK &amp; DANIŞMANLIK HİZMETLERİ</p>
+             <td style="width:5pt;background:#C8922A;padding:0;font-size:1pt">&nbsp;</td>
+             <td style="background:#0B1C38;padding:9pt 18pt 9pt 14pt;vertical-align:middle">
+               <p style="margin:0;font-family:'Arial Black',Arial,sans-serif;font-size:26pt;font-weight:900;color:#FFFFFF;letter-spacing:7pt;line-height:1">ETM</p>
              </td>
-             <td style="background:#0B1C38;width:12pt;padding:0;vertical-align:middle;text-align:center">
+             <td style="background:#0B1C38;width:10pt;padding:0;vertical-align:middle">
                <table style="border-collapse:collapse;width:100%;height:100%"><tr>
-                 <td style="background:#C8922A;width:4pt;padding:0;font-size:1pt">&nbsp;</td>
+                 <td style="background:#C8922A;width:3pt;padding:0;font-size:1pt">&nbsp;</td>
                  <td style="background:#152C50;padding:0;font-size:1pt">&nbsp;</td>
                </tr></table>
              </td>
            </tr>
            <tr>
-             <td colspan="3" style="background:linear-gradient(90deg,#C8922A,#E8B84B);padding:0;height:3pt;font-size:1pt;line-height:0;background:#C8922A">&nbsp;</td>
+             <td colspan="3" style="background:#C8922A;padding:0;height:3pt;font-size:1pt;line-height:0">&nbsp;</td>
            </tr>
-         </table>
-         <p style="margin:4pt 0 0 7pt;font-size:8pt;color:#444444;font-family:Arial,sans-serif;font-style:italic;letter-spacing:0.3pt">${isverenAd}</p>`
-      : `<table style="border-collapse:collapse;width:310pt;line-height:1">
+         </table>`
+      : `<table style="border-collapse:collapse;width:220pt;line-height:1">
            <tr>
-             <td style="width:6pt;background:#2E86C1;padding:0;font-size:1pt">&nbsp;</td>
-             <td style="background:#1A2E4A;padding:10pt 20pt 10pt 16pt;vertical-align:middle">
-               <p style="margin:0;font-family:'Arial Black',Arial,sans-serif;font-size:22pt;font-weight:900;color:#FFFFFF;letter-spacing:3pt;line-height:1">${isverenKisaAd.substring(0, 9).toUpperCase()}</p>
+             <td style="width:5pt;background:#2E86C1;padding:0;font-size:1pt">&nbsp;</td>
+             <td style="background:#1A2E4A;padding:9pt 18pt 9pt 14pt;vertical-align:middle">
+               <p style="margin:0;font-family:'Arial Black',Arial,sans-serif;font-size:20pt;font-weight:900;color:#FFFFFF;letter-spacing:3pt;line-height:1">${isverenKisaAd.substring(0, 9).toUpperCase()}</p>
              </td>
-             <td style="background:#1A2E4A;width:12pt;padding:0;vertical-align:middle;text-align:center">
+             <td style="background:#1A2E4A;width:10pt;padding:0;vertical-align:middle">
                <table style="border-collapse:collapse;width:100%;height:100%"><tr>
-                 <td style="background:#2E86C1;width:4pt;padding:0;font-size:1pt">&nbsp;</td>
+                 <td style="background:#2E86C1;width:3pt;padding:0;font-size:1pt">&nbsp;</td>
                  <td style="background:#243B55;padding:0;font-size:1pt">&nbsp;</td>
                </tr></table>
              </td>
@@ -434,8 +526,7 @@ export default function IcraModule({ firma }: AppCtx) {
            </tr>
          </table>`
 
-    // İmza: cevap_veren doluysa ve isveren'den farklıysa onu göster, yoksa isveren
-    const imzaAdi = (form.cevap_veren && form.cevap_veren !== form.isveren) ? form.cevap_veren : form.isveren
+    const imzaAdi = form.cevap_veren || form.isveren
     const icerik = form.isci_durumu === 'cikti'
       ? `<p style="margin:0 0 8pt 0">Dairenizin yukarıda esas numarası yazılı icra takip dosyasında borçlu olarak gösterilen
          <strong>${kayit.borclu_adi}</strong>${kayit.tc_no ? ` (TC: ${kayit.tc_no})` : ''} hakkında
@@ -449,75 +540,105 @@ export default function IcraModule({ firma }: AppCtx) {
          <p style="margin:0 0 8pt 0">Adı geçen şahıs firmamız bünyesinde hâlen çalışmakta olup aylık net ücreti
          <strong>${maas > 0 ? maas.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺' : '............'}</strong>'dir.</p>
          <p style="margin:0 0 8pt 0">İcra ve İflas Kanunu'nun 355. maddesi gereğince, aylık net ücretin dörtte biri
-         (<strong>${kesinti}</strong>) tutarında kesinti yapılarak <strong>${kayit.dosya_no}</strong> sayılı dosyaya yatırılacaktır.</p>
-         ${kayit.icra_dairesi_iban ? `<p style="margin:0 0 8pt 0"><strong>IBAN:</strong> ${kayit.icra_dairesi_iban}</p>` : ''}
+         tutarında kesinti yapılarak <strong>${kayit.dosya_no}</strong> sayılı dosyaya yatırılacaktır.</p>
          ${form.aciklamalar ? `<p style="margin:0 0 8pt 0"><strong>Açıklama:</strong> ${form.aciklamalar}</p>` : ''}`
 
     const html = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8">
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<!--[if gte mso 9]><xml>
+  <w:WordDocument>
+    <w:View>Print</w:View><w:Zoom>100</w:Zoom>
+    <w:DoNotOptimizeForBrowser/>
+  </w:WordDocument>
+</xml><![endif]-->
 <style>
-  @page { size: A4; margin: 1.5cm; }
-  body { font-family: "Times New Roman", serif; font-size: 10.5pt; color: #000; line-height: 1.4; margin: 0; }
-  table.info { width: 100%; border-collapse: collapse; margin-bottom: 8pt; }
-  table.info td { padding: 3pt 6pt; font-size: 10pt; vertical-align: top; }
-  table.info td.e { font-weight: bold; width: 28%; background: #f0f0f0; }
-  table.info tr:nth-child(even) td { background: #f8f8f8; }
-  table.info tr:nth-child(even) td.e { background: #e8e8e8; }
-</style></head><body>
+  @page { size:A4 portrait; margin:2cm 2.5cm 2.5cm 2.5cm; }
+  body  { font-family:"Times New Roman",serif; font-size:11pt; color:#111111; line-height:1.55; margin:0; padding:0; word-wrap:break-word; }
+  p     { margin:0 0 9pt 0; orphans:3; widows:3; }
+  strong{ font-weight:bold; }
 
-<!-- BAŞLIK -->
-<table style="width:100%;border-collapse:collapse;margin-bottom:24pt;">
+  /* Bilgi tablosu */
+  table.bil { width:100%; border-collapse:collapse; margin:0 0 14pt 0; table-layout:fixed; }
+  table.bil td { font-size:10pt; padding:4pt 6pt; vertical-align:top; word-wrap:break-word; }
+  table.bil td.lbl { font-weight:bold; width:90pt; background:#EFEFEF; border:1px solid #CCCCCC; white-space:nowrap; }
+  table.bil td.val { background:#FAFAFA; border:1px solid #CCCCCC; }
+  table.bil td.val2{ background:#FAFAFA; border:1px solid #CCCCCC; }
+
+  /* İmza */
+  table.imza { width:100%; border-collapse:collapse; margin-top:36pt; }
+  table.imza td { font-size:10.5pt; vertical-align:top; }
+</style>
+</head><body>
+
+<!-- ═══ BAŞLIK ═══ -->
+<table style="width:100%;border-collapse:collapse;margin-bottom:20pt;table-layout:fixed;">
   <tr>
-    <td style="width:60%; vertical-align:top;">${logoHtml}</td>
-    <td style="width:40%; vertical-align:top; text-align:right; font-size:10.5pt; font-family:'Times New Roman',serif;">
-      ${bugun}
+    <td style="width:55%;vertical-align:middle;padding:0;">${logoHtml}</td>
+    <td style="width:45%;vertical-align:middle;text-align:right;padding:0;font-size:10.5pt;font-family:'Times New Roman',serif;color:#222222;">
+      <span style="display:block;margin-bottom:2pt;"><strong>${bugun}</strong></span>
+      <span style="font-size:9pt;color:#555555;">Tarih</span>
     </td>
   </tr>
 </table>
 
-<!-- ADRES -->
-<p style="margin:0 0 2pt 0"><strong>${kayit.icra_dairesi_adi}</strong></p>
-<p style="margin:0 0 10pt 0">SAYIN MÜDÜRLÜĞÜNE</p>
-<p style="font-weight:bold;margin:0 0 8pt 0;border-bottom:1px solid #ccc;padding-bottom:3pt">
+<!-- ═══ ADRES ═══ -->
+<p style="margin:0 0 2pt 0;font-size:11pt;"><strong>${kayit.icra_dairesi_adi}</strong></p>
+<p style="margin:0 0 16pt 0;font-size:11pt;">SAYIN MÜDÜRLÜĞÜNE</p>
+
+<!-- ═══ KONU ═══ -->
+<p style="margin:0 0 14pt 0;font-size:11pt;font-weight:bold;border-bottom:1.5pt solid #333333;padding-bottom:5pt;letter-spacing:0.2pt;">
   KONU: ${kayit.dosya_no} Esas Sayılı Dosyaya Cevabımızdır.
 </p>
 
-<!-- BİLGİ TABLOSU — 4 sütun -->
-<table class="info">
+<!-- ═══ BİLGİ TABLOSU ═══ -->
+<table class="bil">
   <tr>
-    <td class="e">İcra Dairesi</td><td>${kayit.icra_dairesi_adi}</td>
-    <td class="e">Dosya No</td><td>${kayit.dosya_no}</td>
+    <td class="lbl">İcra Dairesi</td>
+    <td class="val" colspan="3">${kayit.icra_dairesi_adi}</td>
   </tr>
   <tr>
-    <td class="e">Tebligat Tarihi</td><td>${tarihFmt(kayit.tebligat_tarihi)}</td>
-    <td class="e">Cevap Tarihi</td><td>${kayit.cevap_tarihi ? tarihFmt(kayit.cevap_tarihi) : bugun}</td>
+    <td class="lbl">Dosya No</td>
+    <td class="val" style="width:90pt;">${kayit.dosya_no}</td>
+    <td class="lbl" style="width:90pt;">Borç Miktarı</td>
+    <td class="val2">${kayit.borc_tutari.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
   </tr>
   <tr>
-    <td class="e">Alacaklı</td><td>${kayit.alacakli_adi}</td>
-    <td class="e">Borç Miktarı</td><td>${kayit.borc_tutari.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
+    <td class="lbl">Tebligat Tarihi</td>
+    <td class="val">${tarihFmt(kayit.tebligat_tarihi)}</td>
+    <td class="lbl">Cevap Tarihi</td>
+    <td class="val2">${kayit.cevap_tarihi ? tarihFmt(kayit.cevap_tarihi) : bugun}</td>
   </tr>
   <tr>
-    <td class="e">Borçlu</td>
-    <td colspan="3">${kayit.borclu_adi}${kayit.tc_no ? ' &mdash; TC: ' + kayit.tc_no : ''}
-      &nbsp;&nbsp;<strong>[${form.isci_durumu === 'cikti' ? 'AYRILMIŞ / İŞTEN ÇIKMIŞ' : 'ÇALIŞMAYA DEVAM ETMEKTEDİR'}]</strong>
+    <td class="lbl">Alacaklı</td>
+    <td class="val" colspan="3">${kayit.alacakli_adi}</td>
+  </tr>
+  <tr>
+    <td class="lbl">Borçlu</td>
+    <td class="val" colspan="3">
+      ${kayit.borclu_adi}${kayit.tc_no ? ' &mdash; TC No: ' + kayit.tc_no : ''}
+      <br><strong style="font-size:9.5pt;">[${form.isci_durumu === 'cikti' ? 'AYRILMIŞ / İŞTEN ÇIKMIŞ' : 'ÇALIŞMAYA DEVAM ETMEKTEDİR'}]</strong>
     </td>
   </tr>
+  ${kayit.icra_dairesi_iban ? `<tr><td class="lbl">IBAN</td><td class="val" colspan="3">${kayit.icra_dairesi_iban}</td></tr>` : ''}
 </table>
 
-<!-- YAZI GÖVDESİ -->
+<!-- ═══ YAZI GÖVDESİ ═══ -->
 ${icerik}
 
-<!-- İMZA -->
-<table style="width:100%;border-collapse:collapse;margin-top:24pt">
+<!-- ═══ İMZA ═══ -->
+<table class="imza">
   <tr>
-    <td style="width:52%">
-      <p style="margin:0;font-size:10pt">Saygılarımızla,</p>
+    <td style="width:58%;padding-top:8pt;">
+      <p style="margin:0 0 0 0;font-size:10.5pt;">Saygılarımızla,</p>
+      <p style="margin:18pt 0 0 0;font-size:10.5pt;"><strong>${isverenAd}</strong></p>
     </td>
-    <td style="border-top:1px solid #000;padding-top:4pt;text-align:center;font-size:10pt">
-      <strong>${imzaAdi}</strong><br>
-      <span style="font-size:9pt">İşveren / Yetkili</span>
+    <td style="width:42%;text-align:center;padding-top:8pt;">
+      <p style="margin:0 0 36pt 0;font-size:10pt;color:#777777;">(İmza)</p>
+      <p style="margin:0;border-top:1pt solid #333333;padding-top:5pt;font-size:10.5pt;">
+        <strong>${imzaAdi}</strong>
+      </p>
+      <p style="margin:3pt 0 0 0;font-size:9pt;color:#444444;">İşveren / Yetkili</p>
     </td>
   </tr>
 </table>
@@ -555,6 +676,56 @@ ${icerik}
     await load()
   }
 
+  // ─── PDF Export ──────────────────────────────────────────────────────────
+  async function exportPdf() {
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const doc = new jsPDF('landscape', 'mm', 'a4')
+
+      // PDF'in standart fontları Türkçe karakter desteklemediği için sorunları önleme temizliği
+      const cleanTr = (text: string) => 
+        String(text || '').replace(/İ/g, 'I').replace(/ı/g, 'i').replace(/Ş/g, 'S').replace(/ş/g, 's')
+            .replace(/Ğ/g, 'G').replace(/ğ/g, 'g').replace(/Ü/g, 'U').replace(/ü/g, 'u')
+            .replace(/Ö/g, 'O').replace(/ö/g, 'o').replace(/Ç/g, 'C').replace(/ç/g, 'c')
+            .replace(/₺/g, 'TL')
+
+      doc.setFontSize(14)
+      doc.text(cleanTr(`${firma.ad} - Icra Takibi Listesi`), 14, 15)
+      doc.setFontSize(10)
+      doc.text(`Tarih: ${format(new Date(), 'dd.MM.yyyy')}`, 14, 22)
+
+      // Kapalı dosyaları rapordan çıkar
+      const reportData = filtered.filter(k => k.durum !== 'kapali')
+
+      const head = [['Sirket', 'Borclu', 'Icra Dairesi', 'Dosya No', 'Tebligat', 'Borc', 'Odenen', 'Kalan', 'Durum']]
+      const body = reportData.map(k => [
+        cleanTr((k as any).sirket || 'ETM'),
+        cleanTr(k.borclu_adi),
+        cleanTr(k.icra_dairesi_adi),
+        cleanTr(k.dosya_no),
+        k.tebligat_tarihi ? format(new Date(k.tebligat_tarihi + 'T00:00:00'), 'dd.MM.yyyy') : '',
+        cleanTr(TL(k.borc_tutari)),
+        cleanTr(TL(odemeToplamı(k.id))),
+        cleanTr(TL(kalanBorc(k))),
+        cleanTr(DURUM_LABEL[k.durum])
+      ])
+
+      autoTable(doc, {
+        startY: 28,
+        head,
+        body,
+        theme: 'grid',
+        styles: { fontSize: 8, font: 'helvetica' },
+        headStyles: { fillColor: [30, 58, 95] },
+      })
+
+      doc.save(`Icra_Takibi_${new Date().toISOString().split('T')[0]}.pdf`)
+    } catch (e: any) {
+      alert('PDF dışa aktarılırken hata oluştu: ' + e.message)
+    }
+  }
+
   // ─── Excel Export ──────────────────────────────────────────────────────────
   async function exportExcel() {
     const XLSX = await import('xlsx-js-style')
@@ -569,13 +740,16 @@ ${icerik}
     const tl   = (v: string) => sc(v, 's', { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1e3a5f' } }, alignment: { horizontal: 'right' }, border })
     const tm   = (v: number, r = false) => sc(v, 'n', { font: { bold: true, sz: 11, color: { rgb: r ? 'dc2626' : 'FFFFFF' } }, fill: { fgColor: { rgb: '1e3a5f' } }, numFmt: '#,##0.00 "₺"', alignment: { horizontal: 'right' }, border })
 
-    const cols = ['Borçlu', 'TC No', 'Müşteri', 'İcra Dairesi', 'Dosya No', 'Tebligat', 'Cevap', 'KEP No', 'Barkod No', 'Alacaklı', 'Borç', 'Ödenen', 'Kalan', 'IBAN', 'İşçi Durumu', 'Durum']
+    const cols = ['Şirket', 'Borçlu', 'TC No', 'İcra Dairesi', 'Dosya No', 'Tebligat', 'Cevap', 'KEP No', 'Barkod No', 'Alacaklı', 'Borç', 'Ödenen', 'Kalan', 'IBAN', 'İşçi Durumu', 'Durum']
     const tf = (t?: string | null) => t ? format(new Date(t + 'T00:00:00'), 'dd.MM.yyyy') : ''
 
-    const rows = filtered.map(k => {
-      const m = musteriler.find(x => x.id === k.musteri_id)
+    // Kapalı dosyaları rapordan çıkar
+    const reportData = filtered.filter(k => k.durum !== 'kapali')
+
+    const rows = reportData.map(k => {
       return [
-        cell(k.borclu_adi), cell(k.tc_no || '', 'center'), cell(m?.ad || ''),
+        cell((k as any).sirket || 'ETM', 'center'),
+        cell(k.borclu_adi), cell(k.tc_no || '', 'center'),
         cell(k.icra_dairesi_adi), cell(k.dosya_no, 'center'),
         cell(tf(k.tebligat_tarihi), 'center'), cell(tf(k.cevap_tarihi), 'center'),
         cell(k.kep_no || ''), cell(k.barkod_no || ''), cell(k.alacakli_adi),
@@ -586,8 +760,9 @@ ${icerik}
       ]
     })
 
-    const to = filtered.reduce((s, k) => s + odemeToplamı(k.id), 0)
-    const tk = filtered.reduce((s, k) => s + kalanBorc(k), 0)
+    const tb = reportData.reduce((s, k) => s + k.borc_tutari, 0)
+    const to = reportData.reduce((s, k) => s + odemeToplamı(k.id), 0)
+    const tk = reportData.reduce((s, k) => s + kalanBorc(k), 0)
 
     const ws = XLSX.utils.aoa_to_sheet([
       [hdr(`${firma.ad} — İcra Takibi`), ...Array(cols.length - 1).fill(emp())],
@@ -595,10 +770,10 @@ ${icerik}
       cols.map(col),
       ...rows,
       Array(cols.length).fill(emp()),
-      [...Array(10).fill(emp()), tl('TOPLAM:'), tm(to), tm(tk, tk > 0), ...Array(3).fill(emp())],
+      [...Array(9).fill(emp()), tl('TOPLAM:'), tm(tb), tm(to), tm(tk, tk > 0), ...Array(3).fill(emp())],
     ])
     ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols.length - 1 } }]
-    ws['!cols'] = [{ wch: 20 }, { wch: 13 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 24 }, { wch: 12 }, { wch: 10 }]
+    ws['!cols'] = [{ wch: 10 }, { wch: 20 }, { wch: 13 }, { wch: 20 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 24 }, { wch: 12 }, { wch: 10 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'İcra Takibi')
     XLSX.writeFile(wb, `Icra_Takibi_${new Date().toISOString().split('T')[0]}.xlsx`)
@@ -610,10 +785,8 @@ ${icerik}
     if (isciFilter !== 'hepsi' && k.isci_durumu !== isciFilter) return false
     if (search.trim()) {
       const q = search.toLowerCase()
-      const m = musteriler.find(x => x.id === k.musteri_id)
       if (!k.borclu_adi.toLowerCase().includes(q) && !k.dosya_no.toLowerCase().includes(q) &&
-          !k.icra_dairesi_adi.toLowerCase().includes(q) && !(k.tc_no || '').includes(q) &&
-          !(m?.ad || '').toLowerCase().includes(q)) return false
+          !k.icra_dairesi_adi.toLowerCase().includes(q) && !(k.tc_no || '').includes(q)) return false
     }
     return true
   })
@@ -630,207 +803,290 @@ ${icerik}
   if (loading) return <Loading />
   if (err)     return <ErrorMsg message={err} onRetry={load} />
 
+  const iSeg = (val: string, active: boolean, danger?: boolean) =>
+    `px-3 py-1.5 rounded-lg text-[13px] font-medium transition-all ${active
+      ? danger ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700 shadow-sm'
+      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`
+
   return (
-    <div className="space-y-6">
-      {/* Başlık */}
+    <div className="space-y-4">
+
+      {/* ── Başlık ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">İcra Takibi</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Personel icra takip ve tebligat yönetimi</p>
+          <h1 className="text-[22px] font-semibold text-slate-800 tracking-tight">İcra Takibi</h1>
+          <p className="text-[13px] text-slate-500 mt-0.5">Personel icra takip ve tebligat yönetimi</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={exportExcel} className={cls.btnSecondary} disabled={filtered.length === 0}>
-            <FileDown size={15} /> Excel
+        <div className="flex items-center gap-2">
+          <button onClick={requestNotifPermission}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition-all hover:bg-slate-50">
+            <BellRing size={14} /> Bildirim İzni
           </button>
-          <button onClick={openNew} className={cls.btnPrimary}>
-            <Plus size={15} /> Yeni İcra Kaydı
+          <button onClick={exportExcel} disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-40">
+            <FileDown size={14} /> Excel
+          </button>
+        <button onClick={exportPdf} disabled={filtered.length === 0}
+          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-red-600 transition-all hover:bg-red-50 disabled:opacity-40">
+          <FileText size={14} /> PDF
+        </button>
+          <button onClick={openNew}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-500/20">
+            <Plus size={14} /> Yeni Kayıt
           </button>
         </div>
       </div>
 
-      {/* Özet — sadece çalışan personel */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <input ref={fileRef} type="file" multiple accept={ACCEPT} className="hidden" onChange={uploadGenericFile} />
+
+      {/* ── Özet Kartları ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Toplam Borç (Çalışanlar)', value: TL(ozet.borc), color: 'text-white' },
-          { label: 'Toplam Ödenen', value: TL(ozet.odenen), color: 'text-emerald-400' },
-          { label: 'Kalan Borç', value: TL(ozet.kalan), color: ozet.kalan > 0 ? 'text-red-400' : 'text-emerald-400' },
+          { label: 'Toplam Borç', sub: 'Çalışan personel', value: TL(ozet.borc), valueClass: 'text-slate-800' },
+          { label: 'Ödenen', sub: 'Toplam tahsilat', value: TL(ozet.odenen), valueClass: 'text-emerald-600' },
+          { label: 'Kalan', sub: 'Tahsil edilecek', value: TL(ozet.kalan), valueClass: ozet.kalan > 0 ? 'text-red-600' : 'text-emerald-600' },
         ].map(c => (
-          <div key={c.label} className={cls.card + ' p-5'}>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1">{c.label}</p>
-            <p className={`text-2xl font-bold tracking-tight ${c.color}`}>{c.value}</p>
+          <div key={c.label}
+            className="rounded-2xl border border-blue-100 bg-white px-5 py-4 shadow-sm">
+            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{c.label}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{c.sub}</p>
+            <p className={`text-xl font-semibold mt-2 tabular-nums ${c.valueClass}`}>{c.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Filtreler */}
-      <div className={cls.card + ' p-4 flex flex-wrap gap-3 items-center'}>
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className={cls.input + ' pl-8'} placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} />
+      {/* ── Filtre Çubuğu ──────────────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 flex flex-wrap gap-3 items-center shadow-sm">
+        {/* Arama */}
+        <div className="relative flex-1 min-w-[160px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[13px] text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-400 focus:bg-white transition-all"
+            placeholder="Borçlu, dosya no, icra dairesi…"
+            value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select value={durumFilter} onChange={e => setDurumFilter(e.target.value as any)} className={cls.input + ' max-w-[150px]'}>
-          <option value="hepsi">Tüm Durumlar</option>
-          {(Object.keys(DURUM_LABEL) as IcraDurum[]).map(d => <option key={d} value={d}>{DURUM_LABEL[d]}</option>)}
-        </select>
-        <select value={isciFilter} onChange={e => setIsciFilter(e.target.value as any)} className={cls.input + ' max-w-[150px]'}>
-          <option value="hepsi">Tüm Personel</option>
-          <option value="calisiyor">Çalışıyor</option>
-          <option value="ayrildi">Ayrıldı</option>
-        </select>
+
+        {/* Durum segmenti */}
+        <div className="flex items-center gap-0.5 rounded-xl bg-slate-100 border border-slate-200 p-1">
+          {([['hepsi', 'Tümü'], ['aktif', 'Aktif'], ['odendi', 'Ödendi'], ['kapali', 'Kapalı']] as const).map(([val, lbl]) => (
+            <button key={val} onClick={() => setDurumFilter(val as any)} className={iSeg(val, durumFilter === val)}>{lbl}</button>
+          ))}
+        </div>
+
+        {/* Personel segmenti */}
+        <div className="flex items-center gap-0.5 rounded-xl bg-slate-100 border border-slate-200 p-1">
+          {([['hepsi', 'Tümü'], ['calisiyor', 'Çalışıyor'], ['ayrildi', 'Ayrıldı']] as const).map(([val, lbl]) => (
+            <button key={val} onClick={() => setIsciFilter(val as any)}
+              className={iSeg(val, isciFilter === val, val === 'ayrildi' && isciFilter === 'ayrildi')}>{lbl}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Tablo */}
+      {/* ── Liste ──────────────────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className={cls.card}>
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[18px] bg-[rgba(18,32,54,0.85)] border border-[rgba(162,180,206,0.14)]">
-              <AlertCircle size={28} className="text-[rgba(230,236,245,0.36)]" />
-            </div>
-            <p className="text-sm font-semibold text-[rgba(245,247,251,0.86)]">Kayıt bulunamadı</p>
-            <div className="mt-5"><button onClick={openNew} className={cls.btnPrimary}><Plus size={14} /> Yeni Kayıt</button></div>
+        <div className="rounded-2xl border border-blue-100 bg-white py-20 flex flex-col items-center gap-3 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+            <AlertCircle size={24} className="text-slate-400" />
           </div>
+          <p className="text-[15px] font-medium text-slate-700">Kayıt bulunamadı</p>
+          <p className="text-[13px] text-slate-500">Filtreleri değiştirin veya yeni kayıt ekleyin.</p>
+          <button onClick={openNew}
+            className="mt-1 flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-medium text-white transition-all hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-500/20">
+            <Plus size={14} /> Yeni Kayıt
+          </button>
         </div>
       ) : (
-        <div className={cls.card + ' overflow-hidden'}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
-              <thead>
-                <tr className="border-b border-white/5">
-                  <th className={cls.th}>Borçlu</th>
-                  <th className={cls.th}>İcra Dairesi / Dosya</th>
-                  <th className={cls.th + ' text-right'}>Borç / Ödenen / Kalan</th>
-                  <th className={cls.th + ' text-center'}>Durum</th>
-                  <th className={cls.th + ' text-center'}>Evrak</th>
-                  <th className={cls.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(k => {
-                  const musteri = musteriler.find(m => m.id === k.musteri_id)
-                  const toplam  = odemeToplamı(k.id)
-                  const kalan   = kalanBorc(k)
-                  const isExp   = expanded === k.id
-                  const tf = (t?: string | null) => t ? format(new Date(t + 'T00:00:00'), 'dd.MM.yyyy') : '—'
-                  return (
-                    <>
-                      <tr key={k.id} className="border-t border-white/5 hover:bg-white/[0.03] transition-colors">
+        <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden shadow-sm">
+          {filtered.map((k, idx) => {
+            const toplam  = odemeToplamı(k.id)
+            const kalan   = kalanBorc(k)
+            const isExp   = expanded === k.id
+            const tf = (t?: string | null) => t ? format(new Date(t + 'T00:00:00'), 'dd.MM.yyyy') : '—'
 
-                        {/* Borçlu + TC + müşteri + personel durumu */}
-                        <td className={cls.td}>
-                          <p className="font-semibold text-white text-sm">{k.borclu_adi}</p>
-                          {k.tc_no && <p className="text-xs text-slate-400">{k.tc_no}</p>}
-                          {musteri && <p className="text-xs text-slate-400 mt-0.5">{musteri.ad}</p>}
-                          <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${ISCI_STYLE[k.isci_durumu ?? 'calisiyor']}`}>
-                            {k.isci_durumu === 'ayrildi' ? 'Ayrıldı' : 'Çalışıyor'}
-                          </span>
-                        </td>
+            return (
+              <div key={k.id}>
+                {idx > 0 && <div className="h-px bg-slate-100 mx-4" />}
 
-                        {/* İcra dairesi + dosya no + tarihler */}
-                        <td className={cls.td}>
-                          <p className="text-slate-200 text-sm">{k.icra_dairesi_adi}</p>
-                          <p className="text-xs text-slate-400 font-mono">{k.dosya_no}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Teb: {tf(k.tebligat_tarihi)}
-                            {k.cevap_tarihi ? <> · Cevap: {tf(k.cevap_tarihi)}</> : null}
-                          </p>
-                        </td>
+                {/* ─ Satır ─────────────────────────────────────────────── */}
+                <div className={`px-4 py-3.5 flex items-center gap-4 transition-colors ${isExp ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
 
-                        {/* Borç / Ödenen / Kalan — sağa hizalı */}
-                        <td className={cls.td + ' text-right'}>
-                          <p className="text-sm text-white font-semibold whitespace-nowrap">{TL(k.borc_tutari)}</p>
-                          <p className="text-xs text-emerald-400 whitespace-nowrap">↓ {TL(toplam)}</p>
-                          <p className={`text-xs font-bold whitespace-nowrap ${kalan > 0 ? 'text-red-400' : 'text-emerald-400'}`}>= {TL(kalan)}</p>
-                        </td>
+                  {/* Sol: Borçlu */}
+                  <div className="flex-1 min-w-0 max-w-[260px]">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[14px] font-semibold text-slate-800 truncate">{k.borclu_adi}</span>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${ISCI_STYLE[k.isci_durumu ?? 'calisiyor']}`}>
+                        {k.isci_durumu === 'ayrildi' ? 'Ayrıldı' : 'Çalışıyor'}
+                      </span>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${DURUM_STYLE[k.durum]}`}>
+                        {DURUM_LABEL[k.durum]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      {k.tc_no && <span className="text-[12px] text-slate-400 font-mono">{k.tc_no}</span>}
+                    </div>
+                  </div>
 
-                        {/* Durum badge'leri */}
-                        <td className={cls.td + ' text-center'}>
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${DURUM_STYLE[k.durum]}`}>
-                            {DURUM_LABEL[k.durum]}
-                          </span>
-                        </td>
+                  {/* Orta: Daire / Dosya / Tarih */}
+                  <div className="hidden sm:block w-[220px] shrink-0">
+                    <p className="text-[13px] text-slate-700 truncate">{k.icra_dairesi_adi}</p>
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">{k.dosya_no}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Teb: {tf(k.tebligat_tarihi)}{k.cevap_tarihi ? ` · Cvp: ${tf(k.cevap_tarihi)}` : ''}
+                    </p>
+                  </div>
 
-                        {/* Evrak ikonları */}
-                        <td className={cls.td + ' text-center'}>
-                          <div className="flex items-center justify-center gap-2">
-                            {k.tebligat_dosya_url
-                              ? <a href={k.tebligat_dosya_url} target="_blank" rel="noreferrer" title={`Tebligat: ${k.tebligat_dosya_adi || ''}`} className="flex flex-col items-center gap-0.5 text-blue-400 hover:text-blue-300">
-                                  <FileIcon size={14} /><span className="text-[9px] font-bold">TEB</span>
-                                </a>
-                              : <span className="text-slate-600 text-[10px]">—</span>
-                            }
-                            {k.cevap_dosya_url
-                              ? <a href={k.cevap_dosya_url} target="_blank" rel="noreferrer" title={`Cevap: ${k.cevap_dosya_adi || ''}`} className="flex flex-col items-center gap-0.5 text-emerald-400 hover:text-emerald-300">
-                                  <FileIcon size={14} /><span className="text-[9px] font-bold">CEV</span>
-                                </a>
-                              : null
-                            }
-                          </div>
-                        </td>
+                  {/* Sağ: Tutarlar */}
+                  <div className="text-right min-w-[110px] hidden md:block">
+                    <p className="text-[13px] font-semibold text-slate-800 tabular-nums">{TL(k.borc_tutari)}</p>
+                    <p className="text-[11px] text-emerald-600 tabular-nums">↓ {TL(toplam)}</p>
+                    <p className={`text-[11px] font-bold tabular-nums ${kalan > 0 ? 'text-red-600' : 'text-emerald-600'}`}>= {TL(kalan)}</p>
+                  </div>
 
-                        {/* Aksiyonlar */}
-                        <td className={cls.td}>
-                          <div className="flex items-center gap-1 justify-end">
-                            <button onClick={() => setExpanded(isExp ? null : k.id)} className={cls.btnGhost} title="Ödemeler">
-                              <CreditCard size={13} />{isExp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                            </button>
-                            <button onClick={() => openCevapModal(k)} className={cls.btnGhost} title="Cevap Yazısı"><FileText size={13} /></button>
-                            <button onClick={() => openEdit(k)} className={cls.btnGhost} title="Düzenle"><Pencil size={13} /></button>
-                            <button onClick={() => setDeleteId(k.id)} className="flex items-center justify-center text-red-400 hover:bg-red-500/10 p-1.5 rounded-xl transition-all" title="Sil"><Trash2 size={13} /></button>
-                          </div>
-                        </td>
-                      </tr>
+                  {/* Evrak linkleri */}
+                  <div className="flex items-center gap-1.5">
+                    {k.tebligat_dosya_url
+                      ? <a href={k.tebligat_dosya_url} target="_blank" rel="noreferrer"
+                          title={k.tebligat_dosya_adi || 'Tebligat'}
+                          className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 hover:bg-blue-100 transition">
+                          <FileIcon size={12} />
+                        </a>
+                      : <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
+                          <FileIcon size={12} className="text-slate-400" />
+                        </div>
+                    }
+                    {k.cevap_dosya_url
+                      ? <a href={k.cevap_dosya_url} target="_blank" rel="noreferrer"
+                          title={k.cevap_dosya_adi || 'Cevap'}
+                          className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition">
+                          <FileText size={12} />
+                        </a>
+                      : <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center">
+                          <FileText size={12} className="text-slate-400" />
+                        </div>
+                    }
+                  </div>
 
-                      {isExp && (
-                        <tr key={k.id + '-exp'} className="border-t border-white/5">
-                          <td colSpan={6} className="px-4 py-0">
-                            <div className="rounded-xl bg-white/[0.03] border border-white/5 p-4 my-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2"><CreditCard size={13} /> Ödeme Geçmişi</p>
-                                <button onClick={() => openOdemeModal(k.id)} className={cls.btnPrimary + ' text-xs py-1.5 px-3'}><Plus size={12} /> Ödeme Ekle</button>
+                  {/* Aksiyon butonları */}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setExpanded(isExp ? null : k.id)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all gap-0.5 ${isExp ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                      title="Ödemeler">
+                      <CreditCard size={13} />
+                      {isExp ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                    </button>
+                    <button onClick={() => setReminderModal({ id: k.id, tarih: k.hatirlatici_tarihi || today(), saat: k.hatirlatici_saati || '', hasExisting: Boolean(k.hatirlatici_tarihi || k.hatirlatici_saati) })}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${k.hatirlatici_tarihi || k.hatirlatici_saati ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'}`}
+                      title="Hatırlatma">
+                      <BellRing size={13} />
+                    </button>
+                    <button onClick={() => openCevapModal(k)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                      title="Cevap Yazısı">
+                      <FileText size={13} />
+                    </button>
+                    <button onClick={() => openEdit(k)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                      title="Düzenle">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => setDeleteId(k.id)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                      title="Sil">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* ─ Ödeme Genişleme Alanı ─────────────────────────────── */}
+                {isExp && (
+                  <div className="mx-4 mb-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Ödemeler */}
+                    <div className="rounded-xl border border-blue-100 bg-white overflow-hidden flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <CreditCard size={12} /> Ödeme Geçmişi
+                        </p>
+                        <button onClick={() => openOdemeModal(k)}
+                          className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-blue-500 transition">
+                          <Plus size={12} /> Ödeme Ekle
+                        </button>
+                      </div>
+                      <div className="flex-1">
+                        {!(odemeler[k.id]?.length) ? (
+                          <p className="text-[13px] text-slate-400 text-center py-4">Henüz ödeme kaydı yok.</p>
+                        ) : (
+                          <div>
+                            {odemeler[k.id].map((o, oi) => (
+                              <div key={o.id} className={`flex items-center gap-3 px-4 py-3 ${oi > 0 ? 'border-t border-slate-100' : ''}`}>
+                                <span className="text-[13px] text-slate-500 tabular-nums w-[80px] shrink-0">
+                                  {format(new Date(o.odeme_tarihi + 'T00:00:00'), 'dd.MM.yyyy')}
+                                </span>
+                                <span className="text-[13px] font-semibold text-emerald-600 tabular-nums w-[90px] shrink-0 text-right">{TL(o.tutar)}</span>
+                                <span className="text-[13px] text-slate-500 flex-1 truncate">{o.aciklama || '—'}</span>
+                                <button onClick={() => setOdemeDeleteId({ icraId: k.id, odemeId: o.id })}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-600 transition shrink-0">
+                                  <Trash2 size={12} />
+                                </button>
                               </div>
-                              {!(odemeler[k.id]?.length) ? (
-                                <p className="text-xs text-slate-500 py-3 text-center">Henüz ödeme yok</p>
-                              ) : (
-                                <table className="w-full">
-                                  <thead><tr>
-                                    {['Tarih', 'Tutar', 'Açıklama', ''].map(h => <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{h}</th>)}
-                                  </tr></thead>
-                                  <tbody>
-                                    {odemeler[k.id].map(o => (
-                                      <tr key={o.id} className="border-t border-white/5">
-                                        <td className="px-3 py-2 text-sm text-slate-300 whitespace-nowrap">{format(new Date(o.odeme_tarihi + 'T00:00:00'), 'dd.MM.yyyy')}</td>
-                                        <td className="px-3 py-2 text-sm font-bold text-emerald-400 text-right whitespace-nowrap">{TL(o.tutar)}</td>
-                                        <td className="px-3 py-2 text-sm text-slate-400">{o.aciklama || '—'}</td>
-                                        <td className="px-3 py-2 text-right">
-                                          <button onClick={() => setOdemeDeleteId({ icraId: k.id, odemeId: o.id })} className="text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg"><Trash2 size={12} /></button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                  <tfoot>
-                                    <tr className="border-t border-white/10">
-                                      <td className="px-3 py-2 text-xs font-semibold text-slate-400">Toplam Ödenen</td>
-                                      <td className="px-3 py-2 text-sm font-bold text-emerald-400 text-right">{TL(toplam)}</td>
-                                      <td colSpan={2} />
-                                    </tr>
-                                    <tr>
-                                      <td className="px-3 py-1 text-xs font-semibold text-slate-400">Kalan Borç</td>
-                                      <td className={`px-3 py-1 text-sm font-bold text-right ${kalan > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{TL(kalan)}</td>
-                                      <td colSpan={2} />
-                                    </tr>
-                                  </tfoot>
-                                </table>
-                              )}
+                            ))}
+                            <div className="border-t border-blue-100 flex items-center gap-3 px-4 py-2.5 bg-slate-50">
+                              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider w-[80px] shrink-0">Toplam</span>
+                              <span className="text-[13px] font-semibold text-emerald-600 tabular-nums w-[90px] shrink-0 text-right">{TL(toplam)}</span>
+                              <span className="text-[11px] font-medium text-slate-400 flex-1 text-right">Kalan:</span>
+                              <span className={`text-[13px] font-semibold tabular-nums w-[90px] text-right ${kalan > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{TL(kalan)}</span>
+                              <div className="w-7 shrink-0" />
                             </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ek Evraklar */}
+                    <div className="rounded-xl border border-blue-100 bg-white overflow-hidden flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <FileIcon size={12} /> Ek Evraklar
+                        </p>
+                        <button onClick={() => setEvrakModal({ icraId: k.id, kategori: 'ust_yazi' })}
+                          className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1.5 text-[12px] font-medium hover:bg-emerald-100 transition">
+                          <Upload size={12} /> Evrak Ekle
+                        </button>
+                      </div>
+                      <div className="p-4 flex-1">
+                        {!(dosyaMap[k.id]?.length) ? (
+                          <p className="text-[13px] text-slate-400 text-center py-4">Ek evrak bulunmuyor.</p>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {dosyaMap[k.id].map(d => {
+                              const katLabel: Record<string, { label: string; cls: string }> = {
+                                ust_yazi:    { label: 'Üst Yazı',    cls: 'bg-blue-50 text-blue-700' },
+                                tebligat_ek: { label: 'Tebligat Ek', cls: 'bg-amber-50 text-amber-700' },
+                                cevap_ek:    { label: 'Cevap Ek',    cls: 'bg-emerald-50 text-emerald-700' },
+                                diger:       { label: 'Diğer',       cls: 'bg-slate-100 text-slate-600' },
+                              }
+                              const kat = katLabel[d.kategori] || katLabel['diger']
+                              return (
+                                <div key={d.id} className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white px-2.5 py-2 hover:bg-slate-50 transition">
+                                  <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${kat.cls}`}>{kat.label}</span>
+                                  <a href={d.dosya_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <FileIcon size={12} className={fileExt(d.dosya_adi).color} />
+                                    <span className="text-[12px] text-slate-600 truncate">{d.dosya_adi}</span>
+                                  </a>
+                                  <button onClick={() => deleteExtraDoc(d)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition shrink-0" title="Sil">
+                                    <X size={11}/>
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -839,7 +1095,7 @@ ${icerik}
         <Modal title={modal.id ? 'İcra Kaydını Düzenle' : 'Yeni İcra Kaydı'} onClose={() => setModal(null)} size="xl"
           footer={
             <>
-              <button onClick={() => setModal(null)} className={cls.btnSecondary}>İptal</button>
+              <button onClick={() => { setModal(null); setModalErr(''); }} className={cls.btnSecondary}>İptal</button>
               <button onClick={save} disabled={saving} className={cls.btnPrimary}>
                 {uploading ? 'Dosya yükleniyor...' : saving ? 'Kaydediliyor...' : modal.id ? 'Güncelle' : 'Kaydet'}
               </button>
@@ -847,163 +1103,176 @@ ${icerik}
           }
         >
           <div className="space-y-5">
-            {modalErr && <ErrorMsg message={modalErr} />}
+            {modalErr && <ErrorMsg message={modalErr} onRetry={() => setModalErr('')} />}
 
-            {/* Personel durumu — en üstte */}
+            {!modal.id && firmalar.length > 1 && (
+              <Field label="Firma">
+                <select className={cls.input} value={selFirmaId} onChange={e => setSelFirmaId(e.target.value)}>
+                  {firmalar.map(f => <option key={f.id} value={f.id}>{f.kisa_ad || f.ad}</option>)}
+                </select>
+              </Field>
+            )}
+
             <Field label="Personel Durumu" required>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {([['calisiyor', 'Çalışmaya Devam Ediyor'], ['ayrildi', 'İşten Ayrıldı']] as [IcraIsciDurumu, string][]).map(([val, lbl]) => (
-                  <button key={val} type="button" onClick={() => setF({ isci_durumu: val, cikis_tarihi: val === 'calisiyor' ? null : modal.form.cikis_tarihi })}
-                    className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold border transition-all ${
+                  <button key={val} type="button"
+                    onClick={() => setF({ isci_durumu: val, cikis_tarihi: val === 'calisiyor' ? null : modal.form.cikis_tarihi })}
+                    className={`flex-1 py-2.5 px-3 rounded-xl text-[13px] font-medium border transition-all ${
                       modal.form.isci_durumu === val
-                        ? val === 'calisiyor' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-red-500/20 border-red-500/40 text-red-400'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                    }`}>
-                    {lbl}
-                  </button>
+                        ? val === 'calisiyor' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}>{lbl}</button>
                 ))}
               </div>
             </Field>
 
             {modal.form.isci_durumu === 'ayrildi' && (
               <Field label="İşten Çıkış Tarihi">
-                <input type="date" className={cls.input}
-                  value={modal.form.cikis_tarihi || ''}
+                <input type="date" className={cls.input} value={modal.form.cikis_tarihi || ''}
                   onChange={e => setF({ cikis_tarihi: e.target.value || null })} />
               </Field>
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Borçlu Adı" required>
-                <input className={cls.input} value={modal.form.borclu_adi} onChange={e => setF({ borclu_adi: e.target.value })} placeholder="Ad Soyad" />
+                <input className={cls.input} value={modal.form.borclu_adi}
+                  onChange={e => setF({ borclu_adi: e.target.value })} placeholder="Ad Soyad" />
               </Field>
               <Field label="TC Kimlik No">
-                <input className={cls.input} value={modal.form.tc_no || ''} onChange={e => setF({ tc_no: e.target.value })} placeholder="00000000000" maxLength={11} />
+                <input className={cls.input} value={modal.form.tc_no || ''}
+                  onChange={e => setF({ tc_no: e.target.value })} placeholder="00000000000" maxLength={11} />
               </Field>
             </div>
 
-            <Field label="Müşteri (İsteğe Bağlı)">
-              <select className={cls.input} value={modal.form.musteri_id || ''} onChange={e => setF({ musteri_id: e.target.value || null })}>
-                <option value="">— Seçiniz —</option>
-                {musteriler.map(m => <option key={m.id} value={m.id}>{m.ad}</option>)}
-              </select>
-            </Field>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="İcra Dairesi Adı" required>
-                <input className={cls.input} value={modal.form.icra_dairesi_adi} onChange={e => setF({ icra_dairesi_adi: e.target.value })} placeholder="X. İcra Müdürlüğü" />
+                <input className={cls.input} value={modal.form.icra_dairesi_adi}
+                  onChange={e => setF({ icra_dairesi_adi: e.target.value })} placeholder="X. İcra Müdürlüğü" />
               </Field>
               <Field label="Dosya Numarası" required>
-                <input className={cls.input} value={modal.form.dosya_no} onChange={e => setF({ dosya_no: e.target.value })} placeholder="2024/1234 E." />
+                <input className={cls.input} value={modal.form.dosya_no}
+                  onChange={e => setF({ dosya_no: e.target.value })} placeholder="2024/1234 E." />
               </Field>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Tebligat Tarihi" required>
-                <input type="date" className={cls.input} value={modal.form.tebligat_tarihi} onChange={e => setF({ tebligat_tarihi: e.target.value })} />
+                <input type="date" className={cls.input} value={modal.form.tebligat_tarihi}
+                  onChange={e => setF({ tebligat_tarihi: e.target.value })} />
               </Field>
               <Field label="Cevap Tarihi">
-                <input type="date" className={cls.input} value={modal.form.cevap_tarihi || ''} onChange={e => setF({ cevap_tarihi: e.target.value })} />
+                <input type="date" className={cls.input} value={modal.form.cevap_tarihi || ''}
+                  onChange={e => setF({ cevap_tarihi: e.target.value })} />
               </Field>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Alacaklı Adı" required>
-                <input className={cls.input} value={modal.form.alacakli_adi} onChange={e => setF({ alacakli_adi: e.target.value })} placeholder="Alacaklı kişi veya kurum" />
+                <input className={cls.input} value={modal.form.alacakli_adi}
+                  onChange={e => setF({ alacakli_adi: e.target.value })} placeholder="Alacaklı kişi veya kurum" />
               </Field>
               <Field label="Borç Tutarı (₺)" required>
-                <input type="number" className={cls.input} value={modal.form.borc_tutari || ''} onChange={e => setF({ borc_tutari: Number(e.target.value) })} placeholder="0.00" min={0} step="0.01" />
+                <input type="number" className={cls.input} value={modal.form.borc_tutari || ''}
+                  onChange={e => setF({ borc_tutari: Number(e.target.value) })} placeholder="0.00" min={0} step="0.01" />
               </Field>
             </div>
 
             <Field label="İcra Dairesi IBAN">
-              <input className={cls.input} value={modal.form.icra_dairesi_iban || ''} onChange={e => setF({ icra_dairesi_iban: e.target.value })} placeholder="TR00 0000 0000 0000 0000 0000 00" />
+              <input className={cls.input} value={modal.form.icra_dairesi_iban || ''}
+                onChange={e => setF({ icra_dairesi_iban: e.target.value })} placeholder="TR00 0000 0000 0000 0000 0000 00" />
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="KEP Numarası" hint="Kayıtlı Elektronik Posta numarası">
-                <input className={cls.input} value={modal.form.kep_no || ''} onChange={e => setF({ kep_no: e.target.value })} placeholder="ornek@hs01.kep.tr" />
+                <input className={cls.input} value={modal.form.kep_no || ''}
+                  onChange={e => setF({ kep_no: e.target.value })} placeholder="ornek@hs01.kep.tr" />
               </Field>
               <Field label="Barkod / Giriş Numarası">
-                <input className={cls.input} value={modal.form.barkod_no || ''} onChange={e => setF({ barkod_no: e.target.value })} placeholder="Üst yazı barkod veya giriş no" />
+                <input className={cls.input} value={modal.form.barkod_no || ''}
+                  onChange={e => setF({ barkod_no: e.target.value })} placeholder="Üst yazı barkod veya giriş no" />
               </Field>
             </div>
 
             <Field label="Durum">
-              <select className={cls.input} value={modal.form.durum} onChange={e => setF({ durum: e.target.value as IcraDurum })}>
+              <select className={cls.input} value={modal.form.durum}
+                onChange={e => setF({ durum: e.target.value as IcraDurum })}>
                 {(Object.keys(DURUM_LABEL) as IcraDurum[]).map(d => <option key={d} value={d}>{DURUM_LABEL[d]}</option>)}
               </select>
             </Field>
 
             <Field label="Notlar">
-              <textarea className={cls.input + ' resize-none'} rows={2} value={modal.form.notlar || ''} onChange={e => setF({ notlar: e.target.value })} placeholder="Ek açıklamalar..." />
+              <textarea className={cls.input + ' resize-none'} rows={2} value={modal.form.notlar || ''}
+                onChange={e => setF({ notlar: e.target.value })} placeholder="Ek açıklamalar..." />
             </Field>
 
-            {/* Evrak Ekleme */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Evrak Ekleme</p>
-              <p className="text-xs text-slate-500">Desteklenen formatlar: .doc, .docx, .xls, .xlsx, .pdf</p>
-
-              {/* Tebligat */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-300">Tebligat Evrakı</p>
-                {(pendingTebligat || modal.form.tebligat_dosya_adi) ? (
-                  <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
-                    <FileIcon size={14} className={fileExt(pendingTebligat?.name || modal.form.tebligat_dosya_adi || '').color} />
-                    <span className="text-sm text-slate-200 flex-1 truncate">{pendingTebligat?.name || modal.form.tebligat_dosya_adi}</span>
-                    {modal.form.tebligat_dosya_url && !pendingTebligat && (
-                      <a href={modal.form.tebligat_dosya_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300"><Download size={14} /></a>
-                    )}
-                    <button type="button" onClick={() => {
-                      if (pendingTebligat) { setPendingTebligat(null); if (tebligatRef.current) tebligatRef.current.value = '' }
-                      else if (modal.id) removeDocFromRecord(modal.id, 'tebligat').then(() => setF({ tebligat_dosya_url: null, tebligat_dosya_adi: null }))
-                      else setF({ tebligat_dosya_url: null, tebligat_dosya_adi: null })
-                    }} className="text-slate-400 hover:text-red-400"><X size={14} /></button>
-                  </div>
-                ) : (
-                  <button type="button" onClick={() => tebligatRef.current?.click()}
-                    className="w-full flex items-center justify-center gap-2 border border-dashed border-white/20 rounded-lg py-2.5 text-sm text-slate-400 hover:border-blue-500/50 hover:text-blue-400 transition-all">
-                    <Upload size={14} /> Tebligat Yükle
-                  </button>
-                )}
-                <input ref={tebligatRef} type="file" accept={ACCEPT} className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) setPendingTebligat(f) }} />
+            {/* Evrak */}
+            <div className="rounded-xl border border-blue-100 bg-slate-50 p-4 space-y-4">
+              <div>
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Evrak Ekleme</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">.doc · .docx · .xls · .xlsx · .pdf</p>
               </div>
 
-              {/* Cevap */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-300">Cevap Evrakı</p>
-                {(pendingCevap || modal.form.cevap_dosya_adi) ? (
-                  <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
-                    <FileIcon size={14} className={fileExt(pendingCevap?.name || modal.form.cevap_dosya_adi || '').color} />
-                    <span className="text-sm text-slate-200 flex-1 truncate">{pendingCevap?.name || modal.form.cevap_dosya_adi}</span>
-                    {modal.form.cevap_dosya_url && !pendingCevap && (
-                      <a href={modal.form.cevap_dosya_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:text-blue-300"><Download size={14} /></a>
+              {(['tebligat', 'cevap'] as const).map(tip => {
+                const isPending = tip === 'tebligat' ? pendingTebligat : pendingCevap
+                const savedAdi  = tip === 'tebligat' ? modal.form.tebligat_dosya_adi : modal.form.cevap_dosya_adi
+                const savedUrl  = tip === 'tebligat' ? modal.form.tebligat_dosya_url : modal.form.cevap_dosya_url
+                const ref       = tip === 'tebligat' ? tebligatRef : cevapRef
+                const label     = tip === 'tebligat' ? 'Tebligat Evrakı' : 'Cevap Evrakı'
+                const accentCls = tip === 'tebligat' ? 'border-blue-300 text-blue-600 hover:bg-blue-50' : 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
+
+                return (
+                  <div key={tip} className="space-y-2">
+                    <p className="text-[12px] font-medium text-slate-600">{label}</p>
+                    {(isPending || savedAdi) ? (
+                      <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-white px-3 py-2.5">
+                        <FileIcon size={14} className={fileExt(isPending?.name || savedAdi || '').color} />
+                        <span className="text-[13px] text-slate-700 flex-1 truncate">{isPending?.name || savedAdi}</span>
+                        {savedUrl && !isPending && (
+                          <a href={savedUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-500 transition"><Download size={13} /></a>
+                        )}
+                        <button type="button" onClick={() => {
+                          if (isPending) {
+                            tip === 'tebligat' ? setPendingTebligat(null) : setPendingCevap(null)
+                            if (ref.current) ref.current.value = ''
+                          } else if (modal.id) {
+                            removeDocFromRecord(modal.id, tip).then(() =>
+                              tip === 'tebligat'
+                                ? setF({ tebligat_dosya_url: null, tebligat_dosya_adi: null })
+                                : setF({ cevap_dosya_url: null, cevap_dosya_adi: null })
+                            )
+                          } else {
+                            tip === 'tebligat'
+                              ? setF({ tebligat_dosya_url: null, tebligat_dosya_adi: null })
+                              : setF({ cevap_dosya_url: null, cevap_dosya_adi: null })
+                          }
+                        }} className="text-slate-400 hover:text-red-600 transition"><X size={13} /></button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => ref.current?.click()}
+                        className={`w-full flex items-center justify-center gap-2 border border-dashed rounded-xl py-3 text-[13px] transition-all bg-white ${accentCls}`}>
+                        <Upload size={13} /> {label} Yükle
+                      </button>
                     )}
-                    <button type="button" onClick={() => {
-                      if (pendingCevap) { setPendingCevap(null); if (cevapRef.current) cevapRef.current.value = '' }
-                      else if (modal.id) removeDocFromRecord(modal.id, 'cevap').then(() => setF({ cevap_dosya_url: null, cevap_dosya_adi: null }))
-                      else setF({ cevap_dosya_url: null, cevap_dosya_adi: null })
-                    }} className="text-slate-400 hover:text-red-400"><X size={14} /></button>
+                    <input ref={ref} type="file" accept={ACCEPT} className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) tip === 'tebligat' ? setPendingTebligat(f) : setPendingCevap(f) }} />
                   </div>
-                ) : (
-                  <button type="button" onClick={() => cevapRef.current?.click()}
-                    className="w-full flex items-center justify-center gap-2 border border-dashed border-white/20 rounded-lg py-2.5 text-sm text-slate-400 hover:border-emerald-500/50 hover:text-emerald-400 transition-all">
-                    <Upload size={14} /> Cevap Yükle
-                  </button>
-                )}
-                <input ref={cevapRef} type="file" accept={ACCEPT} className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) setPendingCevap(f) }} />
-              </div>
+                )
+              })}
             </div>
           </div>
         </Modal>
       )}
 
-      {/* ── Modal: Ödeme Ekle ────────────────────────────────────────────────── */}
+      {/* ── Modal: Ödeme Ekle ──────────────────────────────────────────────── */}
       {odemeModal && (
         <Modal title="Ödeme Ekle" onClose={() => setOdemeModal(null)} size="sm"
-          footer={<><button onClick={() => setOdemeModal(null)} className={cls.btnSecondary}>İptal</button><button onClick={saveOdeme} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
+          footer={
+            <>
+              <button onClick={() => setOdemeModal(null)} className={cls.btnSecondary}>İptal</button>
+              <button onClick={saveOdeme} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+            </>
+          }>
           <div className="space-y-4">
             <Field label="Ödeme Tarihi" required>
               <input type="date" className={cls.input} value={odemeModal.form.odeme_tarihi}
@@ -1021,55 +1290,51 @@ ${icerik}
         </Modal>
       )}
 
-      {/* ── Modal: Cevap Yazısı ──────────────────────────────────────────────── */}
+      {/* ── Modal: Cevap Yazısı ────────────────────────────────────────────── */}
       {cevapModal && (
         <Modal title="Cevap Yazısı Oluştur" onClose={() => setCevapModal(null)} size="lg"
-          footer={<>
-            <button onClick={() => setCevapModal(null)} className={cls.btnSecondary}>İptal</button>
-            <button onClick={generateCevapYazisi} disabled={isGeneratingCevap} className={cls.btnPrimary}>
-              {isGeneratingCevap ? 'Oluşturuluyor...' : <><FileText size={14} /> Word İndir & Kaydet</>}
-            </button>
-          </>}>
+          footer={
+            <>
+              <button onClick={() => setCevapModal(null)} className={cls.btnSecondary}>İptal</button>
+              <button onClick={generateCevapYazisi} disabled={isGeneratingCevap} className={cls.btnPrimary}>
+                {isGeneratingCevap ? 'Oluşturuluyor...' : <><FileText size={14} /> Word İndir & Kaydet</>}
+              </button>
+            </>
+          }>
           <div className="space-y-4">
-            <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-4 space-y-1 text-sm">
-              <p><span className="text-slate-400">Dosya No:</span> <span className="text-white font-medium">{cevapModal.kayit.dosya_no}</span></p>
-              <p><span className="text-slate-400">Borçlu:</span> <span className="text-white font-medium">{cevapModal.kayit.borclu_adi}</span></p>
-              <p><span className="text-slate-400">Borç:</span> <span className="text-white font-medium">{TL(cevapModal.kayit.borc_tutari)}</span></p>
+            <div className="rounded-xl border border-blue-100 bg-slate-50 p-4 space-y-1.5 text-[13px]">
+              <p><span className="text-slate-400">Dosya No</span> <span className="text-slate-800 font-medium ml-2">{cevapModal.kayit.dosya_no}</span></p>
+              <p><span className="text-slate-400">Borçlu</span> <span className="text-slate-800 font-medium ml-2">{cevapModal.kayit.borclu_adi}</span></p>
+              <p><span className="text-slate-400">Borç Tutarı</span> <span className="text-slate-800 font-medium ml-2">{TL(cevapModal.kayit.borc_tutari)}</span></p>
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Cevap Veren (Müşteri)">
-                <select className={cls.input} value={cevapModal.form.cevap_veren_id}
-                  onChange={e => {
-                    const m = musteriler.find(x => x.id === e.target.value)
-                    setCevapModal(c => c ? { ...c, form: { ...c.form, cevap_veren_id: e.target.value, cevap_veren: m?.ad || '' } } : c)
-                  }}>
-                  <option value="">— Seçiniz —</option>
-                  {musteriler.map(m => <option key={m.id} value={m.id}>{m.ad}</option>)}
-                </select>
+              <Field label="Cevap Veren">
+                <input className={cls.input} value={cevapModal.form.cevap_veren}
+                  onChange={e => setCevapModal(c => c ? { ...c, form: { ...c.form, cevap_veren: e.target.value } } : c)}
+                  placeholder="Cevap veren kişi adı" />
               </Field>
-              <Field label="İşveren (Müşteri)">
-                <select className={cls.input} value={cevapModal.form.isveren_id}
-                  onChange={e => {
-                    const m = musteriler.find(x => x.id === e.target.value)
-                    setCevapModal(c => c ? { ...c, form: { ...c.form, isveren_id: e.target.value, isveren: m?.ad || firma.ad } } : c)
-                  }}>
-                  <option value="">— Seçiniz —</option>
-                  {musteriler.map(m => <option key={m.id} value={m.id}>{m.ad}</option>)}
-                </select>
+              <Field label="İşveren">
+                <input className={cls.input} value={cevapModal.form.isveren}
+                  onChange={e => setCevapModal(c => c ? { ...c, form: { ...c.form, isveren: e.target.value } } : c)}
+                  placeholder={firma.ad} />
               </Field>
             </div>
+
             <Field label="İşçinin Durumu">
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {([['devam', 'Çalışmaya Devam Ediyor'], ['cikti', 'İşten Ayrıldı']] as const).map(([val, lbl]) => (
-                  <button key={val} type="button" onClick={() => setCevapModal(m => m ? { ...m, form: { ...m.form, isci_durumu: val } } : m)}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+                  <button key={val} type="button"
+                    onClick={() => setCevapModal(m => m ? { ...m, form: { ...m.form, isci_durumu: val } } : m)}
+                    className={`flex-1 py-2.5 rounded-xl text-[13px] font-medium border transition-all ${
                       cevapModal.form.isci_durumu === val
-                        ? val === 'devam' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-red-500/20 border-red-500/40 text-red-400'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                        ? val === 'devam' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                     }`}>{lbl}</button>
                 ))}
               </div>
             </Field>
+
             {cevapModal.form.isci_durumu === 'cikti' && (
               <Field label="İşten Çıkış Tarihi">
                 <input type="date" className={cls.input} value={cevapModal.form.cikis_tarihi}
@@ -1081,7 +1346,7 @@ ${icerik}
                 <input type="number" className={cls.input} value={cevapModal.form.maas_tutari}
                   onChange={e => setCevapModal(m => m ? { ...m, form: { ...m.form, maas_tutari: e.target.value } } : m)} placeholder="0.00" min={0} step="0.01" />
                 {parseFloat(cevapModal.form.maas_tutari) > 0 && (
-                  <p className="text-xs text-emerald-400 mt-1 font-medium">
+                  <p className="text-[12px] text-emerald-600 mt-1 font-medium">
                     Kesilecek (1/4): {(parseFloat(cevapModal.form.maas_tutari) / 4).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                   </p>
                 )}
@@ -1095,16 +1360,67 @@ ${icerik}
         </Modal>
       )}
 
-      {/* ── Confirm: İcra Sil ────────────────────────────────────────────────── */}
       {deleteId && (
-        <ConfirmModal title="İcra Kaydını Sil" message="Bu icra kaydını, tüm ödeme geçmişini ve yüklü evrakları silmek istediğinize emin misiniz?"
+        <ConfirmModal title="İcra Kaydını Sil"
+          message="Bu icra kaydını, tüm ödeme geçmişini ve yüklü evrakları silmek istediğinize emin misiniz?"
           onConfirm={deleteKayit} onCancel={() => setDeleteId(null)} danger />
       )}
-
-      {/* ── Confirm: Ödeme Sil ───────────────────────────────────────────────── */}
       {odemeDeleteId && (
         <ConfirmModal title="Ödemeyi Sil" message="Bu ödeme kaydını silmek istediğinize emin misiniz?"
           onConfirm={deleteOdeme} onCancel={() => setOdemeDeleteId(null)} danger />
+      )}
+
+      {/* ── Modal: Hatırlatma ──────────────────────────────────────────────── */}
+      {reminderModal && (
+        <Modal title="Hatırlatma Ayarla" onClose={() => setReminderModal(null)} size="sm"
+          footer={
+            <>
+              <button onClick={() => setReminderModal(null)} className={cls.btnSecondary}>İptal</button>
+              <button onClick={saveReminder} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+            </>
+          }>
+          <div className="space-y-4">
+            <Field label="Tarih" required>
+              <input type="date" className={cls.input} value={reminderModal.tarih}
+                onChange={e => setReminderModal(m => m ? { ...m, tarih: e.target.value } : m)} />
+            </Field>
+            <Field label="Saat" required>
+              <input type="time" className={cls.input} value={reminderModal.saat}
+                onChange={e => setReminderModal(m => m ? { ...m, saat: e.target.value } : m)} />
+            </Field>
+            {reminderModal.hasExisting && (
+              <button onClick={() => clearReminder(reminderModal.id)} className="w-full mt-2 py-2 text-[13px] font-bold text-red-600 border border-dashed border-red-300 hover:bg-red-50 rounded-xl transition">
+                Mevcut Hatırlatmayı Temizle
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: Evrak Yükle ─────────────────────────────────────────────── */}
+      {evrakModal && (
+        <Modal title="Evrak Yükle" onClose={() => setEvrakModal(null)} size="sm"
+          footer={
+            <>
+              <button onClick={() => setEvrakModal(null)} className={cls.btnSecondary}>İptal</button>
+              <button onClick={() => fileRef.current?.click()} disabled={saving} className={cls.btnPrimary}>
+                {saving ? 'Yükleniyor...' : <><Upload size={14} /> Dosya Seç</>}
+              </button>
+            </>
+          }>
+          <div className="space-y-4">
+            <Field label="Evrak Türü" required>
+              <select className={cls.input} value={evrakModal.kategori}
+                onChange={e => setEvrakModal(m => m ? { ...m, kategori: e.target.value } : m)}>
+                <option value="ust_yazi">Üst Yazı</option>
+                <option value="tebligat_ek">Tebligat Eki</option>
+                <option value="cevap_ek">Cevap Eki</option>
+                <option value="diger">Diğer</option>
+              </select>
+            </Field>
+            <p className="text-[12px] text-slate-400">Türü seçtikten sonra "Dosya Seç" butonuna tıklayın.</p>
+          </div>
+        </Modal>
       )}
     </div>
   )

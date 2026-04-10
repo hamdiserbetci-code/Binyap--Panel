@@ -1,4 +1,4 @@
-﻿'use client'
+﻿﻿﻿﻿'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { OdemePlani, Firma } from '@/types'
@@ -26,19 +26,25 @@ const DURUM_COLORS: Record<string, string> = { beklemede:'bg-amber-50 text-amber
 
 export default function OdemePlaniPage({ firma, profil }: AppCtx) {
   const [odemeler, setOdemeler] = useState<OdemePlani[]>([])
+  const [musteriler, setMusteriler] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<OdemePlani | null>(null)
   const [filtre, setFiltre] = useState('hepsi')
   const today = new Date().toISOString().split('T')[0]
+  const defaultSaat = (profil as any).varsayilan_bildirim_saati || '09:00'
 
-  const emptyForm = { baslik:'', tur:'vergi', tutar:'', vade_tarihi: today, durum:'beklemede', aciklama:'' }
+  const emptyForm = { musteri_id: '', baslik:'', tur:'vergi', tutar:'', vade_tarihi: today, durum:'beklemede', aciklama:'', hatirlatici_saati: defaultSaat }
   const [form, setForm] = useState(emptyForm)
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('odeme_plani').select('*').eq('firma_id', firma.id).order('vade_tarihi', { ascending: true })
+    const [{ data }, { data: mData }] = await Promise.all([
+      supabase.from('odeme_plani').select('*, musteriler(ad, kisa_ad)').eq('firma_id', firma.id).order('vade_tarihi', { ascending: true }),
+      supabase.from('musteriler').select('id, ad, kisa_ad').eq('firma_id', firma.id).eq('aktif', true).order('ad')
+    ])
     setOdemeler(data || [])
+    setMusteriler(mData || [])
     setLoading(false)
   }, [firma.id])
 
@@ -46,13 +52,13 @@ export default function OdemePlaniPage({ firma, profil }: AppCtx) {
 
   function openModal(o?: OdemePlani) {
     setEditing(o || null)
-    setForm(o ? { baslik:o.baslik, tur:o.tur, tutar:String(o.tutar), vade_tarihi:o.vade_tarihi, durum:o.durum, aciklama:o.aciklama||'' } : emptyForm)
+    setForm(o ? { musteri_id: (o as any).musteri_id || '', baslik:o.baslik, tur:o.tur, tutar:String(o.tutar), vade_tarihi:o.vade_tarihi, durum:o.durum, aciklama:o.aciklama||'', hatirlatici_saati: (o as any).hatirlatici_saati || defaultSaat } : emptyForm)
     setModal(true)
   }
 
   async function handleSave() {
     if (!form.baslik || !form.tutar || !form.vade_tarihi) return
-    const data = { ...form, tutar:parseFloat(form.tutar), firma_id:firma.id, user_id:profil.auth_user_id, aciklama: form.aciklama || null }
+    const data = { ...form, musteri_id: form.musteri_id || null, tutar:parseFloat(form.tutar), firma_id:firma.id, user_id:profil.auth_user_id, aciklama: form.aciklama || null, hatirlatici_tarihi: form.vade_tarihi, hatirlatici_saati: form.hatirlatici_saati }
     if (editing) await supabase.from('odeme_plani').update(data).eq('id', editing.id)
     else await supabase.from('odeme_plani').insert(data)
     setModal(false); fetch()
@@ -171,7 +177,10 @@ export default function OdemePlaniPage({ firma, profil }: AppCtx) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <p className="text-sm font-medium text-slate-800">{o.baslik}</p>
+                    <p className="text-sm font-medium text-slate-800">
+                      {o.baslik}
+                      {(o as any).musteriler && <span className="text-[10px] text-slate-400 ml-1">({(o as any).musteriler.kisa_ad || (o as any).musteriler.ad})</span>}
+                    </p>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${DURUM_COLORS[o.durum]}`}>
                       {o.durum==='beklemede'?'Beklemede':o.durum==='odendi'?'Ödendi':o.durum==='gecikti'?'Gecikti':'İptal'}
                     </span>
@@ -203,6 +212,14 @@ export default function OdemePlaniPage({ firma, profil }: AppCtx) {
             <h3 className="font-bold text-slate-800 text-lg p-5 border-b border-slate-100">{editing ? 'Ödemeyi Düzenle' : 'Yeni Ödeme Ekle'}</h3>
             <div className="p-5">
               <div className="space-y-4">
+                <FormField label="Müşteri / Cari">
+                  <select className={inputCls} value={form.musteri_id} onChange={e => setForm({ ...form, musteri_id: e.target.value })}>
+                    <option value="">Firma Genel (Bağımsız)</option>
+                    {musteriler.map(m => (
+                      <option key={m.id} value={m.id}>{m.kisa_ad || m.ad}</option>
+                    ))}
+                  </select>
+                </FormField>
                 <FormField label="Başlık" required>
                   <input className={inputCls} value={form.baslik} onChange={e => setForm({ ...form, baslik: e.target.value })} placeholder="Ödeme açıklaması" />
                 </FormField>
@@ -229,9 +246,14 @@ export default function OdemePlaniPage({ firma, profil }: AppCtx) {
                     </select>
                   </FormField>
                 </div>
-                <FormField label="Açıklama">
-                  <input className={inputCls} value={form.aciklama} onChange={e => setForm({ ...form, aciklama: e.target.value })} placeholder="Opsiyonel not" />
-                </FormField>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField label="Açıklama">
+                    <input className={inputCls} value={form.aciklama} onChange={e => setForm({ ...form, aciklama: e.target.value })} placeholder="Opsiyonel not" />
+                  </FormField>
+                  <FormField label="Bildirim Saati">
+                    <input type="time" className={inputCls} value={form.hatirlatici_saati} onChange={e => setForm({ ...form, hatirlatici_saati: e.target.value })} />
+                  </FormField>
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">

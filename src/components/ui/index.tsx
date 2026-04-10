@@ -5,55 +5,55 @@ import { useEffect } from 'react'
 import type { GorevDurum, IsTip, Oncelik } from '@/types'
 import { DURUM_COLOR, DURUM_LABEL, ONCELIK_COLOR, ONCELIK_LABEL, TIP_LABEL } from '@/lib/utils'
 
-// ── iOS Stil Sabitleri ─────────────────────────────────────────────────────
+// ── Light Ice-Blue Theme Sabitleri ─────────────────────────────────────────
 export const cls = {
   input: [
-    'w-full rounded-lg border border-[rgba(168,185,212,0.18)] bg-[rgba(8,18,34,0.84)]',
-    'px-3 py-1.5 text-sm font-medium text-[rgba(245,247,251,0.96)] placeholder:text-[rgba(230,236,245,0.40)]',
-    'outline-none focus:border-[rgba(116,166,255,0.55)] focus:ring-1 focus:ring-[rgba(116,166,255,0.15)]',
+    'w-full rounded-lg border border-blue-200 bg-white',
+    'px-3 py-1.5 text-sm font-medium text-slate-700 placeholder:text-slate-400',
+    'outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20',
     'transition-all disabled:opacity-40',
   ].join(' '),
 
   inputSm: [
-    'w-full rounded-lg border border-[rgba(168,185,212,0.2)] bg-[rgba(8,18,34,0.84)]',
-    'px-2.5 py-1.5 text-xs font-medium text-[rgba(245,247,251,0.96)] placeholder:text-[rgba(230,236,245,0.45)]',
-    'outline-none focus:border-[rgba(116,166,255,0.58)] transition-all',
+    'w-full rounded-lg border border-blue-200 bg-white',
+    'px-2.5 py-1.5 text-xs font-medium text-slate-700 placeholder:text-slate-400',
+    'outline-none focus:border-blue-400 transition-all',
   ].join(' '),
 
   btnPrimary: [
     'flex items-center justify-center gap-1.5',
-    'bg-[linear-gradient(180deg,#5b93f7_0%,#447de5_100%)] hover:brightness-105 active:brightness-95',
+    'bg-blue-500 hover:bg-blue-600 active:bg-blue-700',
     'text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold',
     'transition-all disabled:opacity-40 disabled:cursor-not-allowed',
-    'shadow-[0_6px_16px_rgba(68,125,229,0.22)]',
+    'shadow-sm',
   ].join(' '),
 
   btnSecondary: [
     'flex items-center justify-center gap-1.5',
-    'bg-[rgba(18,32,54,0.72)] hover:bg-[rgba(27,44,70,0.82)]',
-    'text-[rgba(245,247,251,0.92)] px-3.5 py-1.5 rounded-lg text-sm font-semibold',
-    'transition-all border border-[rgba(168,185,212,0.18)] backdrop-blur-md',
+    'bg-white hover:bg-slate-50',
+    'text-slate-700 px-3.5 py-1.5 rounded-lg text-sm font-semibold',
+    'transition-all border border-slate-200',
   ].join(' '),
 
   btnDanger: [
     'flex items-center justify-center gap-1.5',
-    'bg-[#d9534f] hover:bg-[#e1635e]',
+    'bg-red-500 hover:bg-red-600',
     'text-white px-3.5 py-1.5 rounded-lg text-sm font-semibold',
     'transition-all',
   ].join(' '),
 
   btnGhost: [
     'flex items-center justify-center gap-1',
-    'text-[rgba(116,166,255,0.94)] hover:bg-[rgba(76,139,245,0.1)]',
+    'text-blue-600 hover:bg-blue-50',
     'px-2 py-1.5 rounded-lg text-sm font-semibold transition-all',
   ].join(' '),
 
-  th: 'text-left px-3 py-2 text-[10px] font-bold text-[rgba(230,236,245,0.46)] uppercase tracking-[0.14em] whitespace-nowrap',
-  td: 'px-3 py-2 text-sm text-[rgba(245,247,251,0.9)]',
-  card: 'rounded-xl border border-[rgba(162,180,206,0.13)] bg-[rgba(10,23,41,0.72)] backdrop-blur-xl shadow-[0_8px_32px_rgba(2,8,23,0.28)]',
+  th: 'text-left px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-[0.14em] whitespace-nowrap',
+  td: 'px-3 py-2 text-sm text-slate-700',
+  card: 'rounded-xl border border-blue-100 bg-white shadow-sm',
 }
 
-// ── Modal (iOS Bottom Sheet) ───────────────────────────────────────────────
+// ── Modal ─────────────────────────────────────────────────────────────────
 export function Modal({ title, onClose, children, footer, size = 'md' }: {
   title: string; onClose: () => void; children: React.ReactNode
   footer?: React.ReactNode; size?: 'sm' | 'md' | 'lg' | 'xl'
@@ -68,26 +68,24 @@ export function Modal({ title, onClose, children, footer, size = 'md' }: {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-[6px]"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 backdrop-blur-[6px]"
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={`
-        bg-[rgba(10,23,41,0.88)] w-full ${maxW[size]}
+        bg-white w-full ${maxW[size]}
         rounded-t-[20px] sm:rounded-[20px]
         max-h-[92dvh] flex flex-col
-        shadow-[0_-2px_40px_rgba(2,8,23,0.55)] sm:shadow-[0_16px_48px_rgba(2,8,23,0.5)]
-        ios-sheet-enter
-        border border-[rgba(162,180,206,0.16)]
+        shadow-xl border border-blue-100
       `}>
         {/* Drag handle (mobil) */}
         <div className="flex justify-center pt-2.5 pb-1 sm:hidden shrink-0">
-          <div className="w-9 h-1 rounded-full bg-[rgba(255,255,255,0.2)]" />
+          <div className="w-9 h-1 rounded-full bg-slate-200" />
         </div>
 
         {/* Başlık */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[rgba(162,180,206,0.12)] shrink-0">
-          <h2 className="text-[15px] font-semibold text-[rgba(245,247,251,0.96)] tracking-tight">{title}</h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0">
+          <h2 className="text-[15px] font-semibold text-slate-800 tracking-tight">{title}</h2>
           <button onClick={onClose}
-            className="w-6 h-6 rounded-full bg-[rgba(18,32,54,0.75)] flex items-center justify-center text-[rgba(230,236,245,0.65)] hover:text-white transition-colors">
+            className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors">
             <X size={13} strokeWidth={2.5} />
           </button>
         </div>
@@ -97,7 +95,7 @@ export function Modal({ title, onClose, children, footer, size = 'md' }: {
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-[rgba(162,180,206,0.12)] shrink-0">
+          <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-slate-100 shrink-0">
             {footer}
           </div>
         )}
@@ -112,13 +110,13 @@ export function Field({ label, required, error, hint, children }: {
 }) {
   return (
     <div className="space-y-1">
-      <label className="block text-[11px] font-semibold text-[rgba(230,236,245,0.55)] uppercase tracking-[0.12em]">
-        {label}{required && <span className="text-[#FF453A] ml-0.5">*</span>}
+      <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-[0.12em]">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
-      {hint && !error && <p className="text-xs text-[rgba(230,236,245,0.42)]">{hint}</p>}
+      {hint && !error && <p className="text-xs text-slate-400">{hint}</p>}
       {error && (
-        <p className="text-xs text-[#FF453A] flex items-center gap-1">
+        <p className="text-xs text-red-500 flex items-center gap-1">
           <AlertCircle size={11} />{error}
         </p>
       )}
@@ -130,8 +128,8 @@ export function Field({ label, required, error, hint, children }: {
 export function Loading({ text = 'Yükleniyor...' }: { text?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
-      <Loader2 size={24} className="animate-spin text-[#0A84FF]" />
-      <span className="text-sm text-[rgba(230,236,245,0.5)]">{text}</span>
+      <Loader2 size={24} className="animate-spin text-blue-500" />
+      <span className="text-sm text-slate-500">{text}</span>
     </div>
   )
 }
@@ -139,11 +137,11 @@ export function Loading({ text = 'Yükleniyor...' }: { text?: string }) {
 // ── ErrorMsg ──────────────────────────────────────────────────────────────
 export function ErrorMsg({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-[rgba(248,113,113,0.28)] bg-[rgba(127,29,29,0.18)] p-4 text-sm text-[#fca5a5]">
-      <AlertCircle size={16} className="shrink-0" />
+    <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <AlertCircle size={16} className="shrink-0 text-red-500" />
       <span className="flex-1">{message}</span>
       {onRetry && (
-        <button onClick={onRetry} className="text-xs font-semibold underline text-[#FF453A] hover:text-[#FF6961]">
+        <button onClick={onRetry} className="text-xs font-semibold underline text-red-600 hover:text-red-800">
           Tekrar dene
         </button>
       )}
@@ -163,7 +161,7 @@ export function ConfirmModal({ title, message, onConfirm, onCancel, danger = fal
           <button onClick={onConfirm} className={danger ? cls.btnDanger : cls.btnPrimary}>Onayla</button>
         </>
       }>
-      <p className="text-sm text-[rgba(245,247,251,0.82)]">{message}</p>
+      <p className="text-sm text-slate-700">{message}</p>
     </Modal>
   )
 }
@@ -189,12 +187,12 @@ export function OncelikBadge({ oncelik }: { oncelik: Oncelik }) {
 // ── Badge: Tip ────────────────────────────────────────────────────────────
 export function TipBadge({ tip }: { tip: IsTip }) {
   const colors: Record<IsTip, string> = {
-    beyanname: 'bg-[rgba(191,90,242,0.2)] text-[#BF5AF2]',
-    odeme:     'bg-[rgba(255,159,10,0.2)] text-[#FF9F0A]',
-    bordro:    'bg-[rgba(10,132,255,0.2)] text-[#0A84FF]',
-    mutabakat: 'bg-[rgba(90,200,245,0.2)] text-[#5AC8F5]',
-    edefter:   'bg-[rgba(94,92,230,0.2)] text-[#5E5CE6]',
-    diger:     'bg-[rgba(120,120,128,0.2)] text-[rgba(235,235,245,0.5)]',
+    beyanname: 'bg-purple-100 text-purple-700',
+    odeme:     'bg-amber-100 text-amber-700',
+    bordro:    'bg-blue-100 text-blue-700',
+    mutabakat: 'bg-cyan-100 text-cyan-700',
+    edefter:   'bg-indigo-100 text-indigo-700',
+    diger:     'bg-slate-100 text-slate-600',
   }
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${colors[tip]}`}>
@@ -205,10 +203,10 @@ export function TipBadge({ tip }: { tip: IsTip }) {
 
 // ── Kalan Gün ─────────────────────────────────────────────────────────────
 export function KalanGunBadge({ gun }: { gun: number }) {
-  if (gun < 0)   return <span className="text-xs font-semibold text-[#FF453A]">{Math.abs(gun)} gün gecikti</span>
-  if (gun === 0) return <span className="text-xs font-semibold text-[#FF453A]">Bugün!</span>
-  if (gun <= 3)  return <span className="text-xs font-semibold text-[#FF9F0A]">{gun} gün kaldı</span>
-  return <span className="text-xs text-[rgba(235,235,245,0.3)]">{gun} gün kaldı</span>
+  if (gun < 0)   return <span className="text-xs font-semibold text-red-600">{Math.abs(gun)} gün gecikti</span>
+  if (gun === 0) return <span className="text-xs font-semibold text-red-600">Bugün!</span>
+  if (gun <= 3)  return <span className="text-xs font-semibold text-amber-600">{gun} gün kaldı</span>
+  return <span className="text-xs text-slate-400">{gun} gün kaldı</span>
 }
 
 // ── Empty State ───────────────────────────────────────────────────────────
@@ -218,11 +216,11 @@ export function Empty({ icon: Icon, title, description, action }: {
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[18px] bg-[rgba(18,32,54,0.85)] border border-[rgba(162,180,206,0.14)]">
-        <Icon size={28} className="text-[rgba(230,236,245,0.36)]" />
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[18px] bg-blue-50 border border-blue-100">
+        <Icon size={28} className="text-blue-300" />
       </div>
-      <p className="text-sm font-semibold text-[rgba(245,247,251,0.86)]">{title}</p>
-      {description && <p className="mt-1 max-w-xs text-xs text-[rgba(230,236,245,0.44)]">{description}</p>}
+      <p className="text-sm font-semibold text-slate-700">{title}</p>
+      {description && <p className="mt-1 max-w-xs text-xs text-slate-400">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   )

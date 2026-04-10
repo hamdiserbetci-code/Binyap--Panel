@@ -1,529 +1,454 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BellRing, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Clock, FileSpreadsheet, FileText, Plus, Upload, User2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle2, FileSpreadsheet, FileText, Plus, X, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { ErrorMsg, Loading } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
-import type { Dokuman, KullaniciProfil, MaliyetSureci as MaliyetSureciBase, Musteri } from '@/types'
-import { cls, ErrorMsg, Field, Loading, Modal } from '@/components/ui'
+import type { Dokuman, MaliyetSureci as MaliyetSureciBase } from '@/types'
 
+// ── Types ──────────────────────────────────────────────────────────────────
+interface MaliyetSureci extends MaliyetSureciBase {
+  musteri_id?: string | null
+}
+
+// ── Config ─────────────────────────────────────────────────────────────────
 const RAPOR_TIPLERI = [
-  { key: 'efatura', label: 'E-Fatura Alis Raporu', accent: 'blue' },
-  { key: 'earsiv', label: 'E-Arsiv Fatura Raporu', accent: 'emerald' },
-  { key: 'utts', label: 'UTTS Alis Raporu', accent: 'amber' },
-  { key: 'bordro', label: 'Aylik Bordro Icmal Raporu', accent: 'violet' },
-  { key: 'satis', label: 'Aylik Satis Raporu', accent: 'rose' },
+  { key: 'efatura', label: 'E-Fatura Alış Raporu',     accent: 'blue'    },
+  { key: 'earsiv',  label: 'E-Arşiv Fatura Raporu',    accent: 'emerald' },
+  { key: 'utts',    label: 'UTTS Alış Raporu',          accent: 'amber'   },
+  { key: 'bordro',  label: 'Aylık Bordro İcmal Raporu', accent: 'violet'  },
+  { key: 'satis',   label: 'Aylık Satış Raporu',        accent: 'rose'    },
 ] as const
 
-interface MaliyetSureci extends MaliyetSureciBase {
-  musteri_id?: string | null;
-}
-
 type RaporKey = (typeof RAPOR_TIPLERI)[number]['key']
-type ReminderState = { id: string; tarih: string; saat: string; hasExisting: boolean }
-type DonemForm = { donem: string; sorumlu_id: string; teslim_gunu: string }
-type MetaModalState = { id: string; sorumlu_id: string; teslim_gunu: string }
 
-const EMPTY_FORM: DonemForm = {
-  donem: new Date().toISOString().slice(0, 7),
-  sorumlu_id: '',
-  teslim_gunu: '',
+const AYLAR     = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara']
+const AYLAR_TAM = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+
+const ACCENT: Record<string, { dot: string; text: string; bg: string }> = {
+  blue:    { dot: 'bg-blue-400',    text: 'text-blue-600',    bg: 'bg-blue-50'    },
+  emerald: { dot: 'bg-emerald-400', text: 'text-emerald-600', bg: 'bg-emerald-50' },
+  amber:   { dot: 'bg-amber-400',   text: 'text-amber-600',   bg: 'bg-amber-50'   },
+  violet:  { dot: 'bg-violet-400',  text: 'text-violet-600',  bg: 'bg-violet-50'  },
+  rose:    { dot: 'bg-rose-400',    text: 'text-rose-600',    bg: 'bg-rose-50'    },
 }
 
-const ACCEPTED_TYPES = '.xlsx,.xls,.pdf'
+const ACCEPTED = '.xlsx,.xls,.pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf'
 
-const ACCENT_STYLES: Record<string, { soft: string; text: string; border: string }> = {
-  blue: { soft: 'bg-blue-500/10', text: 'text-blue-300', border: 'border-blue-500/20' },
-  emerald: { soft: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/20' },
-  amber: { soft: 'bg-amber-500/10', text: 'text-amber-300', border: 'border-amber-500/20' },
-  violet: { soft: 'bg-violet-500/10', text: 'text-violet-300', border: 'border-violet-500/20' },
-  rose: { soft: 'bg-rose-500/10', text: 'text-rose-300', border: 'border-rose-500/20' },
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const pad = (n: number) => String(n).padStart(2, '0')
+
+function getCellStatus(surec: MaliyetSureci | undefined, rapor: RaporKey): 'none' | 'partial' | 'done' {
+  if (!surec) return 'none'
+  const kontrol = Boolean(surec[`${rapor}_kontrol` as keyof MaliyetSureci])
+  const luca    = Boolean(surec[`${rapor}_luca`    as keyof MaliyetSureci])
+  if (kontrol && luca) return 'done'
+  if (kontrol || luca) return 'partial'
+  return 'none'
 }
 
-function donemLabel(donem: string) {
-  const [yil, ay] = donem.split('-')
-  const aylar = ['Ocak', 'Subat', 'Mart', 'Nisan', 'Mayis', 'Haziran', 'Temmuz', 'Agustos', 'Eylul', 'Ekim', 'Kasim', 'Aralik']
-  const index = Number(ay) - 1
-  if (index < 0 || index > 11) return donem
-  return `${aylar[index]} ${yil}`
+function isExcel(doc: Dokuman) {
+  return doc.mime_type?.includes('sheet') || doc.mime_type?.includes('excel') || /\.xlsx?$/i.test(doc.dosya_adi)
 }
 
-function getReportState(surec: MaliyetSureci, key: RaporKey) {
-  const kontrol = Boolean(surec[`${key}_kontrol` as keyof MaliyetSureci])
-  const luca = Boolean(surec[`${key}_luca` as keyof MaliyetSureci])
-  return { kontrol, luca, tamamlandi: kontrol && luca }
+// ── MaliyetCell ──────────────────────────────────────────────────────────────
+function MaliyetCell({ status, isActive, isCurrent, disabled, onClick }: {
+  status: 'none' | 'partial' | 'done'
+  isActive: boolean; isCurrent: boolean; disabled: boolean; onClick: () => void
+}) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className={['group w-full h-7 rounded-md border transition-all flex items-center justify-center select-none',
+        isActive
+          ? 'ring-2 ring-blue-400/50 border-blue-400 bg-blue-50'
+          : status === 'done'    ? 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100'
+          : status === 'partial' ? 'border-amber-300 bg-amber-50 hover:bg-amber-100'
+          : isCurrent            ? 'border-blue-200 bg-blue-50/50 hover:bg-blue-50'
+          :                        'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      {status === 'done'    && <CheckCircle2 size={13} className="text-emerald-500 pointer-events-none" />}
+      {status === 'partial' && <div className="w-3 h-3 rounded-full border-2 border-amber-400 bg-amber-100 pointer-events-none" />}
+      {status === 'none'    && <Plus size={11} className="text-transparent group-hover:text-slate-400 transition-colors pointer-events-none" />}
+    </button>
+  )
 }
 
-function getCompletedCount(surec: MaliyetSureci) {
-  return RAPOR_TIPLERI.filter(({ key }) => getReportState(surec, key).tamamlandi).length
-}
+// ── Main Component ──────────────────────────────────────────────────────────
+export default function AylikMaliyet({
+  firma, firmalar, firmaIds, profil,
+}: AppCtx) {
+  const todayYil = new Date().getFullYear()
+  const todayAy  = new Date().getMonth()
+  let targetAy = todayAy - 1; let targetYil = todayYil;
+  if (targetAy < 0) { targetAy = 11; targetYil--; }
 
-function getOverallStatus(surec: MaliyetSureci) {
-  return getCompletedCount(surec) === RAPOR_TIPLERI.length ? 'tamamlandi' : 'bekliyor'
-}
-
-function fileTypeLabel(doc: Dokuman) {
-  const isSheet = doc.mime_type?.includes('sheet') || /\.xlsx?$/i.test(doc.dosya_adi)
-  return isSheet ? 'Excel' : 'PDF'
-}
-
-function getSorumluLabel(surec: MaliyetSureci, kullanicilar: KullaniciProfil[]) {
-  const sorumlu = kullanicilar.find((item) => item.id === surec.sorumlu_id)
-  return sorumlu?.ad_soyad || sorumlu?.email || 'Atanmadi'
-}
-
-function getTeslimTarihi(donem: string, teslimGunu?: number | null) {
-  if (!teslimGunu) return null
-  const [yilRaw, ayRaw] = getNextMonth(donem).split('-')
-  const yil = Number(yilRaw)
-  const ay = Number(ayRaw)
-  if (!yil || !ay) return null
-  const sonGun = new Date(yil, ay, 0).getDate()
-  const gun = Math.min(teslimGunu, sonGun)
-  return new Date(yil, ay - 1, gun)
-}
-
-function getIslemAyLabel(donem: string) {
-  return donemLabel(getNextMonth(donem))
-}
-
-function getTeslimLabel(donem: string, teslimGunu?: number | null) {
-  const tarih = getTeslimTarihi(donem, teslimGunu)
-  return tarih ? tarih.toLocaleDateString('tr-TR') : 'Belirlenmedi'
-}
-
-function getGecikmeDurumu(surec: MaliyetSureci) {
-  const tarih = getTeslimTarihi(surec.donem, surec.teslim_gunu)
-  if (!tarih || surec.durum === 'tamamlandi') return false
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  return tarih.getTime() < now.getTime()
-}
-
-function getNextMonth(donem: string) {
-  const [yilRaw, ayRaw] = donem.split('-')
-  const tarih = new Date(Number(yilRaw), Number(ayRaw) - 1, 1)
-  tarih.setMonth(tarih.getMonth() + 1)
-  return `${tarih.getFullYear()}-${String(tarih.getMonth() + 1).padStart(2, '0')}`
-}
-
-export default function AylikMaliyet({ firma, profil, selectedMusteri }: AppCtx & { musteriler: Musteri[], selectedMusteri: string }) {
+  const [yil, setYil]           = useState(targetYil)
+  const [selFirmaId, setSelFirmaId] = useState(firma.id)
   const [surecler, setSurecler] = useState<MaliyetSureci[]>([])
-  const [kullanicilar, setKullanicilar] = useState<KullaniciProfil[]>([])
   const [dosyaMap, setDosyaMap] = useState<Record<string, Dokuman[]>>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [showAdd, setShowAdd] = useState(false)
-  const [donemForm, setDonemForm] = useState<DonemForm>(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
-  const [uploadingItem, setUploadingItem] = useState<{ id: string; rKey: RaporKey } | null>(null)
-  const [reminderModal, setReminderModal] = useState<ReminderState | null>(null)
-  const [noteModal, setNoteModal] = useState<{ id: string; value: string } | null>(null)
-  const [metaModal, setMetaModal] = useState<MetaModalState | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
+  const [selCell, setSelCell]   = useState<{ donem: string; rapor: RaporKey } | null>(null)
+  const [notVal, setNotVal]     = useState('')
+  const [saving, setSaving]     = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [uploading, setUploading]   = useState(false)
+  const [uploadingItem, setUploadingItem] = useState<{ recordId: string; raporKey: RaporKey } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => { load() }, [firma.id])
-  useEffect(() => {
-    timerRef.current = setInterval(checkReminders, 60_000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [surecler])
-
-  const filteredSurecler = useMemo(() => {
-    if (!selectedMusteri) return [];
-    return surecler.filter(s => s.musteri_id === selectedMusteri);
-  }, [surecler, selectedMusteri]);
-
-  const summary = useMemo(() => {
-    const toplamDonem = filteredSurecler.length
-    const tamamlananDonem = filteredSurecler.filter((s) => getOverallStatus(s) === 'tamamlandi').length
-    const bekleyenDonem = toplamDonem - tamamlananDonem
-    const aktifHatirlatma = filteredSurecler.filter((s) => s.hatirlatici_tarihi || s.hatirlatici_saati).length
-    const gecikenDonem = filteredSurecler.filter((s) => getGecikmeDurumu(s)).length
-    return { toplamDonem, tamamlananDonem, bekleyenDonem, aktifHatirlatma, gecikenDonem }
-  }, [filteredSurecler])
-
-  async function requestNotifPermission() {
-    if (!('Notification' in window)) return
-    await Notification.requestPermission()
-  }
-
-  function checkReminders() {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return
-    const now = new Date()
-    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    const today = now.toISOString().split('T')[0]
-    surecler.forEach((surec) => {
-      if (surec.hatirlatici_tarihi === today && surec.hatirlatici_saati === hhmm && getOverallStatus(surec) !== 'tamamlandi') {
-        new Notification('Aylik maliyet hatirlaticisi', { body: `${donemLabel(surec.donem)} donemi ${getIslemAyLabel(surec.donem)} icinde tamamlanmadi.`, icon: '/favicon.ico' })
-      }
-    })
-  }
+  useEffect(() => { void load() }, [firmaIds.join(',')])
 
   async function load() {
-    setLoading(true)
-    setError('')
-    const [{ data, error: loadError }, { data: userData, error: userError }] = await Promise.all([
-      supabase.from('maliyet_surecler').select('*').eq('firma_id', firma.id).order('donem', { ascending: false }),
-      supabase.from('kullanici_profilleri').select('*').eq('firma_id', firma.id).eq('aktif', true).order('ad_soyad'),
+    setLoading(true); setError('')
+    const [{ data: s, error: se }, { data: docs, error: de }] = await Promise.all([
+      supabase.from('maliyet_surecler').select('*').in('firma_id', firmaIds),
+      supabase.from('dokumanlar').select('*').in('firma_id', firmaIds).eq('bagli_tablo', 'maliyet_surecler'),
     ])
-    if (loadError || userError) {
-      setError(loadError?.message || userError?.message || 'Veriler yuklenemedi.')
-      setLoading(false)
-      return
-    }
-    const rows = (data || []) as MaliyetSureci[]
-    setSurecler(rows)
-    setKullanicilar((userData || []) as KullaniciProfil[])
-    if (rows.length > 0 && !expandedId) setExpandedId(rows[0].id)
-    const ids = rows.map((row) => row.id)
-    if (ids.length === 0) {
-      setDosyaMap({})
-      setLoading(false)
-      return
-    }
-    const { data: docs, error: docsError } = await supabase.from('dokumanlar').select('*').eq('firma_id', firma.id).eq('bagli_tablo', 'maliyet_surecler').in('bagli_kayit_id', ids).order('created_at', { ascending: false })
-    if (docsError) {
-      setError(docsError.message)
-      setLoading(false)
-      return
-    }
-    const nextMap: Record<string, Dokuman[]> = {}
-    ;(docs || []).forEach((doc) => {
+    if (se || de) { setError(se?.message || de?.message || 'Veri hatası'); setLoading(false); return }
+    setSurecler((s || []) as MaliyetSureci[])
+    const map: Record<string, Dokuman[]> = {}
+    ;(docs || []).forEach(doc => {
       const key = `${doc.bagli_kayit_id}_${doc.kategori}`
-      if (!nextMap[key]) nextMap[key] = []
-      nextMap[key].push(doc as Dokuman)
+      if (!map[key]) map[key] = []
+      map[key].push(doc as Dokuman)
     })
-    setDosyaMap(nextMap)
+    setDosyaMap(map)
     setLoading(false)
   }
 
-  function resetDonemForm() {
-    setDonemForm({ donem: new Date().toISOString().slice(0, 7), sorumlu_id: '', teslim_gunu: '' })
-  }
+  const getSurec = (donem: string): MaliyetSureci | undefined =>
+    surecler.find(s => s.firma_id === selFirmaId && s.donem === donem)
 
-  async function createDonem(payload?: Partial<DonemForm>) {
-    const form = { donem: payload?.donem ?? donemForm.donem, sorumlu_id: payload?.sorumlu_id ?? donemForm.sorumlu_id, teslim_gunu: payload?.teslim_gunu ?? donemForm.teslim_gunu }
-    if (!form.donem) return false
-    setSaving(true)
-    const { error: insertError } = await supabase.from('maliyet_surecler').insert({
-      firma_id: firma.id,
-      donem: form.donem,
-      sorumlu_id: form.sorumlu_id || null,
-      teslim_gunu: form.teslim_gunu ? Number(form.teslim_gunu) : null,
-      musteri_id: selectedMusteri || null,
-    })
-    setSaving(false)
-    if (insertError) {
-      alert(insertError.message)
-      return false
+  const progress = useMemo(() => {
+    let total = 0, done = 0
+    for (let m = 0; m < 12; m++) {
+      const donem = `${yil}-${pad(m + 1)}`
+      const surec = surecler.find(s => s.firma_id === selFirmaId && s.donem === donem)
+      if (!surec) continue
+      for (const r of RAPOR_TIPLERI) { total++; if (getCellStatus(surec, r.key) === 'done') done++ }
     }
-    setShowAdd(false)
-    resetDonemForm()
-    await load()
-    return true
-  }
+    return { total, done, pct: total ? Math.round((done / total) * 100) : 0 }
+  }, [surecler, yil])
 
-  async function cloneNextMonth(surec: MaliyetSureci) {
-    const { error: insertError } = await supabase.from('maliyet_surecler').insert({
-      firma_id: firma.id,
-      donem: getNextMonth(surec.donem),
-      sorumlu_id: surec.sorumlu_id || null,
-      teslim_gunu: surec.teslim_gunu,
-      musteri_id: surec.musteri_id || null,
-    })
-    if (insertError) { alert(insertError.message); return }
-    await load()
-  }
-
-  async function updateSurec(id: string, payload: Partial<MaliyetSureci>) {
-    const { error: updateError } = await supabase.from('maliyet_surecler').update(payload).eq('id', id)
-    if (updateError) {
-      alert(updateError.message)
-      await load()
-      return false
+  async function handleCell(rapor: RaporKey, donem: string) {
+    let surec = getSurec(donem)
+    if (!surec) {
+      setSaving(true)
+      const { data, error: e } = await supabase
+        .from('maliyet_surecler')
+        .insert({ firma_id: selFirmaId, donem })
+        .select().single()
+      setSaving(false)
+      if (e) { alert(e.message); return }
+      if (data) { surec = data as MaliyetSureci; setSurecler(prev => [...prev, surec!]) }
     }
-    return true
+    setSelCell({ donem, rapor })
+    setNotVal(surec?.notlar ?? '')
   }
 
-  async function toggleField(surec: MaliyetSureci, key: keyof MaliyetSureci) {
-    const nextValue = !Boolean(surec[key])
-    const nextSurec = { ...surec, [key]: nextValue } as MaliyetSureci
-    const nextDurum = getOverallStatus(nextSurec)
-    setSurecler((prev) => prev.map((item) => (item.id === surec.id ? { ...item, [key]: nextValue, durum: nextDurum } : item)))
-    await updateSurec(surec.id, { [key]: nextValue, durum: nextDurum } as Partial<MaliyetSureci>)
+  async function toggleField(field: keyof MaliyetSureci) {
+    const surec = selCell ? getSurec(selCell.donem) : null
+    if (!surec) return
+    const nextVal = !Boolean(surec[field])
+    const { error: e } = await supabase.from('maliyet_surecler').update({ [field]: nextVal }).eq('id', surec.id)
+    if (e) { alert(e.message); return }
+    setSurecler(prev => prev.map(s => s.id === surec.id ? { ...s, [field]: nextVal } : s))
   }
 
-  async function toggleOverallDurum(surec: MaliyetSureci) {
-    const nextDurum = surec.durum === 'tamamlandi' ? 'bekliyor' : 'tamamlandi'
-    setSurecler((prev) => prev.map((item) => (item.id === surec.id ? { ...item, durum: nextDurum } : item)))
-    await updateSurec(surec.id, { durum: nextDurum })
-  }
-
-  async function saveReminder() {
-    if (!reminderModal?.tarih || !reminderModal?.saat) return
+  async function saveNot() {
+    const surec = selCell ? getSurec(selCell.donem) : null
+    if (!surec) return
     setSaving(true)
-    const ok = await updateSurec(reminderModal.id, { hatirlatici_tarihi: reminderModal.tarih, hatirlatici_saati: reminderModal.saat })
+    const { error: e } = await supabase.from('maliyet_surecler').update({ notlar: notVal || null }).eq('id', surec.id)
     setSaving(false)
-    if (!ok) return
-    setReminderModal(null)
-    await load()
+    if (e) { alert(e.message); return }
+    setSurecler(prev => prev.map(s => s.id === surec.id ? { ...s, notlar: notVal || null } : s))
   }
 
-  async function clearReminder(id: string) {
-    setSaving(true)
-    const ok = await updateSurec(id, { hatirlatici_tarihi: null, hatirlatici_saati: null })
-    setSaving(false)
-    if (!ok) return
-    setReminderModal(null)
-    await load()
-  }
-
-  async function saveNote() {
-    if (!noteModal) return
-    setSaving(true)
-    const ok = await updateSurec(noteModal.id, { notlar: noteModal.value || null })
-    setSaving(false)
-    if (!ok) return
-    setSurecler((prev) => prev.map((item) => (item.id === noteModal.id ? { ...item, notlar: noteModal.value || null } : item)))
-    setNoteModal(null)
-  }
-
-  async function saveMeta() {
-    if (!metaModal) return
-    setSaving(true)
-    const ok = await updateSurec(metaModal.id, { sorumlu_id: metaModal.sorumlu_id || null, teslim_gunu: metaModal.teslim_gunu ? Number(metaModal.teslim_gunu) : null })
-    setSaving(false)
-    if (!ok) return
-    setMetaModal(null)
-    await load()
+  async function deleteRecord() {
+    const surec = selCell ? getSurec(selCell.donem) : null
+    if (!surec) return
+    setDeleting(true)
+    const { error: e } = await supabase.from('maliyet_surecler').delete().eq('id', surec.id)
+    setDeleting(false)
+    if (e) { alert(e.message); return }
+    setSurecler(prev => prev.filter(s => s.id !== surec.id))
+    setSelCell(null)
   }
 
   async function uploadFile(event: React.ChangeEvent<HTMLInputElement>) {
     const files = event.target.files
     if (!files?.length || !uploadingItem) return
-    setSaving(true)
+    const { recordId, raporKey } = uploadingItem
+    setUploading(true)
     for (const file of Array.from(files)) {
-      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
-      const isExcel = file.type.includes('sheet') || file.type.includes('excel') || /\.xlsx?$/i.test(file.name)
-      if (!isPdf && !isExcel) {
-        alert(`${file.name} sadece Excel veya PDF olarak yuklenebilir.`)
-        continue
-      }
+      const isPdf   = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+      const isExcelFile = file.type.includes('sheet') || file.type.includes('excel') || /\.xlsx?$/i.test(file.name)
+      if (!isPdf && !isExcelFile) { alert(`${file.name} sadece PDF veya Excel olabilir.`); continue }
       const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const path = `maliyetler/${firma.id}/${uploadingItem.id}/${uploadingItem.rKey}/${safeName}`
-      const { error: storageError } = await supabase.storage.from('arsiv').upload(path, file, { upsert: false })
-      if (storageError) {
-        alert(storageError.message)
-        continue
+      const path = `maliyetler/${selFirmaId}/${recordId}/${raporKey}/${safeName}`
+      const { error: sErr } = await supabase.storage.from('dokumanlar').upload(path, file, { upsert: false })
+      if (sErr) { alert(sErr.message); continue }
+      const { data: urlData } = supabase.storage.from('dokumanlar').getPublicUrl(path)
+      const { data: doc, error: dErr } = await supabase.from('dokumanlar').insert({
+        firma_id: selFirmaId,
+        yukleyen_id: profil.auth_user_id,
+        modul: 'rapor' as const,
+        kategori: raporKey,
+        bagli_tablo: 'maliyet_surecler',
+        bagli_kayit_id: recordId,
+        dosya_adi: file.name,
+        dosya_url: urlData.publicUrl,
+        mime_type: file.type || null,
+        dosya_boyutu: file.size || null,
+      }).select().single()
+      if (dErr) { alert(dErr.message); continue }
+      if (doc) {
+        const key = `${recordId}_${raporKey}`
+        setDosyaMap(prev => ({ ...prev, [key]: [...(prev[key] || []), doc as Dokuman] }))
       }
-      const { data: urlData } = supabase.storage.from('arsiv').getPublicUrl(path)
-      const { error: insertError } = await supabase.from('dokumanlar').insert({
-        firma_id: firma.id, yukleyen_id: profil.auth_user_id, modul: 'rapor', kategori: uploadingItem.rKey, bagli_tablo: 'maliyet_surecler',
-        bagli_kayit_id: uploadingItem.id, dosya_adi: file.name, dosya_url: urlData.publicUrl, mime_type: file.type || null, dosya_boyutu: file.size || null,
-      })
-      if (insertError) alert(insertError.message)
     }
-    setSaving(false)
+    setUploading(false)
     setUploadingItem(null)
     if (fileRef.current) fileRef.current.value = ''
-    await load()
   }
 
-  if (loading) return <div className="p-8"><Loading /></div>
-  if (error) return <ErrorMsg message={error} onRetry={load} />
+  async function deleteDoc(doc: Dokuman) {
+    const { error: e } = await supabase.from('dokumanlar').delete().eq('id', doc.id)
+    if (e) { alert(e.message); return }
+    const key = `${doc.bagli_kayit_id}_${doc.kategori}`
+    setDosyaMap(prev => ({ ...prev, [key]: (prev[key] || []).filter(d => d.id !== doc.id) }))
+  }
+
+  if (loading) return <Loading />
+  if (error)   return <ErrorMsg message={error} onRetry={load} />
+
+  const selSurec = selCell ? getSurec(selCell.donem) : null
+  const selRapor = selCell ? RAPOR_TIPLERI.find(r => r.key === selCell.rapor) ?? null : null
+  const selAyIdx = selCell ? Number(selCell.donem.split('-')[1]) - 1 : -1
+  const selYil   = selCell ? selCell.donem.split('-')[0] : yil
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-6">
-      <div className="rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.2),transparent_35%),rgba(15,23,42,0.75)] p-5 sm:p-6 shadow-2xl">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-300/80">Aylik Maliyet Takip Tablosu</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">Donem Ayi, Islem Ayi ve Son Teslim tarihi birlikte izlenir</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-300">Bu yapida maliyet dosyalari donem ayina gore kaydedilir, ancak takip ve kapanis bir sonraki islem ayinda yapilir. Ornegin Subat donemi Martta, Mart donemi Nisanda kapatilir.</p>
-          </div>
-          <div className="flex flex-wrap gap-3 lg:max-w-md lg:justify-end">
-            <button onClick={requestNotifPermission} className={`${cls.btnSecondary} text-xs`}><BellRing size={14} /> Bildirim izni</button>
-            <button onClick={() => { resetDonemForm(); setShowAdd(true) }} className={cls.btnPrimary}><Plus size={16} /> Yeni donem</button>
-          </div>
+    <div className="space-y-5">
+      <input ref={fileRef} type="file" multiple accept={ACCEPTED} className="hidden" onChange={uploadFile} />
+
+      {/* ── Yıl Navigasyonu ── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          {firmalar.length > 1 && (
+            <select
+              className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 shadow-sm mr-2"
+              value={selFirmaId}
+              onChange={e => setSelFirmaId(e.target.value)}
+            >
+              {firmalar.map(f => <option key={f.id} value={f.id}>{f.kisa_ad || f.ad}</option>)}
+            </select>
+          )}
+          <button onClick={() => setYil(y => y - 1)} className="w-8 h-8 rounded-lg border border-slate-200 bg-white grid place-items-center hover:bg-slate-50 transition shadow-sm">
+            <ChevronLeft size={14} className="text-slate-600" />
+          </button>
+          <span className="text-xl font-bold text-slate-800 w-16 text-center tabular-nums">{yil}</span>
+          <button onClick={() => setYil(y => y + 1)} className="w-8 h-8 rounded-lg border border-slate-200 bg-white grid place-items-center hover:bg-slate-50 transition shadow-sm">
+            <ChevronRight size={14} className="text-slate-600" />
+          </button>
+          {yil !== targetYil && (
+            <button onClick={() => setYil(targetYil)} className="text-xs text-blue-600 hover:text-blue-800 transition px-2 py-1 rounded-lg hover:bg-blue-50 border border-blue-100">
+              Bu Dönem
+            </button>
+          )}
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <SummaryCard label="Toplam Donem" value={String(summary.toplamDonem)} tone="slate" />
-          <SummaryCard label="Bekleyen Donem" value={String(summary.bekleyenDonem)} tone="amber" />
-          <SummaryCard label="Tamamlanan Donem" value={String(summary.tamamlananDonem)} tone="emerald" />
-          <SummaryCard label="Geciken Teslim" value={String(summary.gecikenDonem)} tone="rose" />
-          <SummaryCard label="Aktif Hatirlatma" value={String(summary.aktifHatirlatma)} tone="indigo" />
+        {progress.total > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500">{progress.done}/{progress.total} rapor</span>
+            <div className="w-28 h-2 rounded-full bg-slate-200 overflow-hidden">
+              <div className="h-full rounded-full bg-emerald-400 transition-[width] duration-500" style={{ width: `${progress.pct}%` }} />
+            </div>
+            <span className="text-xs font-bold text-emerald-600 w-8 tabular-nums">{progress.pct}%</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Maliyet Matrisi ── */}
+      <div className="rounded-xl border border-blue-100 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse" style={{ minWidth: 800 }}>
+            <colgroup>
+              <col style={{ width: 172 }} />
+              {Array.from({ length: 12 }, (_, i) => <col key={i} style={{ width: 52 }} />)}
+            </colgroup>
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <th className="sticky left-0 z-10 bg-slate-50 text-left px-4 py-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Rapor Tipi</span>
+                </th>
+                {AYLAR.map((ay, i) => (
+                  <th key={i} className={['text-center py-2.5 text-[11px] font-semibold', i === targetAy && yil === targetYil ? 'text-blue-600' : 'text-slate-400'].join(' ')}>
+                    {ay}
+                    {i === targetAy && yil === targetYil && <div className="w-1 h-1 rounded-full bg-blue-500 mx-auto mt-0.5" title="İşlem Ayı (Önceki Ay)" />}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {RAPOR_TIPLERI.map((rapor, ri, arr) => {
+                const ac = ACCENT[rapor.accent]
+                return (
+                  <tr key={rapor.key} className={['transition-colors hover:bg-slate-50/80', ri < arr.length - 1 ? 'border-b border-slate-100' : ''].join(' ')}>
+                    <td className="sticky left-0 z-10 bg-white px-4 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${ac.dot}`} />
+                        <span className={`text-xs font-semibold ${ac.text}`}>{rapor.label}</span>
+                      </div>
+                    </td>
+                    {Array.from({ length: 12 }, (_, mi) => {
+                      const donem = `${yil}-${pad(mi + 1)}`
+                      const surec = getSurec(donem)
+                      return (
+                        <td key={mi} className="px-1 py-1">
+                          <MaliyetCell
+                            status={getCellStatus(surec, rapor.key)}
+                            isActive={selCell?.rapor === rapor.key && selCell.donem === donem}
+                            isCurrent={yil === targetYil && mi === targetAy}
+                            disabled={saving}
+                            onClick={() => handleCell(rapor.key, donem)}
+                          />
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2.5 flex items-center gap-5 flex-wrap">
+          <div className="flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-500" /><span className="text-[11px] text-slate-500">Tamamlandı (Kontrol + Luca)</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border-2 border-amber-400 bg-amber-100" /><span className="text-[11px] text-slate-500">Devam Ediyor</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border border-slate-300" /><span className="text-[11px] text-slate-500">Kayıt Yok — tıkla başlat</span></div>
         </div>
       </div>
-      <input ref={fileRef} type="file" multiple accept={ACCEPTED_TYPES} className="hidden" onChange={uploadFile} />
-      {filteredSurecler.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-white/10 bg-slate-900/50 p-12 text-center">
-          <p className="text-base font-semibold text-white">Bu müşteri için henüz aylık maliyet dönemi oluşturulmadı.</p>
-          <p className="mt-2 text-sm text-slate-400">Yeni bir dönem kaydı açarak ilgili ayın maliyet toplama ve sonraki ay kapanış sürecini başlatabilirsiniz.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredSurecler.map((surec) => {
-            const isExpanded = expandedId === surec.id
-            const tamamlanan = getCompletedCount(surec)
-            const progress = (tamamlanan / RAPOR_TIPLERI.length) * 100
-            const isDone = surec.durum === 'tamamlandi'
-            const gecikti = getGecikmeDurumu(surec)
 
-            return (
-              <div key={surec.id} className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70 shadow-xl">
-                <button onClick={() => setExpandedId(isExpanded ? null : surec.id)} className="flex w-full flex-col gap-4 p-5 text-left transition-colors hover:bg-white/5 sm:p-6">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-blue-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-300">{surec.donem}</span>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${isDone ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{isDone ? 'Tamamlandi' : 'Bekliyor'}</span>
-                        {gecikti && <span className="rounded-full bg-rose-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-rose-300">Teslim gecikti</span>}
-                        {(surec.hatirlatici_tarihi || surec.hatirlatici_saati) && <span className="rounded-full bg-indigo-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-300">Hatirlatma aktif</span>}
-                      </div>
-                      <h3 className="mt-3 text-xl font-bold text-white">{donemLabel(surec.donem)} Donem Dosyasi</h3>
-                      <p className="mt-1 text-sm text-slate-400">Islem Ayi: {getIslemAyLabel(surec.donem)} · Tamamlanan Kalem: {tamamlanan}/{RAPOR_TIPLERI.length}</p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-300">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"><User2 size={12} className="text-sky-300" /> Sorumlu: {getSorumluLabel(surec, kullanicilar)}</span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"><CalendarDays size={12} className="text-cyan-300" /> Islem Ayi: {getIslemAyLabel(surec.donem)}</span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"><CalendarDays size={12} className="text-amber-300" /> Son Teslim Tarihi: {getTeslimLabel(surec.donem, surec.teslim_gunu)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 self-start lg:self-center">
-                      <div className="min-w-[160px]">
-                        <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-slate-400"><span>Ilerleme</span><span>%{Math.round(progress)}</span></div>
-                        <div className="h-2 rounded-full bg-white/10"><div className="h-2 rounded-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400" style={{ width: `${progress}%` }} /></div>
-                      </div>
-                      {isExpanded ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
-                    </div>
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-white/10 bg-black/25 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      <button onClick={() => toggleOverallDurum(surec)} className={`${cls.btnSecondary} text-xs`}><CheckCircle2 size={14} /> {surec.durum === 'tamamlandi' ? 'Bekliyor olarak isaretle' : 'Donemi tamamlandi olarak isaretle'}</button>
-                      <button onClick={() => setMetaModal({ id: surec.id, sorumlu_id: surec.sorumlu_id || '', teslim_gunu: surec.teslim_gunu ? String(surec.teslim_gunu) : '' })} className={`${cls.btnSecondary} text-xs`}><User2 size={14} /> Sorumlu / teslim tarihi</button>
-                      <button onClick={() => setReminderModal({ id: surec.id, tarih: surec.hatirlatici_tarihi || new Date().toISOString().split('T')[0], saat: surec.hatirlatici_saati || '', hasExisting: Boolean(surec.hatirlatici_tarihi || surec.hatirlatici_saati) })} className={`${cls.btnSecondary} text-xs`}><BellRing size={14} /> {(surec.hatirlatici_tarihi || surec.hatirlatici_saati) ? 'Hatirlatmayi duzenle' : 'Hatirlatma ekle'}</button>
-                      <button onClick={() => setNoteModal({ id: surec.id, value: surec.notlar || '' })} className={`${cls.btnSecondary} text-xs`}><FileText size={14} /> Notlar</button>
-                      <button onClick={() => cloneNextMonth(surec)} className={`${cls.btnSecondary} text-xs`}><Plus size={14} /> Sonraki ayi olustur</button>
-                    </div>
-                    {surec.notlar && (
-                      <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Donem Notu</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-200">{surec.notlar}</p>
-                      </div>
-                    )}
-                    <div className="space-y-3">
-                      {RAPOR_TIPLERI.map((rapor) => {
-                        const state = getReportState(surec, rapor.key)
-                        const docs = dosyaMap[`${surec.id}_${rapor.key}`] || []
-                        const accent = ACCENT_STYLES[rapor.accent]
-                        return (
-                          <div key={rapor.key} className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-                            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                              <div className="min-w-0 xl:w-[28%]">
-                                <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${accent.soft} ${accent.border}`}>
-                                  <FileText size={13} className={accent.text} />
-                                  <span className={`text-xs font-bold uppercase tracking-[0.18em] ${accent.text}`}>{rapor.label}</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap gap-3 xl:w-[40%]">
-                                <StatusToggle label="Kontrol Edildi" active={state.kontrol} onClick={() => toggleField(surec, `${rapor.key}_kontrol` as keyof MaliyetSureci)} />
-                                <StatusToggle label="Luca'ya Yuklendi" active={state.luca} onClick={() => toggleField(surec, `${rapor.key}_luca` as keyof MaliyetSureci)} />
-                                <StatusBadge label="Tamamlandi" active={state.tamamlandi} />
-                              </div>
-                              <div className="xl:w-[32%]">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Evraklar ({docs.length})</p>
-                                  <button onClick={() => { setUploadingItem({ id: surec.id, rKey: rapor.key }); fileRef.current?.click() }} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-300 transition-colors hover:text-white"><Upload size={13} /> Excel / PDF ekle</button>
-                                </div>
-                                {docs.length === 0 ? (
-                                  <div className="mt-2 rounded-xl border border-dashed border-white/10 px-3 py-3 text-xs text-slate-500">Bu kalem icin henuz evrak yuklenmedi.</div>
-                                ) : (
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {docs.map((doc) => (
-                                      <a key={doc.id} href={doc.dosya_url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 transition-colors hover:bg-white/10">
-                                        {fileTypeLabel(doc) === 'Excel' ? <FileSpreadsheet size={12} className="shrink-0 text-emerald-300" /> : <FileText size={12} className="shrink-0 text-rose-300" />}
-                                        <span className="truncate">{doc.dosya_adi}</span>
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
+      {/* ── Detay Paneli ── */}
+      {selCell && selRapor && (
+        <div className="rounded-xl border border-blue-100 bg-white shadow-sm p-5">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={`w-2 h-2 rounded-full ${ACCENT[selRapor.accent].dot}`} />
+                <span className={`text-xs font-bold uppercase tracking-wider ${ACCENT[selRapor.accent].text}`}>{selRapor.label}</span>
               </div>
-            )
-          })}
+              <p className="text-lg font-bold text-slate-800 leading-tight">{selAyIdx >= 0 ? AYLAR_TAM[selAyIdx] : ''} {selYil}</p>
+            </div>
+            <button onClick={() => setSelCell(null)} className="p-1.5 rounded-lg hover:bg-slate-100 transition shrink-0">
+              <X size={14} className="text-slate-400" />
+            </button>
+          </div>
+
+          {selSurec ? (
+            <div className="space-y-5">
+              {/* Kontrol + Luca Adımları */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {([
+                  { field: `${selCell.rapor}_kontrol` as keyof MaliyetSureci, label: 'Kontrol Edildi'    },
+                  { field: `${selCell.rapor}_luca`    as keyof MaliyetSureci, label: "Luca'ya Yüklendi" },
+                ]).map(({ field, label }) => {
+                  const done = Boolean(selSurec[field])
+                  return (
+                    <button key={String(field)} onClick={() => toggleField(field)}
+                      className={['flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm font-semibold transition-all text-left',
+                        done ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800',
+                      ].join(' ')}
+                    >
+                      <div className={['w-6 h-6 rounded-full border-2 grid place-items-center shrink-0', done ? 'border-emerald-400 bg-emerald-100' : 'border-slate-300'].join(' ')}>
+                        {done && <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">{label}</div>
+                      {done && <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* ── Dosyalar ── */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Dosyalar (PDF / Excel)</p>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-500">{selRapor.label}</span>
+                    <button
+                      onClick={() => { setUploadingItem({ recordId: selSurec.id, raporKey: selCell.rapor }); fileRef.current?.click() }}
+                      disabled={uploading}
+                      className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-800 transition disabled:opacity-40"
+                    >
+                      {uploading && uploadingItem?.raporKey === selCell.rapor
+                        ? <div className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                        : <Plus size={11} />
+                      }
+                      Dosya Ekle
+                    </button>
+                  </div>
+
+                  {(() => {
+                    const docs = dosyaMap[`${selSurec.id}_${selCell.rapor}`] || []
+                    if (docs.length === 0) return (
+                      <p className="text-[10px] text-slate-400 italic">Henüz dosya yüklenmedi</p>
+                    )
+                    return (
+                      <div className="space-y-1.5">
+                        {docs.map(doc => (
+                          <div key={doc.id} className="flex items-center gap-2 group/doc">
+                            {isExcel(doc)
+                              ? <FileSpreadsheet size={11} className="text-emerald-500 shrink-0" />
+                              : <FileText        size={11} className="text-rose-500    shrink-0" />
+                            }
+                            <a href={doc.dosya_url} target="_blank" rel="noreferrer"
+                              className="flex-1 min-w-0 text-[11px] text-blue-600 hover:text-blue-800 truncate transition">
+                              {doc.dosya_adi}
+                            </a>
+                            <span className="text-[9px] text-slate-400 shrink-0">
+                              {isExcel(doc) ? 'Excel' : 'PDF'}
+                            </span>
+                            <button onClick={() => deleteDoc(doc)}
+                              className="shrink-0 opacity-0 group-hover/doc:opacity-100 text-rose-400 hover:text-rose-600 transition">
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              {/* Notlar */}
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Notlar</label>
+                <textarea
+                  className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/20 transition-all resize-none min-h-[72px]"
+                  placeholder="Bu dönem için not ekleyin..." value={notVal} onChange={e => setNotVal(e.target.value)} />
+              </div>
+
+              {/* Aksiyonlar */}
+              <div className="flex items-center justify-between">
+                <button onClick={deleteRecord} disabled={deleting}
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-40">
+                  <Trash2 size={12} />
+                  {deleting ? 'Siliniyor...' : 'Dönem Kaydını Sil'}
+                </button>
+                <button onClick={saveNot} disabled={saving}
+                  className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all border border-slate-200">
+                  {saving ? 'Kaydediliyor...' : 'Notu Kaydet'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 py-2">Kayıt yükleniyor...</p>
+          )}
         </div>
-      )}
-      {showAdd && (
-        <Modal title="Yeni Aylik Maliyet Donemi" onClose={() => setShowAdd(false)} size="sm" footer={<><button onClick={() => setShowAdd(false)} className={cls.btnSecondary}>Iptal</button><button onClick={() => createDonem()} disabled={saving} className={cls.btnPrimary}>{saving ? 'Olusturuluyor...' : 'Olustur'}</button></>}>
-          <div className="space-y-4">
-            <Field label="Donem" required hint="Ornek: 2026-03"><input type="month" className={cls.input} value={donemForm.donem} onChange={(e) => setDonemForm((prev) => ({ ...prev, donem: e.target.value }))} autoFocus /></Field>
-            <Field label="Sorumlu Kullanici">
-              <select className={cls.input} value={donemForm.sorumlu_id} onChange={(e) => setDonemForm((prev) => ({ ...prev, sorumlu_id: e.target.value }))}>
-                <option value="">Atanmadi</option>
-                {kullanicilar.map((kullanici) => <option key={kullanici.id} value={kullanici.id}>{kullanici.ad_soyad || kullanici.email}</option>)}
-              </select>
-            </Field>
-            <Field label="Son Teslim Gunu" hint="Takip eden islem ayinin hangi gunu tamamlanacagini yazin. Ornek: Subat donemi icin 5 yazarsaniz teslim tarihi 5 Mart olur."><input type="number" min={1} max={31} className={cls.input} value={donemForm.teslim_gunu} onChange={(e) => setDonemForm((prev) => ({ ...prev, teslim_gunu: e.target.value }))} /></Field>
-          </div>
-        </Modal>
-      )}
-      {metaModal && (
-        <Modal title="Sorumlu ve Teslim Bilgisi" onClose={() => setMetaModal(null)} size="sm" footer={<><button onClick={() => setMetaModal(null)} className={cls.btnSecondary}>Iptal</button><button onClick={saveMeta} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
-          <div className="space-y-4">
-            <Field label="Sorumlu Kullanici">
-              <select className={cls.input} value={metaModal.sorumlu_id} onChange={(e) => setMetaModal((prev) => (prev ? { ...prev, sorumlu_id: e.target.value } : prev))}>
-                <option value="">Atanmadi</option>
-                {kullanicilar.map((kullanici) => <option key={kullanici.id} value={kullanici.id}>{kullanici.ad_soyad || kullanici.email}</option>)}
-              </select>
-            </Field>
-            <Field label="Son Teslim Gunu" hint="Bu gun, donemin takip eden islem ayi icinde kullanilir."><input type="number" min={1} max={31} className={cls.input} value={metaModal.teslim_gunu} onChange={(e) => setMetaModal((prev) => (prev ? { ...prev, teslim_gunu: e.target.value } : prev))} /></Field>
-          </div>
-        </Modal>
-      )}
-      {reminderModal && (
-        <Modal title="Hatirlatma Ayarla" onClose={() => setReminderModal(null)} size="sm" footer={<><button onClick={() => setReminderModal(null)} className={cls.btnSecondary}>Iptal</button><button onClick={saveReminder} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
-          <div className="space-y-4">
-            <Field label="Tarih" required><input type="date" className={cls.input} value={reminderModal.tarih} onChange={(e) => setReminderModal((prev) => (prev ? { ...prev, tarih: e.target.value } : prev))} autoFocus /></Field>
-            <Field label="Saat" required><input type="time" className={cls.input} value={reminderModal.saat} onChange={(e) => setReminderModal((prev) => (prev ? { ...prev, saat: e.target.value } : prev))} /></Field>
-            {reminderModal.hasExisting && <button type="button" onClick={() => clearReminder(reminderModal.id)} className="w-full rounded-xl border border-dashed border-red-500/30 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-500/10">Mevcut hatirlatmayi temizle</button>}
-          </div>
-        </Modal>
-      )}
-      {noteModal && (
-        <Modal title="Donem Notlari" onClose={() => setNoteModal(null)} size="sm" footer={<><button onClick={() => setNoteModal(null)} className={cls.btnSecondary}>Iptal</button><button onClick={saveNote} disabled={saving} className={cls.btnPrimary}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button></>}>
-          <Field label="Surec Notu" hint="Bu alana aylik maliyet sureciyle ilgili aciklama, bekleyen konu veya kontrol notu girebilirsiniz.">
-            <textarea className={`${cls.input} resize-none`} rows={5} value={noteModal.value} onChange={(e) => setNoteModal((prev) => (prev ? { ...prev, value: e.target.value } : prev))} autoFocus />
-          </Field>
-        </Modal>
       )}
     </div>
   )
-}
-
-function SummaryCard({ label, value, tone }: { label: string; value: string; tone: 'slate' | 'amber' | 'emerald' | 'indigo' | 'rose' }) {
-  const tones = { slate: 'bg-white/5 border-white/10 text-white', amber: 'bg-amber-500/10 border-amber-500/20 text-amber-300', emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300', indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300', rose: 'bg-rose-500/10 border-rose-500/20 text-rose-300' }
-  return <div className={`rounded-2xl border px-4 py-4 ${tones[tone]}`}><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>
-}
-
-function StatusToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-400 hover:text-white'}`}><SwitchKnob checked={active} /><span>{label}</span></button>
-}
-
-function StatusBadge({ label, active }: { label: string; active: boolean }) {
-  return <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-white/5 text-slate-500'}`}>{active ? <CheckCircle2 size={14} /> : <Clock size={14} />}<span>{label}</span></div>
-}
-
-function SwitchKnob({ checked }: { checked: boolean }) {
-  return <span className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${checked ? 'bg-emerald-500' : 'bg-slate-700'}`}><span className={`h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} /></span>
 }

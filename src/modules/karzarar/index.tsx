@@ -1,12 +1,11 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Save, BarChart2, Calculator, Calendar, Filter, TrendingUp, TrendingDown, Layers, FileSpreadsheet, FileText } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '@/lib/supabase'
-import { cls, Loading, ErrorMsg } from '@/components/ui'
+import { Loading, ErrorMsg } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
-import type { Musteri } from '@/types'
 
 interface KZRaw {
   satis_yurt_ici: number; satis_yurt_disi: number; satis_iade: number
@@ -19,7 +18,7 @@ interface KZDonem {
   id?: string
   firma_id: string
   donem: string
-  musteri_id?: string | null
+  musteri_id?: string | null  // artık kullanılmıyor, geriye dönük uyumluluk için
   satis_yurt_ici: number;  satis_yurt_disi: number;  satis_iade: number
   donem_basi_stok: number; donem_sonu_stok: number
   alis_malzeme: number;    alis_efatura: number;      alis_arsiv: number
@@ -33,47 +32,30 @@ interface KZDonem {
 // ── Saf bileşenler ────────────────────────────────────────────────────────────
 function SectionHeader({ title, color }: { title: string; color: string }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-2.5"
-      style={{ background: `${color}15`, borderLeft: `4px solid ${color}`, borderTop: '1px solid rgba(60,60,67,0.25)', borderBottom: '1px solid rgba(60,60,67,0.25)' }}>
-      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-      <p className="text-xs font-bold uppercase tracking-widest" style={{ color }}>{title}</p>
+    <div className="flex items-center gap-2 px-3 py-1.5"
+      style={{ background: `${color}12`, borderLeft: `3px solid ${color}`, borderTop: '1px solid rgba(0,0,0,0.06)', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color }}>{title}</p>
     </div>
   )
 }
 
-function NumRow({ label, value, onChange, minus, section, sectionColor }: {
+function NumRow({ label, value, onChange, minus }: {
   label: string; value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  minus?: boolean; section?: string; sectionColor?: string
+  minus?: boolean
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(220px,260px)] gap-2 md:gap-3 px-4 py-2 items-center">
-      <span className="text-sm font-medium text-[rgba(255,255,255,0.88)] leading-5 break-words">{label}</span>
-      {section ? (
-        <span
-          className="justify-self-start md:justify-self-center text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap"
-          style={{ color: sectionColor, background: `${sectionColor}22` }}
-        >
-          {section}
-        </span>
-      ) : <span className="hidden md:block" />}
-      <div className="relative w-full">
-        {minus && <span className="absolute top-1/2 -translate-y-1/2 text-sm text-[#FF453A] font-bold" style={{ left: '0.75rem' }}>−</span>}
-        <span
-          className="absolute top-1/2 -translate-y-1/2 text-sm text-[rgba(235,235,245,0.38)] font-medium"
-          style={{ left: minus ? '1.5rem' : '0.85rem' }}
-        >
-          ₺
-        </span>
+    <div className="flex items-center gap-2 px-3 py-1 hover:bg-blue-50/40 transition-colors">
+      <span className="flex-1 text-[12px] font-medium text-slate-700 leading-4 min-w-0">{label}</span>
+      <div className="relative w-40 shrink-0">
+        {minus && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-red-400 font-bold">−</span>}
+        <span className="absolute top-1/2 -translate-y-1/2 text-[11px] text-slate-400" style={{ left: minus ? '1.3rem' : '0.6rem' }}>₺</span>
         <input
-          type="number"
-          min="0"
-          step="0.01"
-          className="w-full h-11 bg-[#111113] border border-[rgba(255,255,255,0.08)] text-white text-base md:text-lg tabular-nums rounded-xl outline-none focus:border-[#0A84FF] focus:ring-2 focus:ring-[rgba(10,132,255,0.18)] text-right pr-4"
-          style={{ paddingLeft: minus ? '2.5rem' : '1.85rem' }}
-          placeholder="0,00"
-          value={value}
-          onChange={onChange}
+          type="text" inputMode="decimal" autoComplete="off"
+          className="w-full h-8 bg-white border border-slate-200 text-slate-800 text-[12px] tabular-nums rounded-lg outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 text-right pr-3 transition-all"
+          style={{ paddingLeft: minus ? '2rem' : '1.4rem' }}
+          placeholder="0,00" value={value} onChange={onChange}
         />
       </div>
     </div>
@@ -85,14 +67,14 @@ function PRow({ label, value, sub, bold, color, indent, separator }: {
   bold?: boolean; color?: string; indent?: boolean; separator?: boolean
 }) {
   return (
-    <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-start md:items-center gap-2 py-2 ${separator ? 'border-t border-[rgba(60,60,67,0.4)] mt-2 pt-3' : ''} ${indent ? 'pl-4 md:pl-5' : ''}`}>
-      <div className="min-w-0">
-        <span className={`block leading-5 ${bold ? 'font-bold text-white text-sm' : 'text-[rgba(235,235,245,0.72)] text-sm'}`}>{label}</span>
-        {sub && <span className="block text-[11px] text-[rgba(235,235,245,0.38)] mt-0.5">{sub}</span>}
+    <div className={`flex items-center justify-between gap-2 py-1 ${separator ? 'border-t border-slate-200 mt-1 pt-2' : ''} ${indent ? 'pl-4' : ''}`}>
+      <div className="min-w-0 flex-1">
+        <span className={`block leading-4 ${bold ? 'font-bold text-slate-800 text-[12px]' : 'text-slate-600 text-[11px]'}`}>{label}</span>
+        {sub && <span className="block text-[10px] text-slate-400 mt-0.5">{sub}</span>}
       </div>
       <span
-        className={`text-sm md:text-base tabular-nums whitespace-nowrap ${bold ? 'font-bold' : 'font-semibold'}`}
-        style={{ color: color ?? (bold ? (value >= 0 ? '#30D158' : '#FF453A') : 'rgba(255,255,255,0.88)') }}
+        className={`text-[12px] tabular-nums whitespace-nowrap shrink-0 ${bold ? 'font-bold' : 'font-semibold'}`}
+        style={{ color: color ?? (bold ? (value >= 0 ? '#16a34a' : '#dc2626') : '#374151') }}
       >
         ₺{fmt(Math.abs(value))}
       </span>
@@ -144,7 +126,7 @@ function getPreviousPeriod(start: string, end: string): { prevStart: string; pre
 
 function calculateChange(current: number, previous: number): { value: string; color: string } {
   if (previous === 0 && current === 0) {
-    return { value: '—', color: 'rgba(235,235,245,0.4)' };
+    return { value: '—', color: '#94a3b8' };
   }
   // If previous is 0, but current is not, it's an "infinite" or new value change.
   // We'll represent it as 'Yeni' (New) for simplicity or show current value if it's new.
@@ -154,7 +136,7 @@ function calculateChange(current: number, previous: number): { value: string; co
     return { value: `Yeni (${fmt(current)})`, color: '#FF453A' };
   }
   const change = ((current - previous) / Math.abs(previous)) * 100;
-  if (Math.abs(change) < 0.1) return { value: '≈0%', color: 'rgba(235,235,245,0.4)' };
+  if (Math.abs(change) < 0.1) return { value: '≈0%', color: '#94a3b8' };
   const formattedChange = `${change > 0 ? '+' : ''}${change.toFixed(0)}%`;
   return { value: formattedChange, color: change > 0 ? '#30D158' : '#FF453A' };
 }
@@ -250,13 +232,9 @@ function dbToForm(row: KZDonem): FormState {
 }
 
 // ── Bileşen ───────────────────────────────────────────────────────────────────
-export default function KarZarar({ firma }: AppCtx) {
+export default function KarZarar({ firma, firmalar, firmaIds }: AppCtx) {
   const thisMonth = new Date().toISOString().slice(0, 7)
   const thisYear  = thisMonth.slice(0, 4)
-
-  // Müşteri filtresi
-  const [musteriler, setMusteriler] = useState<Musteri[]>([])
-  const [selectedMusteri, setSelectedMusteri] = useState('')
 
   // Aylık giriş
   const [donem, setDonem]       = useState(thisMonth)
@@ -268,58 +246,72 @@ export default function KarZarar({ firma }: AppCtx) {
   const [error, setError]       = useState('')
 
   // Kümülatif / rapor
-  const [view, setView]         = useState<'aylik' | 'rapor'>('aylik')
+  const [view, setView]         = useState<'aylik' | 'ozet'>('aylik')
   const [rangeStart, setRangeStart] = useState(`${thisYear}-01`)
   const [rangeEnd,   setRangeEnd]   = useState(thisMonth)
   const [rangeRows,  setRangeRows]  = useState<KZDonem[]>([])
   const [prevRangeRows, setPrevRangeRows] = useState<KZDonem[]>([]);
   const [rangeLoading, setRangeLoading] = useState(false)
+  const [selFirmaId, setSelFirmaId] = useState(firma.id)
 
   // Mobil sekme
   const [mobileTab, setMobileTab] = useState<'giris' | 'tablo'>('giris')
+  const loadDonemRequestRef = useRef(0)
 
-  const ViewToggle = ({ view, setView }: { view: 'aylik' | 'rapor', setView: (v: 'aylik' | 'rapor') => void }) => (
-    <div className="flex rounded-[10px] overflow-hidden border border-[rgba(60,60,67,0.5)]">
-      {([['aylik', 'Aylık Giriş', Calculator], ['rapor', 'Kümülatif Rapor', Layers]] as const).map(([v, lbl, Icon]) => (
-        <button key={v} onClick={() => setView(v)}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-all"
-          style={{
-            background: view === v ? '#0A84FF' : 'rgba(44,44,46,0.8)',
-            color: view === v ? '#fff' : 'rgba(235,235,245,0.5)',
-          }}>
-          <Icon size={12} /> {lbl}
-        </button>
-      ))}
-    </div>
-  );
+  const ViewToggle = ({ view, setView }: { view: 'aylik' | 'ozet', setView: (v: 'aylik' | 'ozet') => void }) => {
+    const menus = [
+      { id: 'aylik', label: 'Aylık Giriş',  Icon: Calculator,  color: 'from-blue-500 to-indigo-600' },
+      { id: 'ozet',  label: 'Kümülatif',     Icon: TrendingUp,  color: 'from-emerald-500 to-teal-600' },
+    ] as const;
 
-  useEffect(() => { loadMusteriler() }, [firma.id])
-  useEffect(() => {
-    if (musteriler.length > 0 && !selectedMusteri) {
-      const binyapi = musteriler.find(m => m.kisa_ad === 'Binyapı' || m.ad.includes('Binyapı'))
-      if (binyapi) {
-        setSelectedMusteri(binyapi.id)
-      } else if (musteriler.length > 0) {
-        setSelectedMusteri(musteriler[0].id)
-      }
-    }
-  }, [musteriler, selectedMusteri])
-  useEffect(() => { loadDonem() }, [firma.id, donem, selectedMusteri])
-  useEffect(() => { if (view === 'rapor') loadRange() }, [firma.id, view, rangeStart, rangeEnd, selectedMusteri])
+    return (
+      <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll">
+        {menus.map((m) => (
+          <button key={m.id} onClick={() => setView(m.id as any)}
+            className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-200 border text-xs font-semibold ${view === m.id ? 'bg-blue-500 border-blue-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}>
+            <m.Icon size={12} />
+            {m.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
 
-  async function loadMusteriler() {
-    const { data } = await supabase
-      .from('musteriler').select('id, ad, kisa_ad')
-      .eq('firma_id', firma.id).eq('aktif', true).order('ad')
-    if (data) setMusteriler(data as Musteri[])
+  useEffect(() => { loadDonem() }, [firma.id, donem])
+  useEffect(() => { if (view === 'ozet') loadRange() }, [firma.id, view, rangeStart, rangeEnd])
+
+  function getCalcFromForm(formState: FormState) {
+    return calcRow({
+      firma_id: firma.id,
+      donem,
+      musteri_id: null,
+      satis_yurt_ici: n(formState.satis_yurt_ici),
+      satis_yurt_disi: n(formState.satis_yurt_disi),
+      satis_iade: n(formState.satis_iade),
+      donem_basi_stok: n(formState.donem_basi_stok),
+      donem_sonu_stok: n(formState.donem_sonu_stok),
+      alis_malzeme: n(formState.alis_malzeme),
+      alis_efatura: n(formState.alis_efatura),
+      alis_arsiv: n(formState.alis_arsiv),
+      alis_utts: 0,
+      alis_iscilik: n(formState.alis_iscilik),
+      gider_personel: n(formState.gider_personel),
+      gider_kira: n(formState.gider_kira),
+      gider_fatura: n(formState.gider_fatura),
+      gider_amortisman: n(formState.gider_amortisman),
+      gider_diger: n(formState.gider_diger),
+      gider_finansal: n(formState.gider_finansal),
+      vergi_orani: n(formState.vergi_orani) || 22,
+      notlar: formState.notlar || null,
+    })
   }
 
   async function loadDonem() {
+    const requestId = ++loadDonemRequestRef.current
     setLoading(true); setError('')
-    let q = supabase.from('kar_zarar_donem').select('*').eq('firma_id', firma.id).eq('donem', donem)
-    if (selectedMusteri) q = q.eq('musteri_id', selectedMusteri)
-    else q = q.is('musteri_id', null)
+    const q = supabase.from('kar_zarar_donem').select('*').eq('firma_id', selFirmaId).eq('donem', donem).is('musteri_id', null)
     const { data, error: e } = await q.maybeSingle()
+    if (requestId !== loadDonemRequestRef.current) return
     if (e) {
       setError(e.message.includes('schema cache') || e.message.includes('does not exist')
         ? 'Tablo bulunamadı. SQL Editör\'de "kar_zarar_donem" tablosunu oluşturun.'
@@ -338,22 +330,17 @@ export default function KarZarar({ firma }: AppCtx) {
     const { prevStart, prevEnd } = getPreviousPeriod(rangeStart, rangeEnd);
 
     const currentPeriodQuery = supabase.from('kar_zarar_donem').select('*')
-      .eq('firma_id', firma.id)
+      .in('firma_id', firmaIds)
       .gte('donem', rangeStart).lte('donem', rangeEnd)
       .order('donem', { ascending: true });
-    
+
     const prevPeriodQuery = supabase.from('kar_zarar_donem').select('*')
-      .eq('firma_id', firma.id)
+      .in('firma_id', firmaIds)
       .gte('donem', prevStart).lte('donem', prevEnd)
       .order('donem', { ascending: true });
 
-    if (selectedMusteri) {
-      currentPeriodQuery.eq('musteri_id', selectedMusteri);
-      prevPeriodQuery.eq('musteri_id', selectedMusteri);
-    } else {
-      currentPeriodQuery.is('musteri_id', null);
-      prevPeriodQuery.is('musteri_id', null);
-    }
+    currentPeriodQuery.is('musteri_id', null);
+    prevPeriodQuery.is('musteri_id', null);
 
     const [currentResult, prevResult] = await Promise.all([
       currentPeriodQuery,
@@ -369,8 +356,8 @@ export default function KarZarar({ firma }: AppCtx) {
   async function save() {
     setSaving(true); setError('')
     const payload: Omit<KZDonem, 'id'> = {
-      firma_id: firma.id, donem,
-      musteri_id: selectedMusteri || null,
+      firma_id: selFirmaId, donem,
+      musteri_id: null,
       satis_yurt_ici: n(form.satis_yurt_ici), satis_yurt_disi: n(form.satis_yurt_disi), satis_iade: n(form.satis_iade),
       donem_basi_stok: n(form.donem_basi_stok), donem_sonu_stok: n(form.donem_sonu_stok),
       alis_malzeme: n(form.alis_malzeme), alis_efatura: n(form.alis_efatura),
@@ -380,45 +367,59 @@ export default function KarZarar({ firma }: AppCtx) {
       vergi_orani: n(form.vergi_orani) || 22, notlar: form.notlar || null,
     }
 
-    let targetId = existingId
+    const { data: samePeriodRows } = await supabase
+      .from('kar_zarar_donem')
+      .select('id, musteri_id')
+      .eq('firma_id', selFirmaId)
+      .eq('donem', donem)
 
-    // existingId yoksa önce mevcut kayıt var mı kontrol et
-    if (!targetId) {
-      let q = supabase.from('kar_zarar_donem').select('id').eq('firma_id', firma.id).eq('donem', donem)
-      if (selectedMusteri) q = q.eq('musteri_id', selectedMusteri)
-      else q = q.is('musteri_id', null)
-      const { data: existing } = await q.maybeSingle()
-      if (existing?.id) targetId = existing.id
-    }
+    const targetRow = (samePeriodRows || []).find((row: any) => row.musteri_id == null)
+    const targetId = targetRow?.id || null
 
     let { error: e } = targetId
       ? await supabase.from('kar_zarar_donem').update(payload).eq('id', targetId)
       : await supabase.from('kar_zarar_donem').insert(payload)
 
-    // Unique constraint ihlali — musteri_id olmadan kayıt var, onu güncelle
     if (e?.code === '23505') {
-      const { data: anyExisting } = await supabase.from('kar_zarar_donem').select('id')
-        .eq('firma_id', firma.id).eq('donem', donem).maybeSingle()
-      if (anyExisting?.id) {
-        targetId = anyExisting.id
-        const { error: e2 } = await supabase.from('kar_zarar_donem').update(payload).eq('id', targetId)
-        e = e2
+      // Yaris kosulu veya eski/veri tekrarindan kaynakli cakismada mevcut satiri bulup guncelle.
+      const { data: retryRows } = await supabase
+        .from('kar_zarar_donem')
+        .select('id, musteri_id')
+        .eq('firma_id', selFirmaId)
+        .eq('donem', donem)
+
+      const retryTarget = (retryRows || []).find((row: any) => row.musteri_id == null)
+
+      if (retryTarget?.id) {
+        const { error: retryError } = await supabase
+          .from('kar_zarar_donem')
+          .update(payload)
+          .eq('id', retryTarget.id)
+        e = retryError || null
+      } else {
+        const hasOtherRowInSamePeriod = (retryRows || []).length > 0
+        e = {
+          ...e,
+          message: hasOtherRowInSamePeriod
+            ? 'Bu veritabaninda kar_zarar_donem icin benzersizlik kuralı musteri bazli degil. SQL Editor’de setup_kar_zarar_unique_fix.sql dosyasini calistirin.'
+            : 'Ayni donem icin cakisan kayit algilandi. Lutfen tekrar deneyin.'
+        } as any
       }
     }
 
     setSaving(false)
     if (e) { setError(e.message); return }
-    if (targetId && !existingId) setExistingId(targetId)
     setSaved(true); setTimeout(() => setSaved(false), 2000)
-    if (!existingId && !targetId) loadDonem()
+    loadDonem()
   }
 
   // ── Export ────────────────────────────────────────────────────────────────
   async function handleExportExcel() {
     const XLSX = (await import('xlsx-js-style')).default
-    const c   = view === 'rapor' ? cumCalc : calc
-    const raw = view === 'rapor' ? cumRaw  : calcRaw
-    const per = view === 'rapor' ? `${ayLabel(rangeStart)} - ${ayLabel(rangeEnd)}` : ayLabel(donem)
+    const isOzet = view === 'ozet'
+    const c   = isOzet ? cumCalc : calc
+    const raw = isOzet ? cumRaw : calcRaw
+    const per = isOzet ? `${ayKisa(rangeStart)} - ${ayKisa(rangeEnd)}` : ayLabel(donem)
     const wb  = XLSX.utils.book_new()
 
     // ── Stil yardımcıları ────────────────────────────────────────────────────
@@ -524,8 +525,8 @@ export default function KarZarar({ firma }: AppCtx) {
       [colHead('KALEM', 'left'), colHead('TUTAR (₺)'), colHead('MARJ')],                                               // r3
       // ── Satışlar ──────────────────────────────────────────────────────────
       [sectionLabel('SATIŞLAR', 'DCFCE7', '15803D'), empty('DCFCE7'), empty('DCFCE7')],                                // r4
-      [label('Yurt İçi Satışlar',  true), money(raw.satis_yurt_ici,  '374151'), pctCell('')],                          // r5
-      [label('Yurt Dışı Satışlar', true), money(raw.satis_yurt_disi, '374151'), pctCell('')],                          // r6
+      [label('Hakedişler',  true), money(raw.satis_yurt_ici,  '374151'), pctCell('')],                          // r5
+      [label('Diğer Satışlar', true), money(raw.satis_yurt_disi, '374151'), pctCell('')],                          // r6
       [label('Satış İadeleri (−)', true), money(raw.satis_iade,      'DC2626'), pctCell('')],                          // r7
       [...highlightRow('Net Satışlar', c.netSatis, '100%', 'DBEAFE', '1D4ED8')],                                       // r8
       [empty(), empty(), empty()],                                                                                       // r9
@@ -571,7 +572,7 @@ export default function KarZarar({ firma }: AppCtx) {
     // ════════════════════════════════════════════════════════════════════════
     // Sheet 2 — Aylık Dağılım (sadece rapor modunda)
     // ════════════════════════════════════════════════════════════════════════
-    if (view === 'rapor' && rowCalcs.length > 0) {
+    if (isOzet && rowCalcs.length > 0) {
       const COLS = 11
       const aylikHead = (v: string, bg: string, fc: string, align = 'right') => sc(v, 's', {
         font:      { bold: true, sz: 9, color: { rgb: fc }, name: 'Calibri' },
@@ -659,7 +660,8 @@ export default function KarZarar({ firma }: AppCtx) {
       XLSX.utils.book_append_sheet(wb, ws2, 'Aylık Dağılım')
     }
 
-    XLSX.writeFile(wb, `KarZarar_${firma.ad}_${view === 'rapor' ? `${rangeStart}_${rangeEnd}` : donem}.xlsx`)
+    const fileName = isOzet ? `KarZarar_Ozet_${firma.ad}_${rangeStart}_${rangeEnd}.xlsx` : `KarZarar_${firma.ad}_${donem}.xlsx`
+    XLSX.writeFile(wb, fileName)
   }
 
   async function handleExportPDF() {
@@ -688,9 +690,10 @@ export default function KarZarar({ firma }: AppCtx) {
       return rgb.map(c => Math.min(255, Math.floor(c + (255 - c) * factor))) as [number, number, number];
     }
 
-    const c   = view === 'rapor' ? cumCalc : calc
-    const raw = view === 'rapor' ? cumRaw  : calcRaw
-    const per = view === 'rapor' ? `${ayLabel(rangeStart)} — ${ayLabel(rangeEnd)}` : ayLabel(donem)
+    const isOzet = view === 'ozet'
+    const c   = isOzet ? cumCalc : calc
+    const raw = isOzet ? cumRaw : calcRaw
+    const per = isOzet ? `${ayKisa(rangeStart)} - ${ayKisa(rangeEnd)}` : ayLabel(donem)
     const color = (v: number, pos = '#16a34a', neg = '#dc2626') => v >= 0 ? pos : neg
 
     // Her bölüm: [başlık?, girintili?, etiket, tutar, marj, kalın?, renk]
@@ -698,8 +701,8 @@ export default function KarZarar({ firma }: AppCtx) {
     const kzRows: KZRow[] = [
       // Satışlar
       { section: 'SATIŞLAR', sectionColor: '#15803d', label: '', value: '' },
-      { label: 'Yurt İçi Satışlar',  value: fmt(raw.satis_yurt_ici),  indent: true },
-      { label: 'Yurt Dışı Satışlar', value: fmt(raw.satis_yurt_disi), indent: true },
+      { label: 'Hakedişler',  value: fmt(raw.satis_yurt_ici),  indent: true },
+      { label: 'Diğer Satışlar', value: fmt(raw.satis_yurt_disi), indent: true },
       { label: 'Satış İadeleri (−)', value: fmt(raw.satis_iade),      indent: true, color: '#dc2626' },
       { label: 'Net Satışlar', value: fmt(c.netSatis), marj: '100%', bold: true, color: '#1d4ed8', highlight: '#eff6ff' },
       // Stok Bilgileri
@@ -822,7 +825,7 @@ export default function KarZarar({ firma }: AppCtx) {
     })
 
     // Monthly Table (if in report view)
-    if (view === 'rapor' && rowCalcs.length > 0) {
+    if (isOzet && rowCalcs.length > 0) {
       doc.addPage('a4', 'landscape') // Add a new page for the monthly table, in landscape
       doc.setFont(fontName, 'bold')
       doc.setFontSize(14)
@@ -934,7 +937,8 @@ export default function KarZarar({ firma }: AppCtx) {
       doc.text(`Sayfa ${i} / ${pageCount}`, (doc as any).internal.pageSize.width / 2, (doc as any).internal.pageSize.height - 10, { align: 'center' });
     }
 
-    doc.save(`KarZarar_${firma.ad}_${view === 'rapor' ? `${rangeStart}_${rangeEnd}` : donem}.pdf`)
+    const fileName = isOzet ? `KarZarar_Ozet_${firma.ad}_${rangeStart}_${rangeEnd}.pdf` : `KarZarar_${firma.ad}_${donem}.pdf`
+    doc.save(fileName)
     } catch (err) {
       console.error('PDF oluşturma hatası:', err)
     }
@@ -942,7 +946,7 @@ export default function KarZarar({ firma }: AppCtx) {
 
   // Aylık hesap (form'dan)
   const calc = useMemo(() => calcRow({
-    firma_id: firma.id, donem, notlar: null,
+    firma_id: selFirmaId, donem, notlar: null,
     satis_yurt_ici: n(form.satis_yurt_ici), satis_yurt_disi: n(form.satis_yurt_disi), satis_iade: n(form.satis_iade),
     donem_basi_stok: n(form.donem_basi_stok), donem_sonu_stok: n(form.donem_sonu_stok),
     alis_malzeme: n(form.alis_malzeme), alis_efatura: n(form.alis_efatura),
@@ -1006,412 +1010,344 @@ export default function KarZarar({ firma }: AppCtx) {
   if (loading) return <Loading />
   if (error && !saving) return <ErrorMsg message={error} onRetry={loadDonem} />
 
-  // ── K/Z Tablosu (tek dönem veya kümülatif için ortak) ─────────────────────
-  const KZTablo = ({ c, baslik, subtitle, raw }: { c: ReturnType<typeof calcRow>; baslik: string; subtitle?: string; raw?: KZRaw }) => (
-    <div className="rounded-2xl border border-[rgba(60,60,67,0.36)] overflow-hidden" style={{ background: '#1C1C1E' }}>
-      <div className="px-4 py-3 border-b border-[rgba(60,60,67,0.36)]" style={{ background: 'rgba(10,132,255,0.1)' }}>
-        <p className="text-xs font-bold uppercase tracking-widest text-[#0A84FF]">{baslik}</p>
-        {subtitle && <p className="text-sm font-semibold text-white mt-0.5">{subtitle}</p>}
-      </div>
-      <div className="px-4 md:px-5 py-4 space-y-1">
+  // ── K/Z Tablosu ────────────────────────────────────────────────────────────
+  const KZTablo = ({ c, baslik, subtitle, raw }: { c: ReturnType<typeof calcRow>; baslik: string; subtitle?: string; raw?: KZRaw }) => {
+    const kar = c.faaliyetKari
+    const karRenk = kar >= 0 ? '#16a34a' : '#dc2626'
+    const karBg   = kar >= 0 ? '#f0fdf4' : '#fef2f2'
+    const karBorder = kar >= 0 ? '#bbf7d0' : '#fecaca'
 
-        {/* Satışlar */}
-        <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#30D158' }}>Satışlar</p>
-        {raw && <>
-          <PRow label="Yurt İçi Satışlar"  value={raw.satis_yurt_ici}  indent color="rgba(235,235,245,0.7)" />
-          <PRow label="Yurt Dışı Satışlar" value={raw.satis_yurt_disi} indent color="rgba(235,235,245,0.7)" />
-          {raw.satis_iade > 0 && <PRow label="Satış İadeleri (−)" value={raw.satis_iade} indent color="#FF453A" />}
-        </>}
-        <PRow label="NET SATIŞLAR" value={c.netSatis} bold separator
-          sub={c.netSatis > 0 ? '100%' : undefined} color={c.netSatis >= 0 ? '#0A84FF' : '#FF453A'} />
+    const chartData = [
+      { name: 'Satışlar',    tutar: c.netSatis,     fill: '#3b82f6' },
+      { name: 'Maliyetler',  tutar: c.smm,          fill: '#f97316' },
+      { name: 'Giderler',    tutar: c.toplamGyg,    fill: '#a855f7' },
+      { name: 'Brüt Kâr',   tutar: Math.max(0, c.brutKar),    fill: '#22c55e' },
+      { name: 'Net Kâr',     tutar: Math.max(0, c.faaliyetKari), fill: kar >= 0 ? '#16a34a' : '#ef4444' },
+    ]
 
-        {/* Stok Bilgileri */}
-        <div className="pt-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#0A84FF' }}>Stok Bilgileri</p>
-          {raw && <>
-            <PRow label="Dönem Başı Stok" value={raw.donem_basi_stok} indent color="rgba(235,235,245,0.7)" />
-            <PRow label="Dönem Sonu Stok" value={raw.donem_sonu_stok} indent color="rgba(235,235,245,0.7)" />
-          </>}
-        </div>
-
-        {/* Alışlar & Maliyetler */}
-        <div className="pt-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#FF9F0A' }}>Alışlar & Maliyetler</p>
-          {raw && <>
-            <PRow label="%1 Alışlar"  value={raw.alis_malzeme}  indent color="rgba(235,235,245,0.7)" />
-            <PRow label="%10 Alışlar" value={raw.alis_efatura}  indent color="rgba(235,235,245,0.7)" />
-            <PRow label="%20 Alışlar"  value={raw.alis_arsiv}    indent color="rgba(235,235,245,0.7)" />
-            <PRow label="İşçilik Giderleri" value={raw.alis_iscilik}  indent color="rgba(235,235,245,0.7)" />
-          </>}
-          <PRow label="Toplam Alışlar & İşçilik" value={c.toplamAlis} indent color="rgba(235,235,245,0.7)" />
-          <PRow label="SATILAN MAL MALİYETİ" value={c.smm} bold separator color={c.smm >= 0 ? '#FF9F0A' : '#30D158'} />
-        </div>
-
-        <div className="py-2.5 my-1 rounded-xl px-3 -mx-1"
-          style={{ background: c.brutKar >= 0 ? 'rgba(48,209,88,0.08)' : 'rgba(255,69,58,0.08)', border: `1px solid ${c.brutKar >= 0 ? 'rgba(48,209,88,0.2)' : 'rgba(255,69,58,0.2)'}` }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-white">BRÜT KAR</p>
-              <p className="text-[10px] mt-0.5" style={{ color: c.brutKar >= 0 ? '#30D158' : '#FF453A' }}>
-                Marj: {pct(c.brutKar, c.netSatis)}
-              </p>
-            </div>
-            <p className="text-lg md:text-2xl font-bold tabular-nums whitespace-nowrap" style={{ color: c.brutKar >= 0 ? '#30D158' : '#FF453A' }}>
-              ₺{fmt(Math.abs(c.brutKar))}
+    return (
+      <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden shadow-sm">
+        {/* Başlık */}
+        <div className="px-4 py-2.5 border-b border-blue-50 bg-blue-50/60 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">{baslik}</p>
+            {subtitle && <p className="text-[13px] font-bold text-slate-700 mt-0.5">{subtitle}</p>}
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-slate-400 font-medium">Faaliyet Kârı</p>
+            <p className="text-[18px] font-black tabular-nums" style={{ color: karRenk }}>
+              {kar < 0 ? '−' : '+'}₺{fmt(Math.abs(kar))}
             </p>
           </div>
         </div>
 
-        {/* Genel Yönetim Giderleri */}
-        <div className="pt-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#BF5AF2' }}>Genel Yönetim Giderleri</p>
-          {raw && (
-            <>
-              <PRow label="Kira Giderleri"     value={raw.gider_kira}       indent color="rgba(235,235,245,0.7)" />
-              <PRow label="Sigorta Giderleri"  value={raw.gider_fatura}     indent color="rgba(235,235,245,0.7)" />
-              <PRow label="Amortisman"         value={raw.gider_amortisman} indent color="rgba(235,235,245,0.7)" />
-              <PRow label="Diğer Giderler"     value={raw.gider_diger}      indent color="rgba(235,235,245,0.7)" />
-              <PRow label="Finansal Giderler"  value={raw.gider_finansal}   indent color="rgba(235,235,245,0.7)" />
-            </>
+        {/* Özet Kartlar */}
+        <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+          {[
+            { label: '💰 Net Satış',   value: c.netSatis,    color: '#2563eb' },
+            { label: '🛒 Toplam Maliyet', value: c.smm + c.toplamGyg, color: '#ea580c' },
+            { label: kar >= 0 ? '📈 Kâr' : '📉 Zarar', value: kar, color: karRenk },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="px-3 py-2 text-center">
+              <p className="text-[9px] font-semibold text-slate-400 mb-0.5">{label}</p>
+              <p className="text-[13px] font-bold tabular-nums leading-none" style={{ color }}>₺{fmt(Math.abs(value))}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Grafik */}
+        <div className="px-3 pt-3 pb-1">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Görsel Özet</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <BarChart data={chartData} barSize={28} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip
+                formatter={(v) => `₺${fmt(Number(v))}`}
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff' }}
+              />
+              <Bar dataKey="tutar" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Tablo */}
+        <div className="px-4 py-2 space-y-0 divide-y divide-slate-50">
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 pb-1">📊 Detay</p>
+
+          {/* Satışlar */}
+          <div className="py-1">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-green-600 mb-0.5">Gelirler</p>
+            {raw && <>
+              <PRow label="Hakedişler"    value={raw.satis_yurt_ici}  indent />
+              <PRow label="Diğer Satışlar" value={raw.satis_yurt_disi} indent />
+              {raw.satis_iade > 0 && <PRow label="İadeler (−)" value={raw.satis_iade} indent color="#dc2626" />}
+            </>}
+            <PRow label="NET SATIŞLAR" value={c.netSatis} bold separator color="#2563eb" />
+          </div>
+
+          {/* Stok */}
+          {raw && (raw.donem_basi_stok > 0 || raw.donem_sonu_stok > 0) && (
+            <div className="py-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-blue-500 mb-0.5">Stok</p>
+              <PRow label="Başlangıç Stoğu" value={raw.donem_basi_stok} indent />
+              <PRow label="Bitiş Stoğu"     value={raw.donem_sonu_stok} indent />
+            </div>
           )}
-          <PRow label="TOPLAM GYG" value={c.toplamGyg} bold separator color="#BF5AF2" />
-        </div>
 
-        <div className="py-3 mt-1.5 rounded-xl px-3 -mx-1"
-          style={{ background: c.faaliyetKari >= 0 ? 'rgba(10,132,255,0.1)' : 'rgba(255,69,58,0.1)', border: `1px solid ${c.faaliyetKari >= 0 ? 'rgba(10,132,255,0.3)' : 'rgba(255,69,58,0.3)'}` }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-white">FAALİYET KARI</p>
-              <p className="text-[10px] mt-0.5" style={{ color: c.faaliyetKari >= 0 ? '#0A84FF' : '#FF453A' }}>
-                Marj: {pct(c.faaliyetKari, c.netSatis)}
+          {/* Maliyetler */}
+          <div className="py-1">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-orange-500 mb-0.5">Maliyetler</p>
+            {raw && <>
+              <PRow label="%1 KDV'li Alışlar"  value={raw.alis_malzeme}  indent />
+              <PRow label="%10 KDV'li Alışlar" value={raw.alis_efatura}  indent />
+              <PRow label="%20 KDV'li Alışlar" value={raw.alis_arsiv}    indent />
+              <PRow label="İşçilik"             value={raw.alis_iscilik}  indent />
+            </>}
+            <PRow label="SATILAN MAL MALİYETİ" value={c.smm} bold separator color="#ea580c" />
+          </div>
+
+          {/* Brüt Kâr */}
+          <div className="py-1.5 px-2 rounded-lg my-1" style={{ background: c.brutKar >= 0 ? '#f0fdf4' : '#fef2f2' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-700">Brüt Kâr</p>
+                <p className="text-[9px] text-slate-400">Satışlar − Maliyetler · Marj: {pct(c.brutKar, c.netSatis)}</p>
+              </div>
+              <p className="text-[15px] font-black tabular-nums" style={{ color: c.brutKar >= 0 ? '#16a34a' : '#dc2626' }}>
+                {c.brutKar < 0 ? '−' : '+'}₺{fmt(Math.abs(c.brutKar))}
               </p>
             </div>
-            <p className="text-xl md:text-3xl font-bold tabular-nums whitespace-nowrap" style={{ color: c.faaliyetKari >= 0 ? '#0A84FF' : '#FF453A' }}>
-              {c.faaliyetKari < 0 ? '-' : '+'}₺{fmt(Math.abs(c.faaliyetKari))}
-            </p>
+          </div>
+
+          {/* GYG */}
+          <div className="py-1">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-purple-500 mb-0.5">İşletme Giderleri</p>
+            {raw && <>
+              <PRow label="Kira"      value={raw.gider_kira}       indent />
+              <PRow label="Sigorta"   value={raw.gider_fatura}     indent />
+              <PRow label="Amortisman" value={raw.gider_amortisman} indent />
+              <PRow label="Diğer"     value={raw.gider_diger}      indent />
+              <PRow label="Banka/Faiz" value={raw.gider_finansal}  indent />
+            </>}
+            <PRow label="TOPLAM GİDERLER" value={c.toplamGyg} bold separator color="#7c3aed" />
+          </div>
+
+          {/* Sonuç */}
+          <div className="py-2 px-2 rounded-xl mt-1" style={{ background: karBg, border: `1px solid ${karBorder}` }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-black text-slate-800">
+                  {kar >= 0 ? '🟢 KÂR EDİYORSUNUZ' : '🔴 ZARAR EDİYORSUNUZ'}
+                </p>
+                <p className="text-[9px] text-slate-500 mt-0.5">
+                  Satışların {pct(kar, c.netSatis)}'i net kâra dönüştü
+                </p>
+              </div>
+              <p className="text-[20px] font-black tabular-nums" style={{ color: karRenk }}>
+                {kar < 0 ? '−' : '+'}₺{fmt(Math.abs(kar))}
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   // ── Aylık veri girişi formu ────────────────────────────────────────────────
   const GirişFormu = () => (
-    <div className="rounded-2xl border border-[rgba(60,60,67,0.36)] overflow-hidden" style={{ background: '#1C1C1E' }}>
-      {/* Satışlar */}
-      <SectionHeader title="Satışlar" color="#30D158" />
-      <div className="py-1.5 space-y-0.5">
-        <NumRow label="Yurt İçi Satışlar"  value={form.satis_yurt_ici}  onChange={set('satis_yurt_ici')}  section="Satışlar" sectionColor="#30D158" />
-        <NumRow label="Yurt Dışı Satışlar" value={form.satis_yurt_disi} onChange={set('satis_yurt_disi')} section="Satışlar" sectionColor="#30D158" />
-        <NumRow label="Satış İadeleri (−)" value={form.satis_iade}      onChange={set('satis_iade')}       section="Satışlar" sectionColor="#30D158" minus />
+    <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden shadow-sm">
+      <SectionHeader title="💰 Satışlar — Ne Kazandık?" color="#16a34a" />
+      <div className="py-1 divide-y divide-slate-50">
+        <NumRow label="Hakedişler (Tahsilat)"  value={form.satis_yurt_ici}  onChange={set('satis_yurt_ici')} />
+        <NumRow label="Diğer Satışlar"         value={form.satis_yurt_disi} onChange={set('satis_yurt_disi')} />
+        <NumRow label="Satış İadeleri"         value={form.satis_iade}      onChange={set('satis_iade')} minus />
       </div>
-      {/* Stok Bilgileri */}
-      <SectionHeader title="Stok Bilgileri" color="#0A84FF" />
-      <div className="py-1.5 space-y-0.5">
-        <NumRow label="Dönem Başı Stok" value={form.donem_basi_stok} onChange={set('donem_basi_stok')} section="Stok" sectionColor="#0A84FF" />
-        <NumRow label="Dönem Sonu Stok" value={form.donem_sonu_stok} onChange={set('donem_sonu_stok')} section="Stok" sectionColor="#0A84FF" />
+      <SectionHeader title="📦 Stok Bilgileri — Depodaki Mal" color="#2563eb" />
+      <div className="py-1 divide-y divide-slate-50">
+        <NumRow label="Dönem Başı Stok (Ay başı depoda ne vardı?)" value={form.donem_basi_stok} onChange={set('donem_basi_stok')} />
+        <NumRow label="Dönem Sonu Stok (Ay sonu depoda ne kaldı?)" value={form.donem_sonu_stok} onChange={set('donem_sonu_stok')} />
       </div>
-      {/* Alışlar & Maliyetler */}
-      <SectionHeader title="Alışlar & Maliyetler" color="#FF9F0A" />
-      <div className="py-1.5 space-y-0.5">
-        <NumRow label="%1 Alışlar"   value={form.alis_malzeme}  onChange={set('alis_malzeme')}  section="Alışlar" sectionColor="#FF9F0A" />
-        <NumRow label="%10 Alışlar"  value={form.alis_efatura}  onChange={set('alis_efatura')}  section="Alışlar" sectionColor="#FF9F0A" />
-        <NumRow label="%20 Alışlar"  value={form.alis_arsiv}    onChange={set('alis_arsiv')}    section="Alışlar" sectionColor="#FF9F0A" />
-        <NumRow label="İşçilik Giderleri" value={form.alis_iscilik}  onChange={set('alis_iscilik')}  section="Alışlar" sectionColor="#FF9F0A" />
+      <SectionHeader title="🛒 Alışlar & Maliyetler — Ne Harcadık?" color="#d97706" />
+      <div className="py-1 divide-y divide-slate-50">
+        <NumRow label="%1 KDV'li Alışlar"   value={form.alis_malzeme}  onChange={set('alis_malzeme')} />
+        <NumRow label="%10 KDV'li Alışlar"  value={form.alis_efatura}  onChange={set('alis_efatura')} />
+        <NumRow label="%20 KDV'li Alışlar"  value={form.alis_arsiv}    onChange={set('alis_arsiv')} />
+        <NumRow label="İşçilik Giderleri"   value={form.alis_iscilik}  onChange={set('alis_iscilik')} />
       </div>
-      {/* Genel Yönetim Giderleri */}
-      <SectionHeader title="Genel Yönetim Giderleri" color="#BF5AF2" />
-      <div className="py-1.5 space-y-0.5">
-        <NumRow label="Kira Giderleri"     value={form.gider_kira}       onChange={set('gider_kira')}       section="GYG" sectionColor="#BF5AF2" />
-        <NumRow label="Sigorta Giderleri"  value={form.gider_fatura}     onChange={set('gider_fatura')}     section="GYG" sectionColor="#BF5AF2" />
-        <NumRow label="Amortisman"         value={form.gider_amortisman} onChange={set('gider_amortisman')} section="GYG" sectionColor="#BF5AF2" />
-        <NumRow label="Diğer Giderler"     value={form.gider_diger}      onChange={set('gider_diger')}      section="GYG" sectionColor="#BF5AF2" />
-        <NumRow label="Finansal Giderler"  value={form.gider_finansal}   onChange={set('gider_finansal')}   section="GYG" sectionColor="#BF5AF2" />
+      <SectionHeader title="🏢 Genel Giderler — İşletme Masrafları" color="#7c3aed" />
+      <div className="py-1 divide-y divide-slate-50">
+        <NumRow label="Kira"           value={form.gider_kira}       onChange={set('gider_kira')} />
+        <NumRow label="Sigorta"        value={form.gider_fatura}     onChange={set('gider_fatura')} />
+        <NumRow label="Amortisman"     value={form.gider_amortisman} onChange={set('gider_amortisman')} />
+        <NumRow label="Diğer Giderler" value={form.gider_diger}      onChange={set('gider_diger')} />
+        <NumRow label="Banka / Faiz"   value={form.gider_finansal}   onChange={set('gider_finansal')} />
       </div>
-      {/* Notlar */}
-      <div className="px-4 py-3 border-t border-[rgba(60,60,67,0.25)]">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[rgba(235,235,245,0.3)] mb-1.5">Notlar</p>
-        <textarea className={`${cls.input} resize-none w-full`} rows={2}
-          placeholder="Dönem notları..." value={form.notlar} onChange={set('notlar')} />
+      <div className="px-3 py-2 border-t border-slate-100">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Notlar</p>
+        <textarea className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 text-[12px] text-slate-700 px-3 py-2 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30 transition-all" rows={2}
+          placeholder="Bu döneme ait notlar..." value={form.notlar} onChange={set('notlar')} />
       </div>
     </div>
   )
+
+  if (view === 'aylik') {
+    return (
+      <div className="w-full max-w-none flex flex-col gap-0 -mt-3 md:-mt-5 md:-mx-4 xl:-mx-6 2xl:-mx-8">
+
+        {/* ── Üst Bar ── */}
+        <div className="flex items-center gap-3 px-4 md:px-5 xl:px-6 py-3.5 border-b border-blue-100 flex-wrap"
+          style={{ background: '#DCEEFA' }}>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0">
+              <BarChart2 size={15} className="text-blue-500" />
+            </div>
+            <div>
+              <h1 className="text-[14px] font-bold text-slate-800 tracking-wide leading-none">Kar / Zarar</h1>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5">Aylık gelir ve gider analizi</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <ViewToggle view={view} setView={setView} />
+            <button onClick={handleExportExcel} title="Excel olarak indir"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all">
+              <FileSpreadsheet size={13} className="text-emerald-600" />
+              <span className="text-[11px] font-semibold text-emerald-600">Excel</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Dönem Seçici ── */}
+        <div className="flex items-center gap-3 px-4 md:px-5 xl:px-6 py-2 border-b border-blue-100"
+          style={{ background: '#E8F4FD' }}>
+          <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-xl px-1 py-1 shadow-sm">
+            {firmalar.length > 1 && (
+              <select className="text-[12px] font-semibold text-slate-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 outline-none mr-2"
+                value={selFirmaId} onChange={e => setSelFirmaId(e.target.value)}>
+                {firmalar.map(f => <option key={f.id} value={f.id}>{f.kisa_ad || f.ad}</option>)}
+              </select>
+            )}
+            <button onClick={() => setDonem(prevMonth(donem))}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors">
+              <ChevronLeft size={15} />
+            </button>
+            <label className="relative cursor-pointer px-3 min-w-[120px] text-center">
+              <span className="text-[13px] font-bold text-slate-700">{ayLabel(donem)}</span>
+              <input type="month" value={donem} onChange={e => setDonem(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer" />
+            </label>
+            <button onClick={() => setDonem(nextMonth(donem))}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors">
+              <ChevronRight size={15} />
+            </button>
+          </div>
+          {existingId && (
+            <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+              ✓ Kayıtlı
+            </span>
+          )}
+        </div>
+
+        {/* ── Tek Panel ── */}
+        <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.2fr)_minmax(460px,0.8fr)] gap-5 p-4 md:p-5 xl:p-6 items-start" style={{ background: '#E8F4FD' }}>
+          {/* Mobil sekme */}
+          <div className="flex 2xl:hidden pb-3 border-b border-blue-100 mb-1">
+            <div className="flex w-full p-1 rounded-xl bg-white border border-blue-200 shadow-sm">
+              {(['giris', 'tablo'] as const).map(t => (
+                <button key={t} onClick={() => setMobileTab(t)}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${mobileTab === t ? 'bg-blue-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>
+                  {t === 'giris' ? <><Calculator size={13} /> Veri Girişi</> : <><BarChart2 size={13} /> K/Z Tablosu</>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && <div className="col-span-full px-4 py-3 rounded-xl text-xs text-red-600 border border-red-200 bg-red-50">{error}</div>}
+
+          <div className={mobileTab === 'giris' ? 'block' : 'hidden 2xl:block'}>
+            {loading ? <Loading /> : GirişFormu()}
+            <div className="mt-4 flex items-center gap-3">
+              <button onClick={save} disabled={saving}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all ${saved ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-blue-500 border-blue-600 text-white hover:bg-blue-600 shadow-sm'}`}>
+                <Save size={14} />
+                {saving ? 'Kaydediliyor...' : saved ? '✓ Kaydedildi!' : 'Kaydet'}
+              </button>
+              <button onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all">
+                <FileSpreadsheet size={14} /> Excel
+              </button>
+            </div>
+          </div>
+
+          <div className={`${mobileTab === 'tablo' ? 'block' : 'hidden 2xl:block'} 2xl:sticky 2xl:top-4`}>
+            {KZTablo({ c: calc, baslik: 'Kar / Zarar Tablosu', subtitle: ayLabel(donem), raw: calcRaw })}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full max-w-none flex flex-col gap-0 -mt-3 md:-mt-5 md:-mx-4 xl:-mx-6 2xl:-mx-8">
 
-      {/* ── Üst Bar ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 md:px-5 xl:px-6 py-4 border-b border-[rgba(60,60,67,0.36)] flex-wrap shrink-0"
-        style={{ background: 'rgba(28,28,30,0.95)' }}>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-white flex-1 uppercase">Kar / Zarar</h1>
-
-        {/* Müşteri Filtresi */}
-        <select
-          value={selectedMusteri}
-          onChange={e => setSelectedMusteri(e.target.value)}
-          className="bg-[#2C2C2E] border border-[rgba(60,60,67,0.5)] text-white text-xs rounded-[10px] px-3 py-2 outline-none focus:border-[#0A84FF] min-w-[160px]"
-        >
-          {musteriler.map(m => (
-            <option key={m.id} value={m.id}>{m.kisa_ad || m.ad}</option>
-          ))}
-        </select>
-
-        {view === 'aylik' && (
-          <button onClick={save} disabled={saving}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-sm font-semibold transition-all disabled:opacity-50"
-            style={{ background: saved ? 'rgba(48,209,88,0.2)' : '#0A84FF', color: saved ? '#30D158' : '#fff' }}>
-            <Save size={15} />
-            {saving ? 'Kaydediliyor...' : saved ? 'Kaydedildi ✓' : 'Kaydet'}
-          </button>
-        )}
-
-        {/* Export butonları */}
-        <div className="flex rounded-[10px] overflow-hidden border border-[rgba(60,60,67,0.5)]">
+      {/* ── Üst Bar ── */}
+      <div className="flex items-center gap-3 px-4 md:px-5 xl:px-6 py-3.5 border-b border-blue-100 flex-wrap"
+        style={{ background: '#DCEEFA' }}>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center shrink-0">
+            <BarChart2 size={15} className="text-blue-500" />
+          </div>
+          <div>
+            <h1 className="text-[14px] font-bold text-slate-800 tracking-wide leading-none">Kar / Zarar</h1>
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">Kümülatif finansal analiz</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <ViewToggle view={view} setView={setView} />
           <button onClick={handleExportExcel} title="Excel olarak indir"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold transition-all hover:bg-[rgba(48,209,88,0.15)]"
-            style={{ background: 'rgba(44,44,46,0.8)', color: '#30D158' }}>
-            <FileSpreadsheet size={13} /> Excel
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all">
+            <FileSpreadsheet size={13} className="text-emerald-600" />
+            <span className="text-[11px] font-semibold text-emerald-600">Excel</span>
           </button>
         </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════════
-          AYLIK GİRİŞ GÖRÜNÜMÜ
+          KÜMÜLATİF GÖRÜNÜM
       ════════════════════════════════════════════════════════════════════════ */}
-      {view === 'aylik' && (
+      {view === 'ozet' && (
         <>
-          {/* Dönem Seçici */}
-          <div className="flex items-center gap-4 px-4 md:px-5 xl:px-6 py-3 border-b border-[rgba(60,60,67,0.2)] flex-wrap"
-            style={{ background: '#1C1C1E' }}>
-            <ViewToggle view={view} setView={setView} />
-            <div className="flex-1 flex items-center justify-center gap-3 flex-wrap">
-              <button onClick={() => setDonem(prevMonth(donem))}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[rgba(235,235,245,0.5)] hover:text-white hover:bg-[rgba(60,60,67,0.5)] transition-all">
-                <ChevronLeft size={18} />
-              </button>
-              <div className="flex items-center justify-center gap-2">
-                <Calendar size={14} className="text-[#0A84FF]" />
-                <label className="relative cursor-pointer">
-                  <span className="text-sm font-bold text-white">{ayLabel(donem)}</span>
-                  <input type="month" value={donem} onChange={e => setDonem(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full" />
-                </label>
-                {existingId && (
-                  <span className="text-[10px] font-semibold text-[#30D158] bg-[rgba(48,209,88,0.12)] px-2 py-0.5 rounded-full border border-[rgba(48,209,88,0.2)]">
-                    Kayıtlı
-                  </span>
-                )}
-                {selectedMusteri && (
-                  <span className="text-[10px] font-semibold text-[#0A84FF] bg-[rgba(10,132,255,0.12)] px-2 py-0.5 rounded-full border border-[rgba(10,132,255,0.2)]">
-                    {musteriler.find(m => m.id === selectedMusteri)?.kisa_ad || musteriler.find(m => m.id === selectedMusteri)?.ad}
-                  </span>
-                )}
-              </div>
-              <button onClick={() => setDonem(nextMonth(donem))}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[rgba(235,235,245,0.5)] hover:text-white hover:bg-[rgba(60,60,67,0.5)] transition-all">
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
-
-          {/* Mobil sekme */}
-          <div className="flex xl:hidden border-b border-[rgba(60,60,67,0.36)] shrink-0" style={{ background: '#1C1C1E' }}>
-            {(['giris', 'tablo'] as const).map(t => (
-              <button key={t} onClick={() => setMobileTab(t as typeof mobileTab)}
-                className={`flex-1 py-2.5 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${mobileTab === t ? 'text-[#0A84FF] border-b-2 border-[#0A84FF]' : 'text-[rgba(235,235,245,0.4)]'}`}>
-                {t === 'giris' ? <><Calculator size={13} /> Veri Girişi</> : <><BarChart2 size={13} /> K/Z Tablosu</>}
-              </button>
-            ))}
-          </div>
-
-          {error && saving && (
-            <div className="mx-4 mt-3 px-4 py-3 rounded-xl text-xs text-[#FF453A] border border-[rgba(255,69,58,0.3)]"
-              style={{ background: 'rgba(255,69,58,0.1)' }}>{error}</div>
-          )}
-
-          <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.2fr)_minmax(460px,0.8fr)] gap-5 p-4 lg:p-5 items-start" style={{ background: '#000000' }}>
-            <div className={mobileTab === 'giris' ? 'block' : 'hidden 2xl:block'}>{GirişFormu()}</div>
-            <div className={`${mobileTab === 'tablo' ? 'block' : 'hidden 2xl:block'} 2xl:sticky 2xl:top-4`}>
-              {KZTablo({ c: calc, baslik: 'Kar / Zarar Tablosu', subtitle: ayLabel(donem), raw: calcRaw })}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ════════════════════════════════════════════════════════════════════════
-          KÜMÜLATİF RAPOR GÖRÜNÜMÜ
-      ════════════════════════════════════════════════════════════════════════ */}
-      {view === 'rapor' && (
-        <>
-          {/* Tarih Aralığı Filtresi */}
-          <div className="flex items-center gap-4 px-4 md:px-5 xl:px-6 py-3 border-b border-[rgba(60,60,67,0.2)] flex-wrap"
-            style={{ background: '#1C1C1E' }}>
+          <div className="flex items-center gap-4 px-4 md:px-5 xl:px-6 py-2.5 border-b border-blue-100 flex-wrap"
+            style={{ background: '#E8F4FD' }}>
             <ViewToggle view={view} setView={setView} />
             <div className="flex items-center gap-3 flex-wrap flex-1">
-              <Filter size={14} className="text-[#0A84FF] shrink-0" />
-              <span className="text-xs text-[rgba(235,235,245,0.5)] shrink-0">Başlangıç</span>
+              <Filter size={14} className="text-blue-500 shrink-0" />
+              <span className="text-xs text-slate-500 shrink-0">Başlangıç</span>
               <input type="month" value={rangeStart} onChange={e => setRangeStart(e.target.value)}
-                className="bg-[#2C2C2E] border border-[rgba(60,60,67,0.5)] text-white text-xs rounded-[10px] px-3 py-2 outline-none focus:border-[#0A84FF]" />
-              <span className="text-xs text-[rgba(235,235,245,0.3)] shrink-0">→</span>
-              <span className="text-xs text-[rgba(235,235,245,0.5)] shrink-0">Bitiş</span>
+                className="bg-white border border-blue-200 text-slate-700 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-blue-400 shadow-sm" />
+              <span className="text-xs text-slate-400 shrink-0">→</span>
+              <span className="text-xs text-slate-500 shrink-0">Bitiş</span>
               <input type="month" value={rangeEnd} onChange={e => setRangeEnd(e.target.value)}
-                className="bg-[#2C2C2E] border border-[rgba(60,60,67,0.5)] text-white text-xs rounded-[10px] px-3 py-2 outline-none focus:border-[#0A84FF]" />
-              <span className="text-[10px] text-[rgba(235,235,245,0.3)] ml-auto">
-                {rangeRows.length} dönem kayıtlı
-              </span>
+                className="bg-white border border-blue-200 text-slate-700 text-xs rounded-lg px-3 py-1.5 outline-none focus:border-blue-400 shadow-sm" />
+              <span className="text-[10px] text-slate-400 ml-auto">{rangeRows.length} ay kayıt</span>
             </div>
           </div>
 
           {rangeLoading ? <Loading /> : (
-            <div className="w-full px-4 md:px-5 xl:px-6 2xl:px-8 py-4 space-y-5" style={{ background: '#000000' }}>
-
-              {/* Özet Kartlar */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 xl:gap-4 w-full">
-                {[
-                  { label: 'Toplam Net Satış', value: cumCalc.netSatis, prevValue: prevCumCalc.netSatis, color: '#0A84FF', icon: TrendingUp },
-                  { label: 'Toplam Brüt Kar',  value: cumCalc.brutKar,  prevValue: prevCumCalc.brutKar, color: '#30D158', icon: TrendingUp },
-                  { label: 'Toplam Net Kar',   value: cumCalc.netKar,   prevValue: prevCumCalc.netKar, color: cumCalc.netKar >= 0 ? '#30D158' : '#FF453A', icon: cumCalc.netKar >= 0 ? TrendingUp : TrendingDown },
-                ].map(({ label, value, prevValue, color, icon: Icon }) => {
-                  const change = calculateChange(value, prevValue);
-                  return (
-                    <div key={label} className="rounded-2xl p-4 md:p-5 flex flex-col gap-2 min-w-0"
-                      style={{ background: `${color}10`, border: `1px solid ${color}25` }}>
-                      <div className="flex items-center gap-1.5">
-                        <Icon size={13} style={{ color }} />
-                        <span className="text-[10px] font-semibold text-[rgba(235,235,245,0.5)] truncate">{label}</span>
-                      </div>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <p className="text-xl md:text-2xl font-bold leading-none tabular-nums break-all" style={{ color }}>
-                          {value < 0 ? '-' : ''}₺{fmt(Math.abs(value))}
-                        </p>
-                        {prevRangeRows.length > 0 && (
-                          <span className="text-xs font-bold" style={{ color: change.color }}>{change.value}</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-[rgba(235,235,245,0.3)] mt-auto pt-1">{ayKisa(rangeStart)} — {ayKisa(rangeEnd)}</p>
-                    </div>
-                  )
-                })}
+            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.2fr)_minmax(460px,0.8fr)] gap-5 p-4 md:p-5 xl:p-6 items-start" style={{ background: '#E8F4FD' }}>
+              <div>
+                {rangeRows.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 text-sm">Bu dönemde kayıt bulunamadı.</div>
+                ) : (
+              KZTablo({ c: cumCalc, baslik: 'Kümülatif Kar / Zarar', subtitle: `${ayKisa(rangeStart)} – ${ayKisa(rangeEnd)}`, raw: cumRaw })
+                )}
               </div>
-
-              <div className="space-y-5 w-full">
-
-                {/* Aylık Detay Tablosu */}
-                <div className="rounded-2xl border border-[rgba(60,60,67,0.36)] overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.22)]" style={{ background: '#1C1C1E' }}>
-                  <div className="px-4 py-3 border-b border-[rgba(60,60,67,0.3)]" style={{ background: 'rgba(94,92,230,0.12)', borderLeft: '3px solid #5E5CE6' }}>
-                    <p className="text-xs font-bold uppercase tracking-widest text-[#5E5CE6]">Aylık Dağılım</p>
-                    <p className="text-[10px] text-[rgba(235,235,245,0.4)] mt-0.5">{ayKisa(rangeStart)} – {ayKisa(rangeEnd)}</p>
-                  </div>
-
-                  {rowCalcs.length < 2 ? (
-                    <div className="px-4 py-8 text-center">
-                      <p className="text-xs text-[rgba(235,235,245,0.3)]">Grafik için en az 2 dönemlik veri gereklidir.</p>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Aylık Dağılım Grafiği */}
-                      <div className="p-4 md:p-5 h-[320px] xl:h-[360px] border-b border-[rgba(60,60,67,0.3)]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={rowCalcs} margin={{ top: 12, right: 30, left: 0, bottom: 4 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-                            <XAxis dataKey="donem" tickFormatter={ayKisa} tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.72)' }} axisLine={{ stroke: 'rgba(255,255,255,0.12)' }} tickLine={false} />
-                            <YAxis width={72} tickFormatter={(v) => `${(Number(v) / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: 'rgba(235,235,245,0.72)' }} axisLine={false} tickLine={false} />
-                            <Tooltip
-                              contentStyle={{
-                                background: '#1C1C1E',
-                                border: '1px solid rgba(60,60,67,0.36)',
-                                borderRadius: '10px',
-                                color: '#fff',
-                                fontSize: '13px'
-                              }}
-                              labelFormatter={(label) => {
-                                if (typeof label === 'string' && /^\d{4}-\d{2}$/.test(label)) {
-                                  return ayLabel(label);
-                                }
-                                return label;
-                              }}
-                              formatter={(value) => [`₺${fmt(Number(value ?? 0))}`, '']}
-                            />
-                            <Legend wrapperStyle={{ fontSize: '11px', color: '#fff', paddingTop: '10px' }} />
-                            <Bar dataKey="netSatis" name="Net Satış" fill="#0A84FF" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="smm" name="Satılan Mal Maliyeti" fill="#FF9F0A" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="faaliyetKari" name="Faaliyet Karı" fill="#30D158" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="overflow-x-auto bg-[#161618] [scrollbar-width:thin]">
-                        <table className="text-sm table-fixed" style={{ minWidth: '1640px', width: '100%' }}>
-                          <thead>
-                            <tr className="border-b border-[rgba(60,60,67,0.3)]">
-                              <th className="w-[140px] px-5 py-3.5 text-left font-semibold text-[rgba(235,235,245,0.72)] text-[11px] uppercase tracking-wider whitespace-nowrap sticky left-0 z-10" style={{ background: '#1C1C1E' }}>Dönem</th>
-                              <th className="w-[140px] px-5 py-3.5 text-right font-semibold text-[rgba(235,235,245,0.72)] text-[11px] uppercase tracking-wider whitespace-nowrap">Net Satış</th>
-                              <th className="w-[130px] px-4 py-3.5 text-right font-semibold text-[#FFB340] text-[11px] uppercase tracking-wider whitespace-nowrap border-l border-[rgba(255,159,10,0.2)]">%1 Alış</th>
-                              <th className="w-[130px] px-4 py-3.5 text-right font-semibold text-[#FFB340] text-[11px] uppercase tracking-wider whitespace-nowrap">%10 Alış</th>
-                              <th className="w-[130px] px-4 py-3.5 text-right font-semibold text-[#FFB340] text-[11px] uppercase tracking-wider whitespace-nowrap">%20 Alış</th>
-                              <th className="w-[130px] px-4 py-3.5 text-right font-semibold text-[#FFB340] text-[11px] uppercase tracking-wider whitespace-nowrap">İşçilik</th>
-                              <th className="w-[145px] px-5 py-3.5 text-right font-semibold text-[rgba(235,235,245,0.72)] text-[11px] uppercase tracking-wider whitespace-nowrap border-l border-[rgba(60,60,67,0.3)]">Toplam Alış</th>
-                              <th className="w-[145px] px-5 py-3.5 text-right font-semibold text-[rgba(235,235,245,0.72)] text-[11px] uppercase tracking-wider whitespace-nowrap">Brüt Kar</th>
-                              <th className="w-[145px] px-4 py-3.5 text-right font-semibold text-[#D8A5FF] text-[11px] uppercase tracking-wider whitespace-nowrap border-l border-[rgba(191,90,242,0.2)]">Toplam GYG</th>
-                              <th className="w-[150px] px-5 py-3.5 text-right font-semibold text-[rgba(235,235,245,0.72)] text-[11px] uppercase tracking-wider whitespace-nowrap border-l border-[rgba(60,60,67,0.3)]">Faaliyet Karı</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rowCalcs.map((r, i) => {
-                              const bg = i % 2 === 0 ? '#1C1C1E' : 'rgba(44,44,46,0.9)'
-                              return (
-                                <tr key={r.donem}
-                                  className={`border-b border-[rgba(60,60,67,0.15)] hover:bg-[rgba(255,255,255,0.03)] transition-colors ${i % 2 === 0 ? '' : 'bg-[rgba(60,60,67,0.08)]'}`}>
-                                  <td className="px-5 py-3.5 font-semibold text-white whitespace-nowrap sticky left-0 z-10" style={{ background: bg }}>{ayKisa(r.donem)}</td>
-                                  <td className="px-5 py-3.5 text-right tabular-nums text-white font-semibold whitespace-nowrap text-[15px]">₺{fmt(r.netSatis)}</td>
-                                  <td className="px-4 py-3.5 text-right tabular-nums text-[rgba(255,255,255,0.88)] whitespace-nowrap text-[14px] border-l border-[rgba(255,159,10,0.15)]">₺{fmt(r.alis_malzeme)}</td>
-                                  <td className="px-4 py-3.5 text-right tabular-nums text-[rgba(255,255,255,0.88)] whitespace-nowrap text-[14px]">₺{fmt(r.alis_efatura)}</td>
-                                  <td className="px-4 py-3.5 text-right tabular-nums text-[rgba(255,255,255,0.88)] whitespace-nowrap text-[14px]">₺{fmt(r.alis_arsiv)}</td>
-                                  <td className="px-4 py-3.5 text-right tabular-nums text-[rgba(255,255,255,0.88)] whitespace-nowrap text-[14px]">₺{fmt(r.alis_iscilik)}</td>
-                                  <td className="px-5 py-3.5 text-right tabular-nums font-semibold text-[#FFB340] whitespace-nowrap text-[15px] border-l border-[rgba(60,60,67,0.3)]">₺{fmt(r.toplamAlis)}</td>
-                                  <td className="px-5 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap text-[15px]" style={{ color: r.brutKar >= 0 ? '#30D158' : '#FF453A' }}>
-                                    {r.brutKar < 0 ? '-' : ''}₺{fmt(Math.abs(r.brutKar))}
-                                  </td>
-                                  <td className="px-4 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap text-[#BF5AF2] text-[15px] border-l border-[rgba(191,90,242,0.15)]">₺{fmt(r.toplamGyg)}</td>
-                                  <td className="px-5 py-3.5 text-right tabular-nums font-bold whitespace-nowrap text-[16px] border-l border-[rgba(60,60,67,0.3)]" style={{ color: r.faaliyetKari >= 0 ? '#30D158' : '#FF453A' }}>
-                                    {r.faaliyetKari < 0 ? '-' : '+'}₺{fmt(Math.abs(r.faaliyetKari))}
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t-2 border-[rgba(60,60,67,0.5)] bg-[rgba(10,132,255,0.06)]">
-                              <td className="px-5 py-4 font-bold text-white text-sm sticky left-0 z-10" style={{ background: 'rgba(10,132,255,0.06)' }}>TOPLAM</td>
-                              <td className="px-5 py-4 text-right tabular-nums font-bold text-white text-[16px] whitespace-nowrap">₺{fmt(cumCalc.netSatis)}</td>
-                              <td className="px-4 py-4 text-right tabular-nums font-bold text-[#FFB340] text-[16px] whitespace-nowrap border-l border-[rgba(255,159,10,0.15)]">₺{fmt(cumAlis.malzeme)}</td>
-                              <td className="px-4 py-4 text-right tabular-nums font-bold text-[#FFB340] text-[16px] whitespace-nowrap">₺{fmt(cumAlis.efatura)}</td>
-                              <td className="px-4 py-4 text-right tabular-nums font-bold text-[#FFB340] text-[16px] whitespace-nowrap">₺{fmt(cumAlis.arsiv)}</td>
-                              <td className="px-4 py-4 text-right tabular-nums font-bold text-[#FFB340] text-[16px] whitespace-nowrap">₺{fmt(cumAlis.iscilik)}</td>
-                              <td className="px-5 py-4 text-right tabular-nums font-bold text-[#FFB340] text-[16px] whitespace-nowrap border-l border-[rgba(60,60,67,0.3)]">₺{fmt(cumCalc.toplamAlis)}</td>
-                              <td className="px-5 py-4 text-right tabular-nums font-bold text-[16px]" style={{ color: cumCalc.brutKar >= 0 ? '#30D158' : '#FF453A' }}>
-                                {cumCalc.brutKar < 0 ? '-' : ''}₺{fmt(Math.abs(cumCalc.brutKar))}
-                              </td>
-                              <td className="px-4 py-4 text-right tabular-nums font-bold text-[#BF5AF2] text-[16px] border-l border-[rgba(191,90,242,0.15)]">₺{fmt(cumCalc.toplamGyg)}</td>
-                              <td className="px-5 py-4 text-right tabular-nums font-bold border-l text-[17px] whitespace-nowrap border-[rgba(60,60,67,0.3)]" style={{ color: cumCalc.faaliyetKari >= 0 ? '#30D158' : '#FF453A' }}>
-                                {cumCalc.faaliyetKari < 0 ? '-' : '+'}₺{fmt(Math.abs(cumCalc.faaliyetKari))}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Kümülatif K/Z Tablosu */}
-                {KZTablo({
-                  c: cumCalc,
-                  baslik: 'Kümülatif Kar / Zarar',
-                  subtitle: `${ayLabel(rangeStart)} — ${ayLabel(rangeEnd)}`,
-                  raw: cumRaw,
-                })}
-              </div>
+              <div className="2xl:sticky 2xl:top-4" />
             </div>
           )}
         </>

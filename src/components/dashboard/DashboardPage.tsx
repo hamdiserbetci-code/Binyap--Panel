@@ -1,9 +1,10 @@
-'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { supabase, Firma, AY_LABELS } from '@/lib/supabase'
-import { Wallet, CreditCard, CheckSquare, TrendingUp, Clock, Receipt, AlertTriangle, ChevronRight, RefreshCw } from 'lucide-react'
+﻿'use client'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase, AY_LABELS } from '@/lib/supabase'
+import type { Firma } from '@/types'
+import { Wallet, CreditCard, CheckSquare, TrendingUp, Clock, Receipt, AlertTriangle, ChevronRight, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 
-interface Props { userId: string; firma: Firma; onNavigate: (page: string) => void }
+interface Props { userId: string; firma: Firma; firmaIds: string[]; onNavigate: (page: string) => void }
 
 const MALATYA_GRUPLER: { id: string; label: string; renkBg: string; renkText: string }[] = [
   { id: 'mal_hizmet', label: 'Mal Hizmet Alışları', renkBg: 'bg-blue-50', renkText: 'text-blue-700' },
@@ -15,7 +16,37 @@ type MalatyaRow = { ana_grup: string; alt_kategori: string; tutar: number }
 type MalatyaAnaToplam = { id: string; label: string; toplam: number; adet: number }
 type MalatyaAltToplam = { ana_grup: string; alt_kategori: string; toplam: number; adet: number }
 
-export default function DashboardPage({ userId, firma, onNavigate }: Props) {
+function normalizeOdemeTur(raw: string) {
+  const key = String(raw || '').toLocaleLowerCase('tr-TR')
+  if (key.includes('vergi')) return 'Vergi'
+  if (key.includes('sgk')) return 'SGK'
+  if (key.includes('maas') || key.includes('maaş')) return 'Maas'
+  if (key.includes('cari')) return 'Cari'
+  if (key.includes('cek') || key.includes('çek')) return 'Cek'
+  if (key.includes('diger') || key.includes('diğer')) return 'Diger'
+  return raw || 'Diger'
+}
+
+function odemeTurBadgeClass(raw: string) {
+  const key = normalizeOdemeTur(raw).toLocaleLowerCase('tr-TR')
+  if (key.includes('vergi')) return 'bg-rose-100 text-rose-700'
+  if (key.includes('sgk')) return 'bg-blue-100 text-blue-700'
+  if (key.includes('maas')) return 'bg-emerald-100 text-emerald-700'
+  if (key.includes('cari')) return 'bg-purple-100 text-purple-700'
+  if (key.includes('cek')) return 'bg-amber-100 text-amber-700'
+  return 'bg-slate-100 text-slate-700'
+}
+
+function normalizeOdemeDurum(raw: string) {
+  const key = String(raw || '').toLocaleLowerCase('tr-TR')
+  if (['odendi', 'tamamlandi', 'tahsil_edildi', 'ödendi'].includes(key)) return 'odendi'
+  if (['iptal', 'silindi'].includes(key)) return 'iptal'
+  return 'odenecek'
+}
+
+const ODEME_TUR_SECENEKLERI = ['Vergi', 'SGK', 'Maas', 'Cari', 'Cek', 'Diger'] as const
+
+export default function DashboardPage({ userId, firma, firmaIds, onNavigate }: Props) {
   const [loading, setLoading] = useState(true)
   const [kasaBakiye, setKasaBakiye] = useState(0)
   const [kasaGiris, setKasaGiris] = useState(0)
@@ -35,6 +66,13 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
   const [puantajMaas, setPuantajMaas] = useState(0)
   const [vergiYaklasan, setVergiYaklasan] = useState<any[]>([])
   const [odemeListesi, setOdemeListesi] = useState<any[]>([])
+  const [odemeMusteriOzet, setOdemeMusteriOzet] = useState<{ id: string; ad: string; toplam: number; items: any[] }[]>([])
+  const [kzMusteriOzet, setKzMusteriOzet] = useState<{ id: string; ad: string; gelir: number; gider: number; net: number; detay: any }[]>([])
+  const [acikOdemeKart, setAcikOdemeKart] = useState<string | null>(null)
+  const [acikKzKart, setAcikKzKart] = useState<string | null>(null)
+  const [odemeDonemFiltre, setOdemeDonemFiltre] = useState<'tum' | 'bu_ay' | 'gelecek_30' | 'gecikmis'>('tum')
+  const [odemeTurFiltreleri, setOdemeTurFiltreleri] = useState<string[]>([])
+  const [projeAdMap, setProjeAdMap] = useState<Record<string, string>>({})
   const [malatyaAnaToplamlar, setMalatyaAnaToplamlar] = useState<MalatyaAnaToplam[]>([])
   const [malatyaAltToplamlar, setMalatyaAltToplamlar] = useState<MalatyaAltToplam[]>([])
 
@@ -47,16 +85,18 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
   const fetchAll = useCallback(async () => {
     setLoading(true)
     const [
-      kasaRes, odemeRes, gorevRes, maliyetRes, puantajRes, vergiRes, malatyaRes
+      kasaRes, odemeRes, cekRes, projeRes, gorevRes, maliyetRes, puantajRes, vergiRes, malatyaRes, karZararRes
     ] = await Promise.all([
-      supabase.from('kasa').select('*').eq('firma_id', firma.id).order('tarih'),
-      supabase.from('odeme_plani').select('*').eq('firma_id', firma.id).eq('durum', 'beklemede').order('vade_tarihi'),
-      supabase.from('gorevler').select('*').eq('firma_id', firma.id),
+      supabase.from('kasa').select('*').in('firma_id', firmaIds).order('tarih'),
+      supabase.from('odeme_plani').select('*').in('firma_id', firmaIds).order('vade'),
+      supabase.from('cekler').select('*').in('firma_id', firmaIds),
+      supabase.from('projeler').select('id,ad').in('firma_id', firmaIds),
+      supabase.from('gorevler').select('*').in('firma_id', firmaIds),
       supabase.from('maliyet').select('*, firmalar(ad)').eq('yil', aktifYil).lte('ay', aktifAy),
       supabase.from('puantaj').select('*').eq('user_id', userId).eq('yil', aktifYil).eq('ay', aktifAy),
-      supabase.from('vergi_surecleri').select('*').eq('firma_id', firma.id).eq('yil', aktifYil).neq('durum', 'tamamlandi').order('son_tarih'),
-      // Tüm aylar + tüm yıllar toplamı (dashboard özetinde tarih filtresi yok)
+      supabase.from('vergi_surecleri').select('*').in('firma_id', firmaIds).eq('yil', aktifYil).neq('durum', 'tamamlandi').order('son_tarih'),
       supabase.from('malatya_maliyet').select('ana_grup, alt_kategori, tutar').eq('user_id', userId),
+      supabase.from('kar_zarar_donem').select('*').in('firma_id', firmaIds).gte('donem', `${aktifYil}-01`).lte('donem', `${aktifYil}-${String(aktifAy).padStart(2, '0')}`),
     ])
 
     // Kasa
@@ -68,13 +108,46 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
     setKasaCikis(buAyKasa.filter((k: any) => k.tur === 'cikis').reduce((s: number, k: any) => s + k.tutar, 0))
 
     // Ödeme
-    const odemeData = odemeRes.data || []
-    setBekleyenOdeme(odemeData.reduce((s: number, o: any) => s + o.tutar, 0))
+    const manualOdemeData = ((odemeRes.data || []) as any[]).map((o: any) => ({
+      ...o,
+      id: String(o.id),
+      baslik: o.baslik || o.aciklama || 'Odeme',
+      tutar: Number(o.tutar || 0),
+      vade_tarihi: o.vade_tarihi || o.vade || o.son_tarih || null,
+      tur: o.tur || 'Diger Odemeler',
+      durum: normalizeOdemeDurum(o.durum),
+      kaynak: o.kaynak || 'Odeme Plani',
+    }))
+    const cekOdemeData = (cekRes.data || []).map((c: any) => ({
+      id: `cek-${c.id}`,
+      baslik: c.baslik || c.cek_no ? `Cek ${c.cek_no || ''}`.trim() : 'Cek',
+      tutar: Number(c.tutar || 0),
+      vade_tarihi: c.vade_tarihi || c.vade || null,
+      durum: normalizeOdemeDurum(c.durum),
+      tur: 'Cek Odemeleri',
+      musteri_id: c.musteri_id || null,
+      cari_ekip: c.cari_hesap || c.cari_ekip || null,
+      kaynak: 'Cek Takibi',
+    }))
+    const allOdemeData = [...manualOdemeData, ...cekOdemeData].filter((o: any) => String(o.durum || '') !== 'iptal')
+    const odemeData = allOdemeData.filter((o: any) => String(o.durum || '') === 'odenecek')
+    const projeMapData: Record<string, string> = {}
+    ;(projeRes.data || []).forEach((p: any) => { projeMapData[p.id] = p.ad })
+    setProjeAdMap(projeMapData)
+    setBekleyenOdeme(odemeData.reduce((s: number, o: any) => s + Number(o.tutar || 0), 0))
     setBekleyenOdemeSayi(odemeData.length)
-    const gecikmisList = odemeData.filter((o: any) => o.vade_tarihi < today)
+    const gecikmisList = odemeData.filter((o: any) => o.vade_tarihi && o.vade_tarihi < today)
     setGecikmisSayi(gecikmisList.length)
-    setGecikmisToplam(gecikmisList.reduce((s: number, o: any) => s + o.tutar, 0))
+    setGecikmisToplam(gecikmisList.reduce((s: number, o: any) => s + Number(o.tutar || 0), 0))
     setOdemeListesi(odemeData.slice(0, 5))
+    const odemeTurGroupMap: Record<string, { id: string; ad: string; toplam: number; items: any[] }> = {}
+    odemeData.forEach((o: any) => {
+      const tur = normalizeOdemeTur(String(o.tur || 'Diger Odemeler'))
+      if (!odemeTurGroupMap[tur]) odemeTurGroupMap[tur] = { id: tur, ad: tur, toplam: 0, items: [] }
+      odemeTurGroupMap[tur].toplam += Number(o.tutar || 0)
+      odemeTurGroupMap[tur].items.push({ ...o, _turLabel: tur })
+    })
+    setOdemeMusteriOzet(Object.values(odemeTurGroupMap).sort((a, b) => b.toplam - a.toplam))
 
     // Görevler
     const gorevData = gorevRes.data || []
@@ -95,6 +168,22 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
     setMaliyetFirmalar(firmaList)
     setMaliyetGelir(firmaList.reduce((s, f) => s + f.gelir, 0))
     setMaliyetGider(firmaList.reduce((s, f) => s + f.gider, 0))
+
+    // Kar/Zarar firma özeti
+    const kzRows = (karZararRes.data || []) as any[]
+    if (kzRows.length > 0) {
+      const sorted = [...kzRows].sort((a, b) => String(a.donem).localeCompare(String(b.donem)))
+      const first = sorted[0]
+      const last = sorted[sorted.length - 1]
+      const gelir = kzRows.reduce((s: number, r: any) => s + Number(r.satis_yurt_ici || 0) + Number(r.satis_yurt_disi || 0) - Number(r.satis_iade || 0), 0)
+      const toplamAlis = kzRows.reduce((s: number, r: any) => s + Number(r.alis_malzeme || 0) + Number(r.alis_efatura || 0) + Number(r.alis_arsiv || 0) + Number(r.alis_utts || 0) + Number(r.alis_iscilik || 0), 0)
+      const smm = Number(first?.donem_basi_stok || 0) + toplamAlis - Number(last?.donem_sonu_stok || 0)
+      const toplamGyg = kzRows.reduce((s: number, r: any) => s + Number(r.gider_personel || 0) + Number(r.gider_kira || 0) + Number(r.gider_fatura || 0) + Number(r.gider_amortisman || 0) + Number(r.gider_diger || 0) + Number(r.gider_finansal || 0), 0)
+      const gider = smm + toplamGyg
+      setKzMusteriOzet([{ id: 'firma', ad: firma.ad, gelir, gider, net: gelir - gider, detay: { smm, toplamGyg, donemAdet: kzRows.length } }])
+    } else {
+      setKzMusteriOzet([])
+    }
 
     // Puantaj
     const puantajData = puantajRes.data || []
@@ -156,7 +245,56 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
     return val.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺'
   }
 
-  const karZarar = maliyetGelir - maliyetGider
+  const filteredOdemeMusteriOzet = useMemo(() => {
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime()
+    const next30 = new Date(now)
+    next30.setDate(next30.getDate() + 30)
+    const next30Time = next30.getTime()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+
+    const matches = (item: any) => {
+      const t = item?.vade_tarihi ? new Date(`${item.vade_tarihi}T00:00:00`).getTime() : NaN
+      if (Number.isNaN(t)) return odemeDonemFiltre === 'tum'
+      if (odemeDonemFiltre === 'bu_ay') return t >= startOfMonth && t <= endOfMonth
+      if (odemeDonemFiltre === 'gelecek_30') return t >= todayStart && t <= next30Time
+      if (odemeDonemFiltre === 'gecikmis') return t < todayStart
+      return true
+    }
+
+    const turSecili = new Set(odemeTurFiltreleri)
+    const turUygun = (item: any) => {
+      if (turSecili.size === 0) return true
+      const tur = normalizeOdemeTur(String(item?._turLabel || item?.tur || 'Diger'))
+      return turSecili.has(tur)
+    }
+
+    return odemeMusteriOzet
+      .map((g) => {
+        const items = g.items.filter((it: any) => matches(it) && turUygun(it))
+        const toplam = items.reduce((s: number, it: any) => s + Number(it.tutar || 0), 0)
+        return { ...g, items, toplam }
+      })
+      .filter((g) => g.items.length > 0)
+      .sort((a, b) => b.toplam - a.toplam)
+  }, [odemeMusteriOzet, odemeDonemFiltre, odemeTurFiltreleri])
+
+  const maxOdemeToplam = useMemo(
+    () => Math.max(...filteredOdemeMusteriOzet.map((m) => Number(m.toplam || 0)), 1),
+    [filteredOdemeMusteriOzet]
+  )
+
+  const maxKzNetAbs = useMemo(
+    () => Math.max(...kzMusteriOzet.map((m) => Math.abs(Number(m.net || 0))), 1),
+    [kzMusteriOzet]
+  )
+
+
+  function toggleOdemeTurFilter(tur: string) {
+    setOdemeTurFiltreleri((prev) => (prev.includes(tur) ? prev.filter((x) => x !== tur) : [...prev, tur]))
+  }
+
   const gorevYuzde = gorevToplam > 0 ? Math.round((gorevTamamlanan / gorevToplam) * 100) : 0
 
   // Pasta grafik için SVG
@@ -213,8 +351,8 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Üst kartlar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* Üst kartlar (kapali) */}
+      <div className="hidden">
         {/* Kasa */}
         <div onClick={() => onNavigate('kasa')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all col-span-2 sm:col-span-1">
           <div className="flex items-center gap-2 mb-3">
@@ -261,8 +399,145 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Orta satır */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* İş Takibi (Görevler) Kartı */}
+      <div onClick={() => onNavigate('gorevler')} className="bg-white border border-emerald-100 rounded-2xl p-5 cursor-pointer hover:border-emerald-200 hover:shadow-sm transition-all relative overflow-hidden group mb-4 mt-2 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-200">
+              <CheckSquare size={18} className="text-emerald-600"/>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 tracking-wide">İş Takibi (Görevler)</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Seçili dönemdeki tamamlanma oranı</p>
+            </div>
+          </div>
+          <div className="flex-1 max-w-md w-full ml-auto">
+             <div className="flex justify-between items-center text-[11px] font-medium text-slate-600 mb-2">
+                <span>{gorevTamamlanan} / {gorevToplam} Görev Tamamlandı</span>
+                {gorevGecikis > 0 ? <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">{gorevGecikis} Gecikmiş Görev</span> : <span className="text-emerald-600 font-bold">{gorevYuzde}%</span>}
+             </div>
+             <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+               <div className="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full transition-all" style={{ width: `${gorevYuzde}%` }}></div>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Ana görünüm: Odemeler + Kar-Zarar */}
+      <div className="space-y-3 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
+        <div className="rounded-2xl border border-blue-100 bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-base font-bold tracking-tight text-slate-800">Ödemeler</p>
+                <p className="text-xs text-slate-500">Müşteri bazlı bekleyen ödeme özeti</p>
+              </div>
+              <div className="space-y-2">
+                <select
+                  value={odemeDonemFiltre}
+                  onChange={(e) => setOdemeDonemFiltre(e.target.value as 'tum' | 'bu_ay' | 'gelecek_30' | 'gecikmis')}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 lg:w-auto"
+                >
+                  <option value="tum">Tüm Dönem</option>
+                  <option value="bu_ay">Bu Ay</option>
+                  <option value="gelecek_30">Gelecek 30 Gün</option>
+                  <option value="gecikmis">Gecikmiş</option>
+                </select>
+                <div className="flex flex-wrap gap-1.5">
+                  {ODEME_TUR_SECENEKLERI.map((tur) => {
+                    const active = odemeTurFiltreleri.includes(tur)
+                    return (
+                      <button
+                        key={tur}
+                        type="button"
+                        onClick={() => toggleOdemeTurFilter(tur)}
+                        className={`rounded-full border px-2 py-1 text-[10px] font-bold transition ${active ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        {tur}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-3 space-y-2">
+            {filteredOdemeMusteriOzet.length === 0 && <p className="text-sm text-slate-400 py-4 text-center">Filtreye uygun ödeme kaydı bulunamadı.</p>}
+            {filteredOdemeMusteriOzet.map((m) => (
+              <div key={m.id} className="rounded-xl border border-slate-100 overflow-hidden">
+                <button onClick={() => setAcikOdemeKart(acikOdemeKart === m.id ? null : m.id)} className="w-full px-3 py-3 flex items-center justify-between text-left bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="min-w-0 w-full">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{m.ad}</p>
+                      <p className="text-sm font-black text-blue-700 whitespace-nowrap">{fmt(m.toplam)}</p>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200">
+                      <div className="h-1.5 rounded-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${Math.max(6, Math.round((Number(m.toplam || 0) / maxOdemeToplam) * 100))}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{m.items.length} kayıt</p>
+                  </div>
+                  {acikOdemeKart === m.id ? <ChevronUp size={16} className="text-slate-400 ml-2 shrink-0" /> : <ChevronDown size={16} className="text-slate-400 ml-2 shrink-0" />}
+                </button>
+                {acikOdemeKart === m.id && (
+                  <div className="p-2 space-y-1.5 bg-white border-t border-slate-100">
+                    {m.items.slice(0, 8).map((o) => (
+                      <div key={o.id} className="flex items-center justify-between gap-2 border border-slate-100 rounded-md p-2 bg-slate-50">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-slate-700 truncate">{o.baslik}</p>
+                            <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${odemeTurBadgeClass(o._turLabel)}`}>{o._turLabel}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500">{o.vade_tarihi || '-'} {o.kaynak ? `• ${o.kaynak}` : ''}</p>
+                          <p className="text-[10px] text-slate-400">Proje: {o.proje_id ? (projeAdMap[o.proje_id] || 'Bilinmeyen Proje') : 'Genel Firma'}</p>
+                        </div>
+                        <p className="text-xs font-bold text-blue-700 shrink-0">{fmt(Number(o.tutar || 0))}</p>
+                      </div>
+                    ))}
+                    <div className="mt-2 flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 px-2 py-1.5">
+                      <span className="text-[11px] font-semibold text-blue-700">Müşteri Toplamı</span>
+                      <span className="text-[12px] font-black text-blue-700">{fmt(Number(m.toplam || 0))}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-blue-100 bg-white shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+            <p className="text-base font-bold tracking-tight text-slate-800">Kar / Zarar</p>
+            <p className="text-xs text-slate-500">Firma net durum özeti</p>
+          </div>
+          <div className="p-3 space-y-2">
+            {kzMusteriOzet.length === 0 && <p className="text-xs text-slate-400 py-4 text-center">Bu dönem kâr/zarar kaydı bulunamadı.</p>}
+            {kzMusteriOzet.map((m) => (
+              <div key={m.id} className="rounded-xl border border-slate-100 overflow-hidden">
+                <button onClick={() => setAcikKzKart(acikKzKart === m.id ? null : m.id)} className="w-full px-3 py-3 flex items-center justify-between text-left bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800 truncate">{m.ad}</p>
+                    <p className={`text-sm font-black ${m.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>Net: {fmt(m.net)}</p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-200">
+                      <div className={`h-1.5 rounded-full ${m.net >= 0 ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : 'bg-gradient-to-r from-rose-400 to-orange-500'}`} style={{ width: `${Math.max(6, Math.round((Math.abs(Number(m.net || 0)) / maxKzNetAbs) * 100))}%` }} />
+                    </div>
+                  </div>
+                  {acikKzKart === m.id ? <ChevronUp size={16} className="text-slate-400 ml-2 shrink-0" /> : <ChevronDown size={16} className="text-slate-400 ml-2 shrink-0" />}
+                </button>
+                {acikKzKart === m.id && (
+                  <div className="p-2 space-y-1.5 text-xs bg-white border-t border-slate-100">
+                    <div className="flex justify-between"><span className="text-slate-500">Gelir</span><span className="font-bold text-emerald-600">{fmt(m.gelir)}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Gider</span><span className="font-bold text-rose-600">{fmt(m.gider)}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Kar/Zarar Durumu</span><span className={`font-bold ${m.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{m.net >= 0 ? '📈 Kâr' : '📉 Zarar'}</span></div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Orta satır (kapali) */}
+      <div className="hidden">
         {/* Maliyet pasta grafik */}
         {maliyetFirmalar.length === 0 ? (
           <div onClick={() => onNavigate('maliyet')} className="bg-white rounded-xl border border-slate-100 p-4 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all">
@@ -368,10 +643,10 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Malatya Proje Maliyet (Ana/Alt toplamlar) */}
+      {/* Malatya Proje Maliyet (kapali) */}
       <div
         onClick={() => onNavigate('malatya-maliyet')}
-        className="bg-white rounded-xl border border-slate-100 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all overflow-hidden"
+        className="hidden bg-white rounded-xl border border-slate-100 cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all overflow-hidden"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
           <div className="flex items-center gap-2">
@@ -436,9 +711,9 @@ export default function DashboardPage({ userId, firma, onNavigate }: Props) {
         )}
       </div>
 
-      {/* Yaklaşan ödemeler */}
+      {/* Yaklaşan ödemeler (kapali) */}
       {odemeListesi.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+        <div className="hidden bg-white rounded-xl border border-slate-100 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
             <p className="text-sm font-medium text-slate-700">Yaklaşan Ödemeler</p>
             <button onClick={() => onNavigate('odeme')} className="text-xs text-blue-600 flex items-center gap-1 hover:underline">

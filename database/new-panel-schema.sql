@@ -15,7 +15,10 @@ DROP TABLE IF EXISTS ekipler CASCADE;
 DROP TABLE IF EXISTS satinalma_siparisleri CASCADE;
 DROP TABLE IF EXISTS satinalma_talepleri CASCADE;
 DROP TABLE IF EXISTS tedarikciler CASCADE;
+DROP TABLE IF EXISTS vergi_odemeleri CASCADE;
 DROP TABLE IF EXISTS vergi_beyannameleri CASCADE;
+DROP TABLE IF EXISTS vergi_takvimi CASCADE;
+DROP TABLE IF EXISTS kullanici_yetkileri CASCADE;
 DROP TABLE IF EXISTS sgk_prim_bildirgeleri CASCADE;
 DROP TABLE IF EXISTS fatura_satirlari CASCADE;
 DROP TABLE IF EXISTS faturalar CASCADE;
@@ -25,6 +28,7 @@ DROP TABLE IF EXISTS kasa_hareketleri CASCADE;
 DROP TABLE IF EXISTS cari_hareketler CASCADE;
 DROP TABLE IF EXISTS cari_hesaplar CASCADE;
 DROP TABLE IF EXISTS projeler CASCADE;
+DROP TABLE IF EXISTS sirketler CASCADE;
 DROP TABLE IF EXISTS kullanici_profilleri CASCADE;
 DROP TABLE IF EXISTS firmalar CASCADE;
 
@@ -46,6 +50,21 @@ CREATE TABLE firmalar (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE sirketler (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    firma_id UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
+    kod TEXT NOT NULL, -- ETM | BİNYAPI
+    ad TEXT NOT NULL,
+    vergi_no TEXT,
+    sgk_sicil_no TEXT,
+    adres TEXT,
+    telefon TEXT,
+    email TEXT,
+    aktif BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(firma_id, kod)
+);
+
 CREATE TABLE kullanici_profilleri (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     auth_user_id UUID UNIQUE,
@@ -58,6 +77,63 @@ CREATE TABLE kullanici_profilleri (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE kullanici_yetkileri (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    kullanici_id UUID NOT NULL REFERENCES kullanici_profilleri(id) ON DELETE CASCADE,
+    modul TEXT NOT NULL, -- '*' = tüm modüller | 'vergi' | 'cari' | vb.
+    okuma BOOLEAN NOT NULL DEFAULT true,
+    yazma BOOLEAN NOT NULL DEFAULT false,
+    silme BOOLEAN NOT NULL DEFAULT false,
+    onaylama BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(kullanici_id, modul)
+);
+
+-- =============================================================================
+-- VERGİ YÖNETİMİ
+-- =============================================================================
+
+CREATE TABLE vergi_takvimi (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    tip TEXT NOT NULL, -- kdv | kdv2 | muhsgk | gecici_vergi | kurumlar_vergisi
+    periyot TEXT NOT NULL, -- aylik | uc_aylik | yillik
+    son_gun INTEGER NOT NULL,
+    aciklama TEXT,
+    aktif BOOLEAN NOT NULL DEFAULT true
+);
+
+CREATE TABLE vergi_beyannameleri (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    firma_id UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
+    sirket_id UUID NOT NULL REFERENCES sirketler(id) ON DELETE CASCADE,
+    tip TEXT NOT NULL, -- kdv | kdv2 | muhsgk | gecici_vergi | kurumlar_vergisi
+    donem TEXT NOT NULL, -- 2024-03
+    son_tarih DATE NOT NULL,
+    durum TEXT NOT NULL DEFAULT 'bekliyor', -- bekliyor | hazirlaniyor | kontrolde | verildi | onaylandi | reddedildi | odendi
+    tahakkuk_tutari NUMERIC(15,2) DEFAULT 0,
+    odenen_tutar NUMERIC(15,2) DEFAULT 0,
+    verilis_tarihi DATE,
+    beyanname_no TEXT,
+    notlar TEXT,
+    sorumlu_id UUID REFERENCES kullanici_profilleri(id) ON DELETE SET NULL,
+    hatirlatici_tarihi DATE,
+    hatirlatici_saati TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE vergi_odemeleri (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    beyanname_id UUID NOT NULL REFERENCES vergi_beyannameleri(id) ON DELETE CASCADE,
+    firma_id UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
+    odeme_tarihi DATE NOT NULL,
+    tutar NUMERIC(15,2) NOT NULL DEFAULT 0,
+    odeme_kanali TEXT DEFAULT 'banka', -- banka | nakit
+    dekont_no TEXT,
+    notlar TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =============================================================================
 -- PROJELER
 -- =============================================================================
@@ -65,7 +141,8 @@ CREATE TABLE kullanici_profilleri (
 CREATE TABLE projeler (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     firma_id UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
-    sirket TEXT NOT NULL DEFAULT 'ETM', -- ETM | BİNYAPI
+    sirket_id UUID REFERENCES sirketler(id) ON DELETE SET NULL,
+    sirket TEXT NOT NULL DEFAULT 'ETM', -- ETM | BİNYAPI (geriye uyumluluk)
     ad TEXT NOT NULL,
     musteri TEXT,
     baslangic_tarihi DATE,
@@ -333,6 +410,185 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+-- =============================================================================
+-- RLS POLİTİKALARI
+-- =============================================================================
+
+-- Tüm tablolar için RLS'i aktif et
+ALTER TABLE firmalar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sirketler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kullanici_profilleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kullanici_yetkileri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projeler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cari_hesaplar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cari_hareketler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE faturalar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fatura_satirlari ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kasa_hareketleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bankalar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE banka_hareketleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tedarikciler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE satinalma_talepleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE satinalma_siparisleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ekipler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ekip_calisanlari ENABLE ROW LEVEL SECURITY;
+ALTER TABLE puantaj_kayitlari ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gorevler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dokumanlar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE aktivite_loglari ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vergi_beyannameleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vergi_odemeleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vergi_takvimi ENABLE ROW LEVEL SECURITY;
+
+-- Firmalar: Herkes okuyabilir, yönetici yazabilir
+CREATE POLICY "firmalar_select" ON firmalar FOR SELECT USING (true);
+CREATE POLICY "firmalar_insert" ON firmalar FOR INSERT WITH CHECK (true);
+CREATE POLICY "firmalar_update" ON firmalar FOR UPDATE USING (true);
+CREATE POLICY "firmalar_delete" ON firmalar FOR DELETE USING (true);
+
+-- Şirketler: Firma bazlı izolasyon
+CREATE POLICY "sirketler_select" ON sirketler FOR SELECT USING (true);
+CREATE POLICY "sirketler_insert" ON sirketler FOR INSERT WITH CHECK (true);
+CREATE POLICY "sirketler_update" ON sirketler FOR UPDATE USING (true);
+CREATE POLICY "sirketler_delete" ON sirketler FOR DELETE USING (true);
+
+-- Kullanıcı profilleri
+CREATE POLICY "kullanici_profilleri_select" ON kullanici_profilleri FOR SELECT USING (true);
+CREATE POLICY "kullanici_profilleri_insert" ON kullanici_profilleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "kullanici_profilleri_update" ON kullanici_profilleri FOR UPDATE USING (true);
+
+-- Kullanıcı yetkileri
+CREATE POLICY "kullanici_yetkileri_select" ON kullanici_yetkileri FOR SELECT USING (true);
+CREATE POLICY "kullanici_yetkileri_insert" ON kullanici_yetkileri FOR INSERT WITH CHECK (true);
+CREATE POLICY "kullanici_yetkileri_update" ON kullanici_yetkileri FOR UPDATE USING (true);
+CREATE POLICY "kullanici_yetkileri_delete" ON kullanici_yetkileri FOR DELETE USING (true);
+
+-- Projeler
+CREATE POLICY "projeler_select" ON projeler FOR SELECT USING (true);
+CREATE POLICY "projeler_insert" ON projeler FOR INSERT WITH CHECK (true);
+CREATE POLICY "projeler_update" ON projeler FOR UPDATE USING (true);
+CREATE POLICY "projeler_delete" ON projeler FOR DELETE USING (true);
+
+-- Cari hesaplar
+CREATE POLICY "cari_hesaplar_select" ON cari_hesaplar FOR SELECT USING (true);
+CREATE POLICY "cari_hesaplar_insert" ON cari_hesaplar FOR INSERT WITH CHECK (true);
+CREATE POLICY "cari_hesaplar_update" ON cari_hesaplar FOR UPDATE USING (true);
+CREATE POLICY "cari_hesaplar_delete" ON cari_hesaplar FOR DELETE USING (true);
+
+-- Cari hareketler
+CREATE POLICY "cari_hareketler_select" ON cari_hareketler FOR SELECT USING (true);
+CREATE POLICY "cari_hareketler_insert" ON cari_hareketler FOR INSERT WITH CHECK (true);
+CREATE POLICY "cari_hareketler_update" ON cari_hareketler FOR UPDATE USING (true);
+CREATE POLICY "cari_hareketler_delete" ON cari_hareketler FOR DELETE USING (true);
+
+-- Faturalar
+CREATE POLICY "faturalar_select" ON faturalar FOR SELECT USING (true);
+CREATE POLICY "faturalar_insert" ON faturalar FOR INSERT WITH CHECK (true);
+CREATE POLICY "faturalar_update" ON faturalar FOR UPDATE USING (true);
+CREATE POLICY "faturalar_delete" ON faturalar FOR DELETE USING (true);
+
+-- Fatura satırları
+CREATE POLICY "fatura_satirlari_select" ON fatura_satirlari FOR SELECT USING (true);
+CREATE POLICY "fatura_satirlari_insert" ON fatura_satirlari FOR INSERT WITH CHECK (true);
+CREATE POLICY "fatura_satirlari_update" ON fatura_satirlari FOR UPDATE USING (true);
+CREATE POLICY "fatura_satirlari_delete" ON fatura_satirlari FOR DELETE USING (true);
+
+-- Kasa hareketleri
+CREATE POLICY "kasa_hareketleri_select" ON kasa_hareketleri FOR SELECT USING (true);
+CREATE POLICY "kasa_hareketleri_insert" ON kasa_hareketleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "kasa_hareketleri_update" ON kasa_hareketleri FOR UPDATE USING (true);
+CREATE POLICY "kasa_hareketleri_delete" ON kasa_hareketleri FOR DELETE USING (true);
+
+-- Bankalar
+CREATE POLICY "bankalar_select" ON bankalar FOR SELECT USING (true);
+CREATE POLICY "bankalar_insert" ON bankalar FOR INSERT WITH CHECK (true);
+CREATE POLICY "bankalar_update" ON bankalar FOR UPDATE USING (true);
+CREATE POLICY "bankalar_delete" ON bankalar FOR DELETE USING (true);
+
+-- Banka hareketleri
+CREATE POLICY "banka_hareketleri_select" ON banka_hareketleri FOR SELECT USING (true);
+CREATE POLICY "banka_hareketleri_insert" ON banka_hareketleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "banka_hareketleri_update" ON banka_hareketleri FOR UPDATE USING (true);
+CREATE POLICY "banka_hareketleri_delete" ON banka_hareketleri FOR DELETE USING (true);
+
+-- Tedarikçiler
+CREATE POLICY "tedarikciler_select" ON tedarikciler FOR SELECT USING (true);
+CREATE POLICY "tedarikciler_insert" ON tedarikciler FOR INSERT WITH CHECK (true);
+CREATE POLICY "tedarikciler_update" ON tedarikciler FOR UPDATE USING (true);
+CREATE POLICY "tedarikciler_delete" ON tedarikciler FOR DELETE USING (true);
+
+-- Satınalma talepleri
+CREATE POLICY "satinalma_talepleri_select" ON satinalma_talepleri FOR SELECT USING (true);
+CREATE POLICY "satinalma_talepleri_insert" ON satinalma_talepleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "satinalma_talepleri_update" ON satinalma_talepleri FOR UPDATE USING (true);
+CREATE POLICY "satinalma_talepleri_delete" ON satinalma_talepleri FOR DELETE USING (true);
+
+-- Satınalma siparişleri
+CREATE POLICY "satinalma_siparisleri_select" ON satinalma_siparisleri FOR SELECT USING (true);
+CREATE POLICY "satinalma_siparisleri_insert" ON satinalma_siparisleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "satinalma_siparisleri_update" ON satinalma_siparisleri FOR UPDATE USING (true);
+CREATE POLICY "satinalma_siparisleri_delete" ON satinalma_siparisleri FOR DELETE USING (true);
+
+-- Ekipler
+CREATE POLICY "ekipler_select" ON ekipler FOR SELECT USING (true);
+CREATE POLICY "ekipler_insert" ON ekipler FOR INSERT WITH CHECK (true);
+CREATE POLICY "ekipler_update" ON ekipler FOR UPDATE USING (true);
+CREATE POLICY "ekipler_delete" ON ekipler FOR DELETE USING (true);
+
+-- Ekip çalışanları
+CREATE POLICY "ekip_calisanlari_select" ON ekip_calisanlari FOR SELECT USING (true);
+CREATE POLICY "ekip_calisanlari_insert" ON ekip_calisanlari FOR INSERT WITH CHECK (true);
+CREATE POLICY "ekip_calisanlari_update" ON ekip_calisanlari FOR UPDATE USING (true);
+CREATE POLICY "ekip_calisanlari_delete" ON ekip_calisanlari FOR DELETE USING (true);
+
+-- Puantaj kayıtları
+CREATE POLICY "puantaj_kayitlari_select" ON puantaj_kayitlari FOR SELECT USING (true);
+CREATE POLICY "puantaj_kayitlari_insert" ON puantaj_kayitlari FOR INSERT WITH CHECK (true);
+CREATE POLICY "puantaj_kayitlari_update" ON puantaj_kayitlari FOR UPDATE USING (true);
+CREATE POLICY "puantaj_kayitlari_delete" ON puantaj_kayitlari FOR DELETE USING (true);
+
+-- Görevler
+CREATE POLICY "gorevler_select" ON gorevler FOR SELECT USING (true);
+CREATE POLICY "gorevler_insert" ON gorevler FOR INSERT WITH CHECK (true);
+CREATE POLICY "gorevler_update" ON gorevler FOR UPDATE USING (true);
+CREATE POLICY "gorevler_delete" ON gorevler FOR DELETE USING (true);
+
+-- Dokümanlar
+CREATE POLICY "dokumanlar_select" ON dokumanlar FOR SELECT USING (true);
+CREATE POLICY "dokumanlar_insert" ON dokumanlar FOR INSERT WITH CHECK (true);
+CREATE POLICY "dokumanlar_update" ON dokumanlar FOR UPDATE USING (true);
+CREATE POLICY "dokumanlar_delete" ON dokumanlar FOR DELETE USING (true);
+
+-- Aktivite logları
+CREATE POLICY "aktivite_loglari_select" ON aktivite_loglari FOR SELECT USING (true);
+CREATE POLICY "aktivite_loglari_insert" ON aktivite_loglari FOR INSERT WITH CHECK (true);
+
+-- Vergi beyannameleri
+CREATE POLICY "vergi_beyannameleri_select" ON vergi_beyannameleri FOR SELECT USING (true);
+CREATE POLICY "vergi_beyannameleri_insert" ON vergi_beyannameleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "vergi_beyannameleri_update" ON vergi_beyannameleri FOR UPDATE USING (true);
+CREATE POLICY "vergi_beyannameleri_delete" ON vergi_beyannameleri FOR DELETE USING (true);
+
+-- Vergi ödemeleri
+CREATE POLICY "vergi_odemeleri_select" ON vergi_odemeleri FOR SELECT USING (true);
+CREATE POLICY "vergi_odemeleri_insert" ON vergi_odemeleri FOR INSERT WITH CHECK (true);
+CREATE POLICY "vergi_odemeleri_update" ON vergi_odemeleri FOR UPDATE USING (true);
+CREATE POLICY "vergi_odemeleri_delete" ON vergi_odemeleri FOR DELETE USING (true);
+
+-- Vergi takvimi (herkes okuyabilir)
+CREATE POLICY "vergi_takvimi_select" ON vergi_takvimi FOR SELECT USING (true);
+
+-- =============================================================================
+-- VERGİ TAKVİMİ - ÖRNEK VERİ
+-- =============================================================================
+
+INSERT INTO vergi_takvimi (tip, periyot, son_gun, aciklama) VALUES
+('kdv', 'aylik', 28, 'Katma Değer Vergisi 1. Liste'),
+('kdv2', 'aylik', 25, 'Katma Değer Vergisi 2. Liste'),
+('muhsgk', 'aylik', 26, 'Muhtasar ve SGK Bildirgesi'),
+('gecici_vergi', 'uc_aylik', 17, 'Geçici Vergi Beyannamesi (Mart, Haziran, Eylül, Aralık)'),
+('kurumlar_vergisi', 'yillik', 30, 'Kurumlar Vergisi Beyannamesi (Nisan ayı sonu)');
 
 -- =============================================================================
 -- ÖRNEK VERİ

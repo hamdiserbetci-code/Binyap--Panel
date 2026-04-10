@@ -82,11 +82,9 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
   useEffect(() => {
     async function loadDependencies() {
       try {
-        const { data: musteriData } = await supabase.from('musteriler').select('id, ad, kisa_ad').eq('firma_id', firma.id).order('ad')
-        setMusteriler((musteriData || []) as Musteri[])
-        const { data: projeData } = await supabase.from('projeler').select('id, ad, musteri_id').eq('firma_id', firma.id).order('ad')
-        setProjeler((projeData || []) as Proje[])
-      } catch (e: any) {
+        const { data: musteriData } = await supabase.from('cari_hesaplar').select('id, ad').eq('tip', 'musteri').eq('firma_id', firma.id).order('ad')
+        setMusteriler((musteriData || []) as sbase.from('projeler').select('id, ad, musteri').eq('firma_id', firma.id).order('ad')
+        setProjeler((projeData || []) as any[] as Proje[])
         setError('Müşteri ve proje listesi yüklenemedi: ' + e.message)
       }
     }
@@ -127,9 +125,6 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
     if (projectIdToUse && projectIdToUse !== 'none') {
       const selectedProje = projeler.find(p => p.id === projectIdToUse);
       if (selectedProje) {
-        // new-panel-schema.sql'deki projeler tablosunda musteri_id yok, bu yüzden bu kısım çalışmayabilir
-        // Eğer musteri_id'yi projeler tablosuna eklemediyseniz, bu satırı yorum satırı yapın veya projeden müşteri ID'si almayın.
-        // musteriIdToUse = selectedProje.musteri_id || null;
       }
     } else {
       projectIdToUse = null; // "Proje yok" seçildiyse null yap
@@ -177,20 +172,24 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
 
       const { data: urlData } = supabase.storage.from('dokumanlar').getPublicUrl(path)
 
-      const { error: dbErr } = await supabase.from('dokumanlar').insert({
+      const dbPayload: any = {
         firma_id: firma.id,
-        yukleyen_id: profil.id, // Assuming yukleyen_id exists in dokumanlar table
-        musteri_id: musteriIdToUse === 'none' ? null : musteriIdToUse, // Assuming musteri_id exists
         proje_id: projectIdToUse === 'none' ? null : projectIdToUse,
-        modul: uploadFileType, // Using 'modul' for document type
-        kategori: baseKlasor, // Using 'kategori' for folder path, or can be null if tags are used
+        modul: uploadFileType,
+        kategori: baseKlasor,
         dosya_adi: file.name,
         dosya_url: urlData.publicUrl,
         mime_type: file.type || null,
-        dosya_boyutu: file.size ?? null, // Using 'dosya_boyutu' as per new-panel-schema.sql
-        etiketler: [], // Assuming etiketler (TEXT[]) exists in dokumanlar table
-        aciklama: '', // Default empty description
-      })
+        dosya_boyutu: file.size ?? null,
+        aciklama: '',
+      };
+
+      if (musteriIdToUse && musteriIdToUse !== 'none') {
+        dbPayload.bagli_tablo = 'cari_hesaplar';
+        dbPayload.bagli_kayit_id = musteriIdToUse;
+      }
+
+      const { error: dbErr } = await supabase.from('dokumanlar').insert(dbPayload)
 
       if (dbErr) {
         alert(`Veritabanı hatası: ${dbErr.message}`)
@@ -255,7 +254,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
   const filteredDokumanlar = dokumanlar.filter(d => {
     const matchSearch = !search || d.dosya_adi.toLowerCase().includes(search.toLowerCase()) || d.aciklama?.toLowerCase().includes(search.toLowerCase())
     const matchFolder = !folder || d.kategori === folder // Using kategori for folder filtering
-    const matchMusteri = filterMusteri === 'all' || d.musteri_id === filterMusteri // Assuming musteri_id exists
+    const matchMusteri = filterMusteri === 'all' || (d as any).bagli_kayit_id === filterMusteri
     const matchProje = filterProje === 'all' || d.proje_id === filterProje
     const matchModul = filterModul === 'all' || d.modul === filterModul // Filtering by 'modul' (document type)
     const matchTags = filterTags.length === 0 || filterTags.every(ft => d.etiketler?.includes(ft)) // Assuming etiketler exists
@@ -271,8 +270,8 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
   const tree = buildTree(dokumanlar)
   const folders = Object.keys(tree).sort()
 
-  const filteredProjeler = projeler.filter(p => filterMusteri === 'all' || p.musteri_id === filterMusteri);
-  const filteredMusterilerForUpload = musteriler.filter(m => !uploadToProject || projeler.some(p => p.id === uploadToProject && p.musteri_id === m.id));
+  const filteredProjeler = projeler; // Projeler tablosundan musteri_id kaldırıldığı için filtreleme basitleştirildi
+  const filteredMusterilerForUpload = musteriler;
 
   if (loading) return <Loading />
   if (error) return <ErrorMsg message={error} onRetry={load} />
@@ -281,7 +280,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
     <div className="flex flex-col gap-0 -mx-3 md:-mx-5 -mt-3 md:-mt-5">
       {/* Üst Bar */}
       <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-[rgba(60,60,67,0.36)] shrink-0 flex-wrap"
-        style={{ background: 'rgba(28,28,30,0.95)' }}>
+        style={{ background: '#52BDE0' }}>
         <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-white flex-1 uppercase">
           Dosya Yükleme
         </h1>
@@ -292,7 +291,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
 
       <div className="flex flex-1 min-h-0">
         {/* Klasör ağacı */}
-        <div className="hidden md:flex flex-col w-52 shrink-0 overflow-y-auto py-3 px-3 border-r border-[rgba(60,60,67,0.36)]" style={{ background: '#1C1C1E' }}>
+        <div className="hidden md:flex flex-col w-52 shrink-0 overflow-y-auto py-3 px-3 border-r border-[rgba(60,60,67,0.36)]" style={{ background: '#52BDE0' }}>
           <p className="text-[10px] font-bold text-[rgba(235,235,245,0.3)] uppercase tracking-widest px-2 mb-2">
             Klasörler
           </p>
@@ -316,7 +315,7 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
         </div>
 
         {/* Ana alan */}
-        <div className="flex-1 flex flex-col min-w-0 space-y-4 p-4 md:p-5" style={{ background: '#000000' }}>
+        <div className="flex-1 flex flex-col min-w-0 space-y-4 p-4 md:p-5" style={{ background: '#52BDE0' }}>
           {/* Araç çubuğu */}
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -443,16 +442,16 @@ export default function DosyaYukleme({ firma, profil }: AppCtx) {
             </button>
           </>}>
           <div className="space-y-4">
-            <p className="text-sm text-[rgba(235,235,245,0.7)] font-medium truncate">Dosya: <span className="text-white">{editingFile.dosya_adi}</span></p>
+            <p className="text-sm text-slate-700 font-medium truncate">Dosya: <span className="text-slate-900 font-bold">{editingFile.dosya_adi}</span></p>
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-[rgba(235,235,245,0.5)]">Mevcut Etiketler</p>
+              <p className="text-xs font-semibold text-slate-500">Mevcut Etiketler</p>
               {(editingFile.etiketler || []).length > 0 ? (
-                <div className="flex flex-wrap gap-2 p-3 bg-[rgba(60,60,67,0.3)] rounded-lg border border-[rgba(60,60,67,0.36)]">
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
                   {(editingFile.etiketler || []).map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1.5 bg-[rgba(60,60,67,0.5)] text-white px-2 py-0.5 rounded-full text-[10px] font-semibold">{tag}<button onClick={() => removeTag(editingFile, tag)} className="hover:text-[#FF453A]"><X size={10} /></button></span>
+                    <span key={tag} className="inline-flex items-center gap-1.5 bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">{tag}<button onClick={() => removeTag(editingFile, tag)} className="hover:text-red-500"><X size={10} /></button></span>
                   ))}
                 </div>
-              ) : <p className="text-xs text-[rgba(235,235,245,0.4)]">Henüz etiket yok.</p>}
+              ) : <p className="text-xs text-slate-400">Henüz etiket yok.</p>}
             </div>
             <Field label="Yeni Etiket Ekle" hint="Birden fazla etiket için virgül (,) kullanın.">
               <input className={cls.input} value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="fatura, kdv, mart-2024" autoFocus />

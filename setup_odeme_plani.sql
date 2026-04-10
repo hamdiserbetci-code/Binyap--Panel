@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS odeme_plani (
     ilgili_kurum TEXT,
     tutar NUMERIC(12,2) NOT NULL DEFAULT 0,
     vade_tarihi DATE NOT NULL,
-    durum TEXT NOT NULL DEFAULT 'bekliyor' CHECK (durum IN ('bekliyor', 'odendi', 'ertelendi', 'iptal')),
+    durum TEXT NOT NULL DEFAULT 'odenecek' CHECK (durum IN ('odenecek', 'odendi')),
     aciklama TEXT,
     hatirlatici_tarihi DATE,
     hatirlatici_saati TEXT,

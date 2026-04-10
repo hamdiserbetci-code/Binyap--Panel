@@ -1,0 +1,243 @@
+diff --git a/src/components/ik/BordroPage.tsx b/src/components/ik/BordroPage.tsx
+index 43be3c6..0d04c40 100644
+--- a/src/components/ik/BordroPage.tsx
++++ b/src/components/ik/BordroPage.tsx
+@@ -1,479 +1,500 @@
+ 'use client'
+ import { useState, useEffect, useCallback } from 'react'
+ import { supabase } from '@/lib/supabase'
+ import { Firma } from '@/types'
+ import Modal, { FormField, inputCls, btnPrimary, btnSecondary } from '@/components/ui/Modal'
+ import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, FolderKanban, Users, FileText } from 'lucide-react'
+ 
+ interface Props { firma: Firma; userId: string }
+ 
+-interface Proje { id: string; firma_id: string; ad: string; durum?: string }
+-interface Ekip { id: string; firma_id: string; proje_id: string; ad_soyad: string; pozisyon: string; ise_giris?: string }
++interface Proje { id: string; firma_id: string; ad: string }
++interface Ekip  { id: string; firma_id: string; proje_id: string; ad_soyad: string; pozisyon?: string }
+ interface Bordro {
+   id: string; firma_id: string; proje_id: string; ekip_id: string; donem: string
+   brut: number; net: number; sgk_isci: number; sgk_isveren: number; vergi: number; avans: number; kesinti: number
+ }
+ 
+ const fmt = (v: number) => v.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ?'
+ const AY = ['','Ocak','Þubat','Mart','Nisan','Mayýs','Haziran','Temmuz','Aðustos','Eylül','Ekim','Kasým','Aralýk']
+ 
+ type Tab = 'projeler' | 'ekip' | 'bordro'
+ 
+ export default function BordroPage({ firma, userId }: Props) {
+   const [tab, setTab] = useState<Tab>('projeler')
+   const [projeler, setProjeler] = useState<Proje[]>([])
+   const [ekipler, setEkipler] = useState<Ekip[]>([])
+   const [bordrolar, setBordrolar] = useState<Bordro[]>([])
+   const [selectedDonem, setSelectedDonem] = useState(new Date().toISOString().slice(0, 7))
+   const [expandedProje, setExpandedProje] = useState<string | null>(null)
+ 
+   // Proje modal
+   const [projeModal, setProjeModal] = useState(false)
+   const [editingProje, setEditingProje] = useState<Proje | null>(null)
+-  const [projeForm, setProjeForm] = useState({ ad: '', durum: 'devam' })
++  const [projeAd, setProjeAd] = useState('')
+   const [projeError, setProjeError] = useState('')
+   const [projeSaving, setProjeSaving] = useState(false)
+ 
+-  // Ekip modal
++  // Ekip modal — "ekip adý" (A Ekibi, B Ekibi vb.)
+   const [ekipModal, setEkipModal] = useState(false)
+   const [editingEkip, setEditingEkip] = useState<Ekip | null>(null)
+-  const [ekipForm, setEkipForm] = useState({ proje_id: '', ad_soyad: '', pozisyon: '', ise_giris: '' })
++  const [ekipForm, setEkipForm] = useState({ proje_id: '', ad_soyad: '' })
++  const [ekipError, setEkipError] = useState('')
++  const [ekipSaving, setEkipSaving] = useState(false)
+ 
+-  // Bordro modal
++  // Bordro modal — ekip bazlý toplam tutar giriþi
+   const [bordroModal, setBordroModal] = useState(false)
+   const [editingBordro, setEditingBordro] = useState<Bordro | null>(null)
+-  const emptyBordroForm = { proje_id: '', ekip_id: '', donem: selectedDonem, brut: '', avans: '', kesinti: '' }
+-  const [bordroForm, setBordroForm] = useState<any>(emptyBordroForm)
+-
+-  const calcBordro = (brut: number, avans: number, kesinti: number) => {
+-    const sgk_isci = Math.round(brut * 0.14 * 100) / 100
+-    const vergi = Math.round((brut - sgk_isci) * 0.15 * 100) / 100
+-    const sgk_isveren = Math.round(brut * 0.205 * 100) / 100
+-    const net = Math.round((brut - sgk_isci - vergi - avans - kesinti) * 100) / 100
+-    return { sgk_isci, sgk_isveren, vergi, net }
+-  }
++  const emptyBordro = { proje_id: '', ekip_id: '', donem: selectedDonem, brut: '', sgk_isci: '', sgk_isveren: '', vergi: '', avans: '', kesinti: '' }
++  const [bordroForm, setBordroForm] = useState<any>(emptyBordro)
++  const [bordroError, setBordroError] = useState('')
++  const [bordroSaving, setBordroSaving] = useState(false)
+ 
+   const fetchAll = useCallback(async () => {
+     const [{ data: p }, { data: e }, { data: b }] = await Promise.all([
+-      supabase.from('projeler').select('id,firma_id,ad,durum').eq('firma_id', firma.id).order('ad'),
+-      supabase.from('ekipler').select('id,firma_id,proje_id,ad_soyad,pozisyon,ise_giris').eq('firma_id', firma.id).order('ad_soyad'),
++      supabase.from('projeler').select('id,firma_id,ad').eq('firma_id', firma.id).order('ad'),
++      supabase.from('ekipler').select('id,firma_id,proje_id,ad_soyad,pozisyon').eq('firma_id', firma.id).order('ad_soyad'),
+       supabase.from('bordro').select('*').eq('firma_id', firma.id).eq('donem', selectedDonem),
+     ])
+     setProjeler(p || [])
+     setEkipler(e || [])
+     setBordrolar(b || [])
+   }, [firma.id, selectedDonem])
+ 
+   useEffect(() => { fetchAll() }, [fetchAll])
+ 
+-  // ¦¦ PROJE CRUD ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
++  // ¦¦ PROJE ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
+   function openProjeModal(item?: Proje) {
+     setEditingProje(item || null)
+-    setProjeForm({ ad: item?.ad || '', durum: item?.durum || 'devam' })
++    setProjeAd(item?.ad || '')
++    setProjeError('')
+     setProjeModal(true)
+   }
+ 
+   async function saveProje() {
+-    if (!projeForm.ad.trim()) return
+-    setProjeSaving(true)
+-    setProjeError('')
+-    // durum kolonu olmayabilir, önce sadece ad ile dene
+-    const payload: any = { firma_id: firma.id, ad: projeForm.ad }
+-    // durum kolonunu ayrýca ekle, hata verirse yok sayýlýr
++    if (!projeAd.trim()) return
++    setProjeSaving(true); setProjeError('')
+     const { error } = editingProje
+-      ? await supabase.from('projeler').update({ ad: projeForm.ad }).eq('id', editingProje.id)
+-      : await supabase.from('projeler').insert(payload)
+-    if (error) {
+-      setProjeError(error.message)
+-      setProjeSaving(false)
+-      return
+-    }
+-    setProjeModal(false)
+-    fetchAll()
+-    setProjeSaving(false)
++      ? await supabase.from('projeler').update({ ad: projeAd }).eq('id', editingProje.id)
++      : await supabase.from('projeler').insert({ firma_id: firma.id, ad: projeAd })
++    if (error) { setProjeError(error.message); setProjeSaving(false); return }
++    setProjeModal(false); fetchAll(); setProjeSaving(false)
+   }
+ 
+   async function delProje(id: string) {
+     if (!confirm('Proje ve baðlý tüm ekip/bordro kayýtlarý silinecek. Emin misiniz?')) return
+     await supabase.from('bordro').delete().eq('proje_id', id)
+     await supabase.from('ekipler').delete().eq('proje_id', id)
+     await supabase.from('projeler').delete().eq('id', id)
+     fetchAll()
+   }
+ 
+-  // ¦¦ EKÝP CRUD ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
++  // ¦¦ EKÝP ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
+   function openEkipModal(item?: Ekip, projeId?: string) {
+     setEditingEkip(item || null)
+-    setEkipForm({
+-      proje_id: item?.proje_id || projeId || '',
+-      ad_soyad: item?.ad_soyad || '',
+-      pozisyon: item?.pozisyon || '',
+-      ise_giris: item?.ise_giris || '',
+-    })
++    setEkipForm({ proje_id: item?.proje_id || projeId || '', ad_soyad: item?.ad_soyad || '' })
++    setEkipError('')
+     setEkipModal(true)
+   }
+ 
+   async function saveEkip() {
+-    if (!ekipForm.ad_soyad.trim() || !ekipForm.proje_id) return
+-    const payload = {
+-      firma_id: firma.id,
+-      proje_id: ekipForm.proje_id,
+-      ad_soyad: ekipForm.ad_soyad,
+-      pozisyon: ekipForm.pozisyon,
+-      ise_giris: ekipForm.ise_giris || null,
+-    }
+-    if (editingEkip) {
+-      await supabase.from('ekipler').update(payload).eq('id', editingEkip.id)
+-    } else {
+-      await supabase.from('ekipler').insert(payload)
+-    }
+-    setEkipModal(false)
+-    fetchAll()
++    if (!ekipForm.ad_soyad.trim() || !ekipForm.proje_id) { setEkipError('Proje ve ekip adý zorunludur.'); return }
++    setEkipSaving(true); setEkipError('')
++    const payload = { firma_id: firma.id, proje_id: ekipForm.proje_id, ad_soyad: ekipForm.ad_soyad }
++    const { error } = editingEkip
++      ? await supabase.from('ekipler').update({ ad_soyad: ekipForm.ad_soyad, proje_id: ekipForm.proje_id }).eq('id', editingEkip.id)
++      : await supabase.from('ekipler').insert(payload)
++    if (error) { setEkipError(error.message); setEkipSaving(false); return }
++    setEkipModal(false); fetchAll(); setEkipSaving(false)
+   }
+ 
+   async function delEkip(id: string) {
+-    if (!confirm('Personel ve bordro kayýtlarý silinecek. Emin misiniz?')) return
++    if (!confirm('Ekip ve bordro kayýtlarý silinecek. Emin misiniz?')) return
+     await supabase.from('bordro').delete().eq('ekip_id', id)
+     await supabase.from('ekipler').delete().eq('id', id)
+     fetchAll()
+   }
+ 
+-  // ¦¦ BORDRO CRUD ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
++  // ¦¦ BORDRO ¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦
++  // Net = Brüt - SGK Ýþçi - Vergi - Avans - Kesinti
++  const calcNet = (f: any) => {
++    const b = parseFloat(f.brut) || 0
++    const s = parseFloat(f.sgk_isci) || 0
++    const v = parseFloat(f.vergi) || 0
++    const a = parseFloat(f.avans) || 0
++    const k = parseFloat(f.kesinti) || 0
++    return Math.round((b - s - v - a - k) * 100) / 100
++  }
++
+   function openBordroModal(item?: Bordro) {
+     setEditingBordro(item || null)
+-    setBordroForm(item
+-      ? { proje_id: item.proje_id, ekip_id: item.ekip_id, donem: item.donem, brut: String(item.brut), avans: String(item.avans), kesinti: String(item.kesinti) }
+-      : { ...emptyBordroForm, donem: selectedDonem })
++    setBordroForm(item ? {
++      proje_id: item.proje_id, ekip_id: item.ekip_id, donem: item.donem,
++      brut: String(item.brut), sgk_isci: String(item.sgk_isci),
++      sgk_isveren: String(item.sgk_isveren), vergi: String(item.vergi),
++      avans: String(item.avans), kesinti: String(item.kesinti),
++    } : { ...emptyBordro, donem: selectedDonem })
++    setBordroError('')
+     setBordroModal(true)
+   }
+ 
+   async function saveBordro() {
+-    if (!bordroForm.proje_id || !bordroForm.ekip_id || !bordroForm.brut) return
+-    const brut = parseFloat(bordroForm.brut) || 0
+-    const avans = parseFloat(bordroForm.avans) || 0
+-    const kesinti = parseFloat(bordroForm.kesinti) || 0
+-    const calc = calcBordro(brut, avans, kesinti)
+-    const payload = { firma_id: firma.id, proje_id: bordroForm.proje_id, ekip_id: bordroForm.ekip_id, donem: bordroForm.donem, brut, avans, kesinti, ...calc }
+-    if (editingBordro) await supabase.from('bordro').update(payload).eq('id', editingBordro.id)
+-    else await supabase.from('bordro').insert(payload)
+-    setBordroModal(false)
+-    fetchAll()
++    if (!bordroForm.proje_id || !bordroForm.ekip_id || !bordroForm.brut) {
++      setBordroError('Proje, ekip ve brüt tutar zorunludur.'); return
++    }
++    setBordroSaving(true); setBordroError('')
++    const brut        = parseFloat(bordroForm.brut) || 0
++    const sgk_isci    = parseFloat(bordroForm.sgk_isci) || 0
++    const sgk_isveren = parseFloat(bordroForm.sgk_isveren) || 0
++    const vergi       = parseFloat(bordroForm.vergi) || 0
++    const avans       = parseFloat(bordroForm.avans) || 0
++    const kesinti     = parseFloat(bordroForm.kesinti) || 0
++    const net         = Math.round((brut - sgk_isci - vergi - avans - kesinti) * 100) / 100
++    const payload = { firma_id: firma.id, proje_id: bordroForm.proje_id, ekip_id: bordroForm.ekip_id, donem: bordroForm.donem, brut, sgk_isci, sgk_isveren, vergi, avans, kesinti, net }
++    const { error } = editingBordro
++      ? await supabase.from('bordro').update(payload).eq('id', editingBordro.id)
++      : await supabase.from('bordro').insert(payload)
++    if (error) { setBordroError(error.message); setBordroSaving(false); return }
++    setBordroModal(false); fetchAll(); setBordroSaving(false)
+   }
+ 
+   async function delBordro(id: string) {
+     if (!confirm('Silinsin mi?')) return
+-    await supabase.from('bordro').delete().eq('id', id)
+-    fetchAll()
++    await supabase.from('bordro').delete().eq('id', id); fetchAll()
+   }

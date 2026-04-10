@@ -7,6 +7,7 @@ create table if not exists icra_takibi (
   id                  uuid primary key default gen_random_uuid(),
   firma_id            uuid not null references firmalar(id) on delete cascade,
   musteri_id          uuid references musteriler(id) on delete set null,
+  sirket              text not null default 'ETM' check (sirket in ('ETM', 'BİNYAPI')),
 
   -- Tebligat bilgileri
   borclu_adi          text not null,
@@ -32,6 +33,7 @@ create table if not exists icra_odemeler (
   id              uuid primary key default gen_random_uuid(),
   icra_id         uuid not null references icra_takibi(id) on delete cascade,
   firma_id        uuid not null references firmalar(id) on delete cascade,
+  sirket          text not null default 'ETM' check (sirket in ('ETM', 'BİNYAPI')),
   odeme_tarihi    date not null,
   tutar           numeric(15,2) not null default 0,
   aciklama        text,
