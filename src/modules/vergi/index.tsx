@@ -5,12 +5,15 @@ import {
   FileCheck, Plus, Pencil, Trash2, Search, RefreshCw,
   CheckCircle2, Clock, AlertCircle, Receipt, BookOpen,
   ChevronRight, FileText, Upload, CheckCheck, Send, BadgeCheck,
-  ArrowRight
+  ArrowRight, FileDown, Table2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cls, Modal, Field, Loading, ConfirmModal } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 import type { VergiBeyanname, VergiTip, BeyannameDurum, Sirket, KullaniciProfil } from '@/types'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // ── Beyanname sabit değerleri ─────────────────────────────────────────────────
 const TIP_LABEL: Record<VergiTip, string> = {
@@ -248,6 +251,133 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
     surecler.filter(s => s.tip === 'edefter' && s.donem === surecDonem),
     [surecler, surecDonem])
 
+  // ── Export fonksiyonları ────────────────────────────────────────────────────
+  const TIP_FULL: Record<string, string> = {
+    efatura: 'E-Fatura Gelen', efatura_giden: 'E-Fatura Giden',
+    earsiv_gelen: 'E-Arşiv Gelen', earsiv: 'E-Arşiv Giden', edefter: 'E-Defter'
+  }
+
+  function exportBeyannamePDF() {
+    const doc = new jsPDF()
+    doc.setFontSize(14)
+    doc.text('Vergi Beyannameleri', 14, 16)
+    doc.setFontSize(9)
+    doc.text(`Oluşturulma: ${new Date().toLocaleDateString('tr-TR')}`, 14, 23)
+    autoTable(doc, {
+      startY: 28,
+      head: [['Dönem', 'Tip', 'Şirket', 'Durum', 'Tahakkuk (₺)', 'Ödenen (₺)', 'Kalan (₺)', 'Son Tarih']],
+      body: filtered.map(b => [
+        b.donem,
+        TIP_LABEL[b.tip as VergiTip] || b.tip,
+        b.sirket?.kod || '-',
+        DURUM_LABEL[b.durum as BeyannameDurum] || b.durum,
+        Number(b.tahakkuk_tutari || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+        Number(b.odenen_tutar || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+        (Number(b.tahakkuk_tutari || 0) - Number(b.odened_tutar || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+        b.son_tarih ? new Date(b.son_tarih).toLocaleDateString('tr-TR') : '-',
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [37, 99, 235] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    })
+    doc.save(`vergi-beyannameleri-${new Date().toISOString().slice(0,10)}.pdf`)
+  }
+
+  function exportBeyannamExcel() {
+    const rows = filtered.map(b => ({
+      'Dönem': b.donem,
+      'Tip': TIP_LABEL[b.tip as VergiTip] || b.tip,
+      'Şirket': b.sirket?.kod || '-',
+      'Durum': DURUM_LABEL[b.durum as BeyannameDurum] || b.durum,
+      'Tahakkuk (₺)': Number(b.tahakkuk_tutari || 0),
+      'Ödenen (₺)': Number(b.odenen_tutar || 0),
+      'Kalan (₺)': Number(b.tahakkuk_tutari || 0) - Number(b.odenen_tutar || 0),
+      'Son Tarih': b.son_tarih ? new Date(b.son_tarih).toLocaleDateString('tr-TR') : '-',
+      'Notlar': b.notlar || '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Beyannameler')
+    XLSX.writeFile(wb, `vergi-beyannameleri-${new Date().toISOString().slice(0,10)}.xlsx`)
+  }
+
+  function exportEfaturaPDF() {
+    const doc = new jsPDF()
+    doc.setFontSize(14)
+    doc.text(`E-Fatura / E-Arşiv Süreçleri — ${surecDonem}`, 14, 16)
+    doc.setFontSize(9)
+    doc.text(`Oluşturulma: ${new Date().toLocaleDateString('tr-TR')}`, 14, 23)
+    autoTable(doc, {
+      startY: 28,
+      head: [['Tip', 'Şirket', 'Durum', 'Fatura Sayısı', 'Tutar (₺)', 'Notlar']],
+      body: efaturaFiltered.map(s => [
+        TIP_FULL[s.tip] || s.tip,
+        s.sirket?.kod || '-',
+        s.durum,
+        s.fatura_sayisi || 0,
+        Number(s.tutar || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 }),
+        s.notlar || '',
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [37, 99, 235] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    })
+    doc.save(`efatura-arsiv-${surecDonem}.pdf`)
+  }
+
+  function exportEfaturaExcel() {
+    const rows = efaturaFiltered.map(s => ({
+      'Tip': TIP_FULL[s.tip] || s.tip,
+      'Dönem': s.donem,
+      'Şirket': s.sirket?.kod || '-',
+      'Durum': s.durum,
+      'Fatura Sayısı': s.fatura_sayisi || 0,
+      'Tutar (₺)': Number(s.tutar || 0),
+      'Notlar': s.notlar || '',
+      'Tamamlanma': s.tamamlandi_at ? new Date(s.tamamlandi_at).toLocaleDateString('tr-TR') : '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'E-Fatura & E-Arşiv')
+    XLSX.writeFile(wb, `efatura-arsiv-${surecDonem}.xlsx`)
+  }
+
+  function exportEdeferPDF() {
+    const doc = new jsPDF()
+    doc.setFontSize(14)
+    doc.text(`E-Defter Süreçleri — ${surecDonem}`, 14, 16)
+    doc.setFontSize(9)
+    doc.text(`Oluşturulma: ${new Date().toLocaleDateString('tr-TR')}`, 14, 23)
+    autoTable(doc, {
+      startY: 28,
+      head: [['Şirket', 'Durum', 'Notlar', 'Tamamlanma']],
+      body: edeferFiltered.map(s => [
+        s.sirket?.kod || '-',
+        s.durum,
+        s.notlar || '',
+        s.tamamlandi_at ? new Date(s.tamamlandi_at).toLocaleDateString('tr-TR') : '-',
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [5, 150, 105] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    })
+    doc.save(`edefter-${surecDonem}.pdf`)
+  }
+
+  function exportEdeferExcel() {
+    const rows = edeferFiltered.map(s => ({
+      'Şirket': s.sirket?.kod || '-',
+      'Dönem': s.donem,
+      'Durum': s.durum,
+      'Notlar': s.notlar || '',
+      'Tamamlanma': s.tamamlandi_at ? new Date(s.tamamlandi_at).toLocaleDateString('tr-TR') : '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'E-Defter')
+    XLSX.writeFile(wb, `edefter-${surecDonem}.xlsx`)
+  }
+
   if (loading) return <Loading />
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -320,6 +450,15 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
               <option value="all">Tüm Tipler</option>
               {Object.entries(TIP_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
+            <div className="flex items-center gap-1.5 border border-slate-200 rounded-xl overflow-hidden">
+              <button onClick={exportBeyannamePDF} title="PDF İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
+                <FileDown size={13} /> PDF
+              </button>
+              <div className="w-px h-5 bg-slate-200" />
+              <button onClick={exportBeyannamExcel} title="Excel İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors">
+                <Table2 size={13} /> Excel
+              </button>
+            </div>
             <button onClick={() => setModal({ tip: 'kdv', donem: getDonemStr(), durum: 'bekliyor', tahakkuk_tutari: 0, odenen_tutar: 0 })} className={cls.btnPrimary}>
               <Plus size={14} /> Yeni Beyanname
             </button>
@@ -477,6 +616,8 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
             onDonemChange={setSurecDonem}
             onEkle={() => setSurecModal({ tip: 'efatura', donem: surecDonem, durum: 'bekliyor', fatura_sayisi: 0, tutar: 0 })}
             ekleLabel="Yeni E-Fatura/E-Arşiv Süreci"
+            onPDF={exportEfaturaPDF}
+            onExcel={exportEfaturaExcel}
           />
 
           {/* 2x2 grid: E-Fatura Gelen / Giden + E-Arşiv Gelen / Giden */}
@@ -538,6 +679,8 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
             onDonemChange={setSurecDonem}
             onEkle={() => setSurecModal({ tip: 'edefter', donem: surecDonem, durum: 'bekliyor', fatura_sayisi: 0, tutar: 0 })}
             ekleLabel="Yeni E-Defter Süreci"
+            onPDF={exportEdeferPDF}
+            onExcel={exportEdeferExcel}
           />
 
           <div className="bg-white border border-blue-100 rounded-2xl shadow-sm overflow-hidden">
@@ -658,8 +801,9 @@ export default function VergiModule({ firma, firmalar, firmaIds, profil }: AppCt
 
 // ── Alt bileşenler ─────────────────────────────────────────────────────────────
 
-function SurecTabBar({ donem, onDonemChange, onEkle, ekleLabel }: {
+function SurecTabBar({ donem, onDonemChange, onEkle, ekleLabel, onPDF, onExcel }: {
   donem: string; onDonemChange: (d: string) => void; onEkle: () => void; ekleLabel: string
+  onPDF?: () => void; onExcel?: () => void
 }) {
   return (
     <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 flex flex-wrap gap-3 items-center shadow-sm">
@@ -668,7 +812,22 @@ function SurecTabBar({ donem, onDonemChange, onEkle, ekleLabel }: {
         <input type="month" value={donem} onChange={e => onDonemChange(e.target.value)}
           className="bg-slate-50 border border-blue-100 rounded-xl px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-blue-400" />
       </div>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        {(onPDF || onExcel) && (
+          <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden">
+            {onPDF && (
+              <button onClick={onPDF} title="PDF İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
+                <FileDown size={13} /> PDF
+              </button>
+            )}
+            {onPDF && onExcel && <div className="w-px h-5 bg-slate-200" />}
+            {onExcel && (
+              <button onClick={onExcel} title="Excel İndir" className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors">
+                <Table2 size={13} /> Excel
+              </button>
+            )}
+          </div>
+        )}
         <button onClick={onEkle} className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-[13px] font-medium flex items-center gap-1.5 transition-colors">
           <Plus size={14} /> {ekleLabel}
         </button>
