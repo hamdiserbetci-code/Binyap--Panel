@@ -172,94 +172,129 @@ ALTER TABLE workflow_rules ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 
 -- Ödeme Planı
-CREATE POLICY IF NOT EXISTS "odeme_plani_select" ON odeme_plani FOR SELECT
+DROP POLICY IF EXISTS "odeme_plani_select" ON odeme_plani;
+DROP POLICY IF EXISTS "odeme_plani_insert" ON odeme_plani;
+DROP POLICY IF EXISTS "odeme_plani_update" ON odeme_plani;
+DROP POLICY IF EXISTS "odeme_plani_delete" ON odeme_plani;
+
+CREATE POLICY "odeme_plani_select" ON odeme_plani FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "odeme_plani_insert" ON odeme_plani FOR INSERT
+CREATE POLICY "odeme_plani_insert" ON odeme_plani FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "odeme_plani_update" ON odeme_plani FOR UPDATE
+CREATE POLICY "odeme_plani_update" ON odeme_plani FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "odeme_plani_delete" ON odeme_plani FOR DELETE
+CREATE POLICY "odeme_plani_delete" ON odeme_plani FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- Projeler
-CREATE POLICY IF NOT EXISTS "projeler_select" ON projeler_conf FOR SELECT
+DROP POLICY IF EXISTS "projeler_select" ON projeler_conf;
+DROP POLICY IF EXISTS "projeler_insert" ON projeler_conf;
+DROP POLICY IF EXISTS "projeler_update" ON projeler_conf;
+DROP POLICY IF EXISTS "projeler_delete" ON projeler_conf;
+
+CREATE POLICY "projeler_select" ON projeler_conf FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "projeler_insert" ON projeler_conf FOR INSERT
+CREATE POLICY "projeler_insert" ON projeler_conf FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "projeler_update" ON projeler_conf FOR UPDATE
+CREATE POLICY "projeler_update" ON projeler_conf FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "projeler_delete" ON projeler_conf FOR DELETE
+CREATE POLICY "projeler_delete" ON projeler_conf FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- Bordro
-CREATE POLICY IF NOT EXISTS "bordro_select" ON bordro_donemleri FOR SELECT
+DROP POLICY IF EXISTS "bordro_select" ON bordro_donemleri;
+DROP POLICY IF EXISTS "bordro_insert" ON bordro_donemleri;
+DROP POLICY IF EXISTS "bordro_update" ON bordro_donemleri;
+DROP POLICY IF EXISTS "bordro_delete" ON bordro_donemleri;
+
+CREATE POLICY "bordro_select" ON bordro_donemleri FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "bordro_insert" ON bordro_donemleri FOR INSERT
+CREATE POLICY "bordro_insert" ON bordro_donemleri FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "bordro_update" ON bordro_donemleri FOR UPDATE
+CREATE POLICY "bordro_update" ON bordro_donemleri FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "bordro_delete" ON bordro_donemleri FOR DELETE
+CREATE POLICY "bordro_delete" ON bordro_donemleri FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- Vergi
-CREATE POLICY IF NOT EXISTS "vergi_select" ON vergi_surecleri FOR SELECT
+DROP POLICY IF EXISTS "vergi_select" ON vergi_surecleri;
+DROP POLICY IF EXISTS "vergi_insert" ON vergi_surecleri;
+DROP POLICY IF EXISTS "vergi_update" ON vergi_surecleri;
+DROP POLICY IF EXISTS "vergi_delete" ON vergi_surecleri;
+
+CREATE POLICY "vergi_select" ON vergi_surecleri FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "vergi_insert" ON vergi_surecleri FOR INSERT
+CREATE POLICY "vergi_insert" ON vergi_surecleri FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "vergi_update" ON vergi_surecleri FOR UPDATE
+CREATE POLICY "vergi_update" ON vergi_surecleri FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "vergi_delete" ON vergi_surecleri FOR DELETE
+CREATE POLICY "vergi_delete" ON vergi_surecleri FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- SGK
-CREATE POLICY IF NOT EXISTS "sgk_select" ON sgk_entegrasyon FOR SELECT
+DROP POLICY IF EXISTS "sgk_select" ON sgk_entegrasyon;
+DROP POLICY IF EXISTS "sgk_insert" ON sgk_entegrasyon;
+DROP POLICY IF EXISTS "sgk_update" ON sgk_entegrasyon;
+DROP POLICY IF EXISTS "sgk_delete" ON sgk_entegrasyon;
+
+CREATE POLICY "sgk_select" ON sgk_entegrasyon FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "sgk_insert" ON sgk_entegrasyon FOR INSERT
+CREATE POLICY "sgk_insert" ON sgk_entegrasyon FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "sgk_update" ON sgk_entegrasyon FOR UPDATE
+CREATE POLICY "sgk_update" ON sgk_entegrasyon FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "sgk_delete" ON sgk_entegrasyon FOR DELETE
+CREATE POLICY "sgk_delete" ON sgk_entegrasyon FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- Module Settings
-CREATE POLICY IF NOT EXISTS "settings_select" ON module_settings FOR SELECT
+DROP POLICY IF EXISTS "settings_select" ON module_settings;
+DROP POLICY IF EXISTS "settings_insert" ON module_settings;
+DROP POLICY IF EXISTS "settings_update" ON module_settings;
+DROP POLICY IF EXISTS "settings_delete" ON module_settings;
+
+CREATE POLICY "settings_select" ON module_settings FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "settings_insert" ON module_settings FOR INSERT
+CREATE POLICY "settings_insert" ON module_settings FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "settings_update" ON module_settings FOR UPDATE
+CREATE POLICY "settings_update" ON module_settings FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "settings_delete" ON module_settings FOR DELETE
+CREATE POLICY "settings_delete" ON module_settings FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- Workflow Rules
-CREATE POLICY IF NOT EXISTS "workflow_select" ON workflow_rules FOR SELECT
+DROP POLICY IF EXISTS "workflow_select" ON workflow_rules;
+DROP POLICY IF EXISTS "workflow_insert" ON workflow_rules;
+DROP POLICY IF EXISTS "workflow_update" ON workflow_rules;
+DROP POLICY IF EXISTS "workflow_delete" ON workflow_rules;
+
+CREATE POLICY "workflow_select" ON workflow_rules FOR SELECT
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "workflow_insert" ON workflow_rules FOR INSERT
+CREATE POLICY "workflow_insert" ON workflow_rules FOR INSERT
     WITH CHECK (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "workflow_update" ON workflow_rules FOR UPDATE
+CREATE POLICY "workflow_update" ON workflow_rules FOR UPDATE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
-CREATE POLICY IF NOT EXISTS "workflow_delete" ON workflow_rules FOR DELETE
+CREATE POLICY "workflow_delete" ON workflow_rules FOR DELETE
     USING (firma_id IN (SELECT firma_id FROM kullanici_profilleri WHERE auth_user_id = auth.uid()));
 
 -- ============================================================
