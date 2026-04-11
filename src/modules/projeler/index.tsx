@@ -44,7 +44,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
   async function fetchProjects() {
     setLoading(true)
     const { data, error } = await supabase
-      .from('projeler')
+      .from('projeler_conf')
       .select('*')
       .eq('firma_id', firma.id)
       .order('baslangic_tarihi', { ascending: false })
@@ -133,12 +133,12 @@ export default function ProjeTakibi({ firma }: AppCtx) {
     try {
       if (editingProject) {
         await supabase
-          .from('projeler')
+          .from('projeler_conf')
           .update(payload)
           .eq('id', editingProject.id)
       } else {
         await supabase
-          .from('projeler')
+          .from('projeler_conf')
           .insert({ ...payload, firma_id: firma.id })
       }
       setShowModal(false)
@@ -153,7 +153,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
 
   async function deleteProject(id: string) {
     try {
-      await supabase.from('projeler').delete().eq('id', id)
+      await supabase.from('projeler_conf').delete().eq('id', id)
       setDeletingId(null)
       fetchProjects()
     } catch (error) {
