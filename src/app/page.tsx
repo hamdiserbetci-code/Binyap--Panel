@@ -9,7 +9,6 @@ import dynamic from 'next/dynamic'
 import { NAV, type ModuleId } from './nav-config'
 import DashboardHome from '@/components/dashboard/DashboardPage'
 
-const Cari          = dynamic(() => import('@/modules/cari'),          { ssr: false })
 const Ayarlar       = dynamic(() => import('@/modules/ayarlar'),       { ssr: false })
 const OdemePlani    = dynamic(() => import('@/modules/odemeplan'),     { ssr: false })
 const Payrolls      = dynamic(() => import('@/modules/payrolls'),      { ssr: false })
@@ -276,7 +275,6 @@ function AppContent() {
 
         <div className="flex-1 overflow-y-auto custom-scroll relative p-4 lg:p-8 animate-fade-scale">
           {!module && <DashboardHome userId={authUserId} firma={firma!} firmaIds={firmaIds} onNavigate={navigate as any} />}
-          {module === 'cari'          && <Cari          {...ctx} />}
           {module === 'ayarlar'       && <Ayarlar       {...ctx} />}
           {module === 'odemeplani'    && <OdemePlani    {...ctx} />}
           {module === 'payrolls'      && <Payrolls      {...ctx} />}

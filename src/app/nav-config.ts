@@ -1,9 +1,8 @@
-import { Clock, Settings, Users, FileCheck, FolderOpen, Receipt, Shield } from 'lucide-react'
+import { Clock, Settings, FileCheck, FolderOpen, Receipt, Shield } from 'lucide-react'
 
 export type ModuleId = string
 
 export const NAV = [
-  { id: 'cari', label: 'Cari Kartlar', icon: Users, group: 'Finans', color: 'from-blue-700 to-blue-900' },
   { id: 'odemeplani', label: 'Ödeme Planı', icon: Clock, group: 'Finans', color: 'from-amber-700 to-amber-900' },
   { id: 'projeler', label: 'Proje Takibi', icon: FolderOpen, group: 'Yönetim', color: 'from-purple-700 to-purple-900' },
   { id: 'payrolls', label: 'Bordro Yönetimi', icon: FileCheck, group: 'İnsan Kaynakları', color: 'from-cyan-700 to-cyan-900' },
