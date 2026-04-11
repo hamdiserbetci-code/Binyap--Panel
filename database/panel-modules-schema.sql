@@ -19,18 +19,18 @@ CREATE TABLE IF NOT EXISTS odeme_plani (
     firma_id            UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
     
     -- Ödeme Bilgileri
-    ödeme_türü          TEXT NOT NULL, -- 'çek', 'cari', 'vergi', 'sgk', 'maaş', 'diğer'
-    ödeme_no            TEXT, -- Çek no vs.
-    açıklama            TEXT,
+    odeme_tipi          TEXT NOT NULL, -- 'cek', 'cari', 'vergi', 'sgk', 'maas', 'diger'
+    odeme_no            TEXT, -- Çek no vs.
+    aciklama            TEXT,
     
     -- Tutar ve Tarihler
     tutar               NUMERIC(12,2) NOT NULL DEFAULT 0,
-    gözlemleme_tarihi   DATE,
+    gozlemleme_tarihi   DATE,
     vade_tarihi         DATE,
-    ödeme_tarihi        DATE,
+    odeme_tarihi        DATE,
     
     -- Durum
-    durum               TEXT NOT NULL DEFAULT 'bekliyor', -- 'bekliyor', 'ödendi', 'kısmi', 'iptal'
+    durum               TEXT NOT NULL DEFAULT 'bekliyor', -- 'bekliyor', 'odendi', 'kismi', 'iptal'
     notlar              TEXT,
     
     -- Sistem
@@ -52,18 +52,18 @@ CREATE TABLE IF NOT EXISTS projeler_conf (
     
     -- Proje Bilgileri
     proje_adi           TEXT NOT NULL,
-    açıklama            TEXT,
+    aciklama            TEXT,
     
     -- Tarihler
-    başlangıç_tarihi    DATE,
-    bitiş_tarihi        DATE,
+    baslangic_tarihi    DATE,
+    bitis_tarihi        DATE,
     
     -- Bütçe ve Sorumlu
-    bütçe               NUMERIC(12,2) NOT NULL DEFAULT 0,
-    sorumlu_kişi        TEXT,
+    butce               NUMERIC(12,2) NOT NULL DEFAULT 0,
+    sorumlu_kisi        TEXT,
     
     -- Durum
-    durum               TEXT NOT NULL DEFAULT 'planlama', -- 'planlama', 'devam', 'tamamlandı', 'iptal'
+    durum               TEXT NOT NULL DEFAULT 'planlama', -- 'planlama', 'devam', 'tamamlandi', 'iptal'
     notlar              TEXT,
     
     -- Sistem
@@ -83,16 +83,16 @@ CREATE TABLE IF NOT EXISTS bordro_donemleri (
     firma_id            UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
     
     -- Dönem Bilgileri
-    dönem_adı           TEXT NOT NULL,
-    açıklama            TEXT,
+    donem_adi           TEXT NOT NULL,
+    aciklama            TEXT,
     
     -- Dönem Tarihleri
-    başlangıç_tarihi    DATE NOT NULL,
-    bitiş_tarihi        DATE NOT NULL,
+    baslangic_tarihi    DATE NOT NULL,
+    bitis_tarihi        DATE NOT NULL,
     bordro_tarihi       DATE NOT NULL,
     
     -- Durum (otomatik hesaplanan)
-    durum               TEXT, -- 'aktif', 'tamamlandı'
+    durum               TEXT, -- 'aktif', 'tamamlandi'
     notlar              TEXT,
     
     -- Sistem
@@ -112,26 +112,26 @@ CREATE TABLE IF NOT EXISTS vergi_surecleri (
     firma_id            UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
     
     -- Vergi Türü
-    vergi_türü          TEXT NOT NULL, 
-    -- 'kdv', 'kdv2', 'muhsgk', 'geçici_vergi', 'kurumlar_vergisi', 'edefter'
+    vergi_tipi          TEXT NOT NULL, 
+    -- 'kdv', 'kdv2', 'muhsgk', 'gecici_vergi', 'kurumlar_vergisi', 'edefter'
     
     -- Dönem
-    dönem               TEXT,
+    donem               TEXT,
     
     -- Tutar
     tutar               NUMERIC(12,2) NOT NULL DEFAULT 0,
     
     -- Tarihler
     vade_tarihi         DATE NOT NULL,
-    ödeme_tarihi        DATE,
+    odeme_tarihi        DATE,
     
     -- Durum
     durum               TEXT NOT NULL DEFAULT 'bekliyor', 
-    -- 'bekliyor', 'ödendi', 'gecikti'
+    -- 'bekliyor', 'odendi', 'gecikti'
     
     -- Belgeler
     belge_no            TEXT,
-    açıklama            TEXT,
+    aciklama            TEXT,
     notlar              TEXT,
     
     -- Sistem
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS vergi_surecleri (
 );
 
 CREATE INDEX idx_vergi_firma_id ON vergi_surecleri(firma_id);
-CREATE INDEX idx_vergi_türü ON vergi_surecleri(vergi_türü);
+CREATE INDEX idx_vergi_tipi ON vergi_surecleri(vergi_tipi);
 CREATE INDEX idx_vergi_vade ON vergi_surecleri(vade_tarihi);
 CREATE INDEX idx_vergi_durum ON vergi_surecleri(durum);
 
@@ -153,27 +153,27 @@ CREATE TABLE IF NOT EXISTS sgk_entegrasyon (
     firma_id            UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
     
     -- SGK Türü
-    sgk_türü            TEXT NOT NULL,
-    -- 'malullük', 'genel_sağlık', 'iş_kazası', 'işsizlik', 'diğer'
+    sgk_tipi            TEXT NOT NULL,
+    -- 'malulluk', 'genel_saglik', 'is_kazasi', 'issizlik', 'diger'
     
     -- Dönem
-    dönem               TEXT,
+    donem               TEXT,
     
     -- Çalışan ve Prim
-    çalışan_sayısı      INTEGER DEFAULT 0,
-    prim_tutarı         NUMERIC(12,2) NOT NULL DEFAULT 0,
+    calisan_sayisi      INTEGER DEFAULT 0,
+    prim_tutari         NUMERIC(12,2) NOT NULL DEFAULT 0,
     
     -- Tarihler
     vade_tarihi         DATE NOT NULL,
-    ödeme_tarihi        DATE,
+    odeme_tarihi        DATE,
     
     -- Durum
     durum               TEXT NOT NULL DEFAULT 'bekliyor',
-    -- 'bekliyor', 'ödendi', 'gecikti'
+    -- 'bekliyor', 'odendi', 'gecikti'
     
     -- Belgeler
     belge_no            TEXT,
-    açıklama            TEXT,
+    aciklama            TEXT,
     notlar              TEXT,
     
     -- Sistem
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS sgk_entegrasyon (
 );
 
 CREATE INDEX idx_sgk_firma_id ON sgk_entegrasyon(firma_id);
-CREATE INDEX idx_sgk_türü ON sgk_entegrasyon(sgk_türü);
+CREATE INDEX idx_sgk_tipi ON sgk_entegrasyon(sgk_tipi);
 CREATE INDEX idx_sgk_vade ON sgk_entegrasyon(vade_tarihi);
 CREATE INDEX idx_sgk_durum ON sgk_entegrasyon(durum);
 
@@ -212,9 +212,9 @@ CREATE TABLE IF NOT EXISTS workflow_rules (
     module_id           TEXT NOT NULL,
     
     -- Kural Bilgileri
-    kural_adı           TEXT NOT NULL,
-    kural_türü          TEXT NOT NULL, -- 'notification', 'alert', 'action'
-    açıklama            TEXT,
+    kural_adi           TEXT NOT NULL,
+    kural_tipi          TEXT NOT NULL, -- 'notification', 'alert', 'action'
+    aciklama            TEXT,
     
     -- Kural Koşulu (JSON)
     condition           JSONB DEFAULT '{}',
