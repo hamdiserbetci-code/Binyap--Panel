@@ -47,6 +47,9 @@ CREATE TABLE firmalar (
     email TEXT,
     adres TEXT,
     aktif BOOLEAN NOT NULL DEFAULT true,
+    -- Net E-Fatura entegrasyon bilgileri
+    efatura_kullanici_adi TEXT,
+    efatura_sifre TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -61,6 +64,10 @@ CREATE TABLE sirketler (
     telefon TEXT,
     email TEXT,
     aktif BOOLEAN NOT NULL DEFAULT true,
+    -- E-Fatura entegrasyon bilgileri
+    efatura_gonderici_etiket TEXT,
+    efatura_alici_etiket TEXT,
+    efatura_aktif BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(firma_id, kod)
 );
@@ -149,6 +156,7 @@ CREATE TABLE projeler (
     bitis_tarihi DATE,
     butce NUMERIC(15,2) DEFAULT 0,
     durum TEXT NOT NULL DEFAULT 'aktif', -- aktif | tamamlandi | iptal
+    sgk_sicil_no TEXT,
     aciklama TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -401,6 +409,62 @@ CREATE TABLE aktivite_loglari (
     meta JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- =============================================================================
+-- DÖNEMSEL ALIŞLAR
+-- =============================================================================
+
+CREATE TABLE donemsel_alislar (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    firma_id UUID NOT NULL REFERENCES firmalar(id) ON DELETE CASCADE,
+    sirket_id UUID REFERENCES sirketler(id) ON DELETE SET NULL,
+    donem TEXT NOT NULL, -- 2024-03
+    kaynak_tipi TEXT NOT NULL, -- efatura | earsiv | utts | kdvsize
+    kdvsize_gider_tipi TEXT, -- finansman | sigorta | iscilik | null
+    tedarikci_adi TEXT NOT NULL,
+    tedarikci_vkn TEXT,
+    
+    -- KDV Matrahları
+    kdv_0_matrah NUMERIC(15,2) DEFAULT 0,
+    kdv_1_matrah NUMERIC(15,2) DEFAULT 0,
+    kdv_10_matrah NUMERIC(15,2) DEFAULT 0,
+    kdv_20_matrah NUMERIC(15,2) DEFAULT 0,
+    
+    -- KDV Tutarları
+    kdv_0_tutar NUMERIC(15,2) DEFAULT 0,
+    kdv_1_tutar NUMERIC(15,2) DEFAULT 0,
+    kdv_10_tutar NUMERIC(15,2) DEFAULT 0,
+    kdv_20_tutar NUMERIC(15,2) DEFAULT 0,
+    
+    -- Toplamlar
+    toplam_matrah NUMERIC(15,2) DEFAULT 0,
+    toplam_kdv NUMERIC(15,2) DEFAULT 0,
+    genel_toplam NUMERIC(15,2) DEFAULT 0,
+    
+    -- Tevkifat
+    tevkifat_tipi TEXT, -- yok | nakliye_2_10 | demir_5_10
+    tevkifat_orani NUMERIC(5,2) DEFAULT 0,
+    tevkifat_tutari NUMERIC(15,2) DEFAULT 0,
+    net_kdv NUMERIC(15,2) DEFAULT 0,
+    
+    -- Kontrol
+    toplam_odeme NUMERIC(15,2),
+    fark_tutari NUMERIC(15,2) DEFAULT 0,
+    
+    notlar TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================================================
+-- RLS POLİTİKALARI
+-- =============================================================================
+
+ALTER TABLE donemsel_alislar ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "donemsel_alislar_select" ON donemsel_alislar FOR SELECT USING (true);
+CREATE POLICY "donemsel_alislar_insert" ON donemsel_alislar FOR INSERT WITH CHECK (true);
+CREATE POLICY "donemsel_alislar_update" ON donemsel_alislar FOR UPDATE USING (true);
+CREATE POLICY "donemsel_alislar_delete" ON donemsel_alislar FOR DELETE USING (true);
 
 -- =============================================================================
 -- İZİNLER

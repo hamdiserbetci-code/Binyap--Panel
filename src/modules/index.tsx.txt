@@ -1,5 +1,0 @@
-'use client'
-
-export default function OdemePlaniModule() {
-  return <div className="p-4 text-white">Odeme plani modulu gecici olarak devre disi.</div>
-}
