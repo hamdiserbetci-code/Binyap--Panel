@@ -43,7 +43,6 @@ ALTER TABLE IF EXISTS proje_faturalari ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS cariler (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     firma_id UUID NOT NULL REFERENCES firmalar(id),
-    musteri_id UUID REFERENCES musteriler(id),
     kod VARCHAR(50) NOT NULL,
     unvan VARCHAR(200) NOT NULL,
     vergi_dairesi VARCHAR(100),
@@ -52,7 +51,7 @@ CREATE TABLE IF NOT EXISTS cariler (
     email VARCHAR(100),
     adres TEXT,
     bakiye DECIMAL(15,2) DEFAULT 0,
-    limit DECIMAL(15,2),
+    risk_limiti DECIMAL(15,2),
     risk_durumu VARCHAR(20) DEFAULT 'dusuk' CHECK (risk_durumu IN ('dusuk', 'orta', 'yuksek')),
     notlar TEXT,
     aktif BOOLEAN DEFAULT true,
