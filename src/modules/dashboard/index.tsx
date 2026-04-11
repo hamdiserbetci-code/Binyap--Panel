@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { AlertTriangle, TrendingUp, Clock, FileText, DollarSign, Users, Calendar } from 'lucide-react'
+import { AlertTriangle, TrendingUp, Clock, FileText, DollarSign, Users, Calendar, Receipt, FolderOpen } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { AppCtx } from '@/app/page'
 

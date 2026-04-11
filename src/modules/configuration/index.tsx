@@ -19,7 +19,7 @@ export default function ModuleConfiguration({ firma }: AppCtx) {
       .select('*')
       .eq('firma_id', firma.id)
 
-    const configMap = {}
+    const configMap: Record<string, any> = {}
     data?.forEach((item: any) => {
       configMap[item.module_id] = item.config || {}
     })

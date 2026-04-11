@@ -332,8 +332,8 @@ export default function OdemePlani({ firma }: AppCtx) {
                     {formatDate(item.vade_tarihi)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${STATUSES[item.durum]?.color}`}>
-                      {STATUSES[item.durum]?.label}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${STATUSES[item.durum as keyof typeof STATUSES]?.color}`}>
+                      {STATUSES[item.durum as keyof typeof STATUSES]?.label}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
