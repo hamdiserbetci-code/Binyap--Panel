@@ -102,6 +102,100 @@ export default function CariModule({ firma }: AppCtx) {
     setSaving(false); setModal(false); load()
   }
 
+
+  const [contextMenu, setContextMenu] = React.useState<{x:number;y:number;cari:any}|null>(null)
+
+  function handleContextMenu(e: React.MouseEvent, cari: any) {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, cari })
+  }
+
+  async function exportExcel(hedefCariler?: any[]) {
+    const liste = hedefCariler || filtered
+    const XLSX = await import('xlsx-js-style')
+    const { utils, writeFile } = XLSX
+    const KOYU='0F172A'; const BEYAZ='FFFFFF'; const SINIR='E2E8F0'; const MAVI='1E40AF'
+    const border = { top:{style:'thin',color:{rgb:SINIR}}, bottom:{style:'thin',color:{rgb:SINIR}}, left:{style:'thin',color:{rgb:SINIR}}, right:{style:'thin',color:{rgb:SINIR}} }
+    const sTh = { font:{name:'Calibri',sz:9,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:MAVI}}, alignment:{horizontal:'center',vertical:'center'}, border }
+    const sTd = (z:boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:KOYU}}, fill:{fgColor:{rgb:z?'F8FAFC':BEYAZ}}, alignment:{vertical:'center'}, border })
+    const sPara = (z:boolean) => ({ ...sTd(z), alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 \u20BA' })
+    const cv = (v:any,s:any) => ({ v:v??'', s, t:typeof v==='number'?'n':'s' })
+    const ws:any = {}; const merges:any[] = []; const COLS = 8; let row = 0
+    ws[utils.encode_cell({r:row,c:0})] = cv(`${firma.ad.toUpperCase()} - CARI HESAP RAPORU`, {font:{name:'Calibri',sz:13,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'left',vertical:'center'}})
+    for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',{fill:{fgColor:{rgb:KOYU}}})
+    ws[utils.encode_cell({r:row,c:COLS-1})] = cv(new Date().toLocaleDateString('tr-TR'),{font:{name:'Calibri',sz:9,color:{rgb:'BFDBFE'}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'right',vertical:'center'}})
+    merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+    ;['Cari Ad','Tip','VKN/TCKN','Telefon','IBAN','Alacak','Borc','Net Bakiye'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cv(h,sTh) }); row++
+    liste.forEach((cari,idx) => {
+      const z = idx%2===1; const bak = Number(cari.bakiye||0)
+      const alacak = bak > 0 ? bak : 0; const borc = bak < 0 ? Math.abs(bak) : 0
+      ws[utils.encode_cell({r:row,c:0})] = cv(cari.ad, sTd(z))
+      ws[utils.encode_cell({r:row,c:1})] = cv(CARI_TIPLER.find((t:any)=>t.v===cari.tip)?.l||cari.tip||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:2})] = cv(cari.vkn_tckn||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:3})] = cv(cari.telefon||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:4})] = cv(cari.iban||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:5})] = {v:alacak, s:{...sPara(z),font:{name:'Calibri',sz:9,bold:alacak>0,color:{rgb:alacak>0?'166534':KOYU}}}, t:'n'}
+      ws[utils.encode_cell({r:row,c:6})] = {v:borc, s:{...sPara(z),font:{name:'Calibri',sz:9,bold:borc>0,color:{rgb:borc>0?'991B1B':KOYU}}}, t:'n'}
+      ws[utils.encode_cell({r:row,c:7})] = {v:bak, s:{...sPara(z),font:{name:'Calibri',sz:9,bold:true,color:{rgb:bak>=0?'166534':'991B1B'}}}, t:'n'}
+      row++
+    })
+    const topS = {font:{name:'Calibri',sz:10,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:'1E293B'}},alignment:{horizontal:'right',vertical:'center'},numFmt:'#,##0.00 \u20BA',border:{top:{style:'medium',color:{rgb:KOYU}},bottom:{style:'medium',color:{rgb:KOYU}},left:{style:'thin',color:{rgb:KOYU}},right:{style:'thin',color:{rgb:KOYU}}}}
+    const topL = {...topS, alignment:{horizontal:'left',vertical:'center'}}
+    ws[utils.encode_cell({r:row,c:0})] = cv(`TOPLAM: ${liste.length} cari`, topL)
+    for(let i=1;i<5;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',topL)
+    ws[utils.encode_cell({r:row,c:5})] = {v:liste.reduce((s:number,c:any)=>s+(Number(c.bakiye)>0?Number(c.bakiye):0),0), s:topS, t:'n'}
+    ws[utils.encode_cell({r:row,c:6})] = {v:liste.reduce((s:number,c:any)=>s+(Number(c.bakiye)<0?Math.abs(Number(c.bakiye)):0),0), s:topS, t:'n'}
+    ws[utils.encode_cell({r:row,c:7})] = {v:liste.reduce((s:number,c:any)=>s+Number(c.bakiye||0),0), s:topS, t:'n'}
+    merges.push({s:{r:row,c:0},e:{r:row,c:4}}); row++
+    ws['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:14},{wch:26},{wch:16},{wch:16},{wch:16}]
+    ws['!merges'] = merges; ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}})
+    const wb = utils.book_new(); utils.book_append_sheet(wb, ws, 'Cari Hesaplar')
+    writeFile(wb, `cari-hesaplar-${firma.ad}-${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  async function exportCariDetay(cari: any) {
+    const { data: hareketler } = await supabase.from('cari_hareketler').select('*').eq('cari_hesap_id', cari.id).order('tarih', { ascending: true })
+    const XLSX = await import('xlsx-js-style')
+    const { utils, writeFile } = XLSX
+    const KOYU='0F172A'; const BEYAZ='FFFFFF'; const SINIR='E2E8F0'; const MAVI='1E40AF'
+    const border = { top:{style:'thin',color:{rgb:SINIR}}, bottom:{style:'thin',color:{rgb:SINIR}}, left:{style:'thin',color:{rgb:SINIR}}, right:{style:'thin',color:{rgb:SINIR}} }
+    const sTh = { font:{name:'Calibri',sz:9,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:MAVI}}, alignment:{horizontal:'center',vertical:'center'}, border }
+    const sTd = (z:boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:KOYU}}, fill:{fgColor:{rgb:z?'F8FAFC':BEYAZ}}, alignment:{vertical:'center'}, border })
+    const sPara = (z:boolean,renk?:string) => ({ ...sTd(z), alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 \u20BA', font:{name:'Calibri',sz:9,color:{rgb:renk||KOYU}} })
+    const cv = (v:any,s:any) => ({ v:v??'', s, t:typeof v==='number'?'n':'s' })
+    const ws:any = {}; const merges:any[] = []; const COLS = 7; let row = 0
+    ws[utils.encode_cell({r:row,c:0})] = cv(`${cari.ad.toUpperCase()} - CARI EKSTRE`, {font:{name:'Calibri',sz:13,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'left',vertical:'center'}})
+    for(let i=1;i<COLS;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',{fill:{fgColor:{rgb:KOYU}}})
+    merges.push({s:{r:row,c:0},e:{r:row,c:COLS-1}}); row++
+    const bilgiS = {font:{name:'Calibri',sz:9,color:{rgb:KOYU}},fill:{fgColor:{rgb:'F1F5F9'}},alignment:{vertical:'center'},border}
+    ;[['VKN/TCKN',cari.vkn_tckn||'-'],['Telefon',cari.telefon||'-'],['IBAN',cari.iban||'-'],['Adres',cari.adres||'-']].forEach(([k,v]) => {
+      ws[utils.encode_cell({r:row,c:0})] = cv(k, {...bilgiS,font:{name:'Calibri',sz:9,bold:true,color:{rgb:KOYU}},fill:{fgColor:{rgb:'E2E8F0'}}})
+      ws[utils.encode_cell({r:row,c:1})] = cv(v, bilgiS)
+      for(let i=2;i<COLS;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',bilgiS)
+      merges.push({s:{r:row,c:1},e:{r:row,c:COLS-1}}); row++
+    })
+    row++
+    ;['Tarih','Tur','Belge No','Aciklama','Borc','Alacak','Bakiye'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cv(h,sTh) }); row++
+    let bakiye = 0
+    ;(hareketler||[]).forEach((h:any,idx:number) => {
+      const z = idx%2===1; const t = Number(h.tutar||0)
+      const isAlacak = ['alacak','tahsilat','cek_alindi'].includes(h.tur)
+      const borc = isAlacak ? 0 : t; const alacak = isAlacak ? t : 0
+      bakiye += isAlacak ? t : -t
+      ws[utils.encode_cell({r:row,c:0})] = cv(h.tarih ? new Date(h.tarih).toLocaleDateString('tr-TR') : '-', sTd(z))
+      ws[utils.encode_cell({r:row,c:1})] = cv(HAREKET_TURLERI.find((t:any)=>t.v===h.tur)?.l||h.tur, sTd(z))
+      ws[utils.encode_cell({r:row,c:2})] = cv(h.belge_no||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:3})] = cv(h.aciklama||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:4})] = borc>0 ? {v:borc, s:sPara(z,'991B1B'), t:'n'} : cv('-',sTd(z))
+      ws[utils.encode_cell({r:row,c:5})] = alacak>0 ? {v:alacak, s:sPara(z,'166534'), t:'n'} : cv('-',sTd(z))
+      ws[utils.encode_cell({r:row,c:6})] = {v:bakiye, s:sPara(z,bakiye>=0?'166534':'991B1B'), t:'n'}
+      row++
+    })
+    ws['!cols'] = [{wch:12},{wch:14},{wch:14},{wch:30},{wch:16},{wch:16},{wch:16}]
+    ws['!merges'] = merges; ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}})
+    const wb = utils.book_new(); utils.book_append_sheet(wb, ws, 'Ekstre')
+    writeFile(wb, `ekstre-${cari.ad}-${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
   return (
     <div className="space-y-6">
       {/* Baslik */}
