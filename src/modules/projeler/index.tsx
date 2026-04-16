@@ -272,12 +272,14 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
       vade_tarihi: giderForm.vade_tarihi || null, odeme_durumu: giderForm.odeme_durumu, aciklama: giderForm.aciklama || null,
     }
     if (editingGider) {
-      await supabase.from('proje_giderler').update(payload).eq('id', editingGider.id)
+      const { error: ue } = await supabase.from('proje_giderler').update(payload).eq('id', editingGider.id)
+      if (ue) { alert('Guncelleme hatasi: ' + ue.message); setSavingG(false); return }
       if (editingGider.odeme_plani_id && giderForm.vade_tarihi) {
         await supabase.from('odeme_plani').update({ aciklama: `${giderForm.cari_unvan} - ${giderForm.gider_kalemi}`, tutar: net, kalan_tutar: net, vade_tarihi: giderForm.vade_tarihi }).eq('id', editingGider.odeme_plani_id)
       }
     } else {
-      const { data: yeni } = await supabase.from('proje_giderler').insert(payload).select().single()
+      const { data: yeni, error: ie } = await supabase.from('proje_giderler').insert(payload).select().single()
+      if (ie) { alert('Kayit hatasi: ' + ie.message); setSavingG(false); return }
       if (yeni?.id && giderForm.vade_tarihi) {
         const { data: op } = await supabase.from('odeme_plani').insert({ firma_id: firma.id, odeme_tipi: 'cari', aciklama: `${giderForm.cari_unvan} - ${giderForm.gider_kalemi}`, tutar: net, odenen_tutar: 0, kalan_tutar: net, vade_tarihi: giderForm.vade_tarihi, durum: 'bekliyor', notlar: `Proje gideri - ${r.proje_adi}` }).select().single()
         if (op?.id) await supabase.from('proje_giderler').update({ odeme_plani_id: op.id }).eq('id', yeni.id)
