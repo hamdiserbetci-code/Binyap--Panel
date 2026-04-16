@@ -1,85 +1,80 @@
 'use client'
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import {
-  CheckSquare, Plus, Edit, Trash2, Search, Bell, Clock,
-  AlertTriangle, CheckCircle, Upload, Download, Eye, X,
-  ChevronDown, Filter, Calendar, Paperclip, RotateCcw, Flag
+  CheckSquare, Plus, Edit, Trash2, Search, Bell,
+  Clock, AlertTriangle, CheckCircle, Upload, Download,
+  X, RotateCcw, Flag, Calendar, Paperclip, GripVertical, Filter
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { PageHeader, Card, Modal, Btn, Field, inputCls, ConfirmDialog, Badge, EmptyState, fmtDate } from '@/components/ui'
+import { Modal, Btn, Field, inputCls, ConfirmDialog, Badge, fmtDate } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 
-// ─── Sabitler ────────────────────────────────────────────────
+// ─── Sabitler ─────────────────────────────────────────────────
 const ONCELIK = {
-  dusuk:   { l: 'Düşük',   v: 'gray'   as const, renk: 'text-gray-500',   bg: 'bg-gray-100',   icon: '○' },
-  normal:  { l: 'Normal',  v: 'blue'   as const, renk: 'text-blue-600',   bg: 'bg-blue-50',    icon: '◎' },
-  yuksek:  { l: 'Yüksek',  v: 'orange' as const, renk: 'text-orange-600', bg: 'bg-orange-50',  icon: '●' },
-  kritik:  { l: 'Kritik',  v: 'red'    as const, renk: 'text-red-600',    bg: 'bg-red-50',     icon: '⬤' },
+  dusuk:  { l: 'Dusuk',  v: 'gray'   as const, renk: 'text-gray-500',   bg: 'bg-gray-100',  dot: 'bg-gray-400'   },
+  normal: { l: 'Normal', v: 'blue'   as const, renk: 'text-blue-600',   bg: 'bg-blue-50',   dot: 'bg-blue-500'   },
+  yuksek: { l: 'Yuksek', v: 'orange' as const, renk: 'text-orange-600', bg: 'bg-orange-50', dot: 'bg-orange-500' },
+  kritik: { l: 'Kritik', v: 'red'    as const, renk: 'text-red-600',    bg: 'bg-red-50',    dot: 'bg-red-500'    },
 }
 
 const KATEGORI = {
-  genel:   { l: 'Genel',   emoji: '📋' },
-  finans:  { l: 'Finans',  emoji: '💰' },
-  ik:      { l: 'İK',      emoji: '👥' },
-  hukuk:   { l: 'Hukuk',   emoji: '⚖️'  },
-  vergi:   { l: 'Vergi',   emoji: '🧾' },
-  proje:   { l: 'Proje',   emoji: '🏗️'  },
-  diger:   { l: 'Diğer',   emoji: '📌' },
+  genel:  { l: 'Genel',  emoji: '📋' },
+  finans: { l: 'Finans', emoji: '💰' },
+  ik:     { l: 'IK',     emoji: '👥' },
+  hukuk:  { l: 'Hukuk',  emoji: '⚖️'  },
+  vergi:  { l: 'Vergi',  emoji: '🧾' },
+  proje:  { l: 'Proje',  emoji: '🏗️'  },
+  diger:  { l: 'Diger',  emoji: '📌' },
 }
 
-const DURUM = {
-  bekliyor:    { l: 'Bekliyor',     v: 'gray'   as const, icon: Clock         },
-  devam:       { l: 'Devam Ediyor', v: 'yellow' as const, icon: AlertTriangle },
-  tamamlandi:  { l: 'Tamamlandı',   v: 'green'  as const, icon: CheckCircle   },
-  ertelendi:   { l: 'Ertelendi',    v: 'blue'   as const, icon: RotateCcw     },
-  iptal:       { l: 'İptal',        v: 'red'    as const, icon: X             },
-}
+// Kanban kolonlari
+const KOLONLAR = [
+  { id: 'bekliyor',   l: 'Bekliyor',     renk: 'border-gray-300',   bg: 'bg-gray-50',    baslik: 'bg-gray-100 text-gray-700',   sayi: 'bg-gray-200 text-gray-700'   },
+  { id: 'devam',      l: 'Devam Ediyor', renk: 'border-blue-300',   bg: 'bg-blue-50/40', baslik: 'bg-blue-100 text-blue-700',   sayi: 'bg-blue-200 text-blue-700'   },
+  { id: 'ertelendi',  l: 'Ertelendi',    renk: 'border-amber-300',  bg: 'bg-amber-50/40',baslik: 'bg-amber-100 text-amber-700', sayi: 'bg-amber-200 text-amber-700' },
+  { id: 'tamamlandi', l: 'Tamamlandi',   renk: 'border-green-300',  bg: 'bg-green-50/40',baslik: 'bg-green-100 text-green-700', sayi: 'bg-green-200 text-green-700' },
+  { id: 'iptal',      l: 'Iptal',        renk: 'border-red-200',    bg: 'bg-red-50/30',  baslik: 'bg-red-100 text-red-600',     sayi: 'bg-red-200 text-red-600'     },
+]
 
 const emptyForm = {
   baslik: '', aciklama: '', oncelik: 'normal', kategori: 'genel',
   durum: 'bekliyor', atanan_kisi: '', son_tarih: '', hatirlatma_tarihi: '',
 }
 
-const emptyErteleme = { erteleme_tarihi: '', erteleme_notu: '' }
-
-// ─── Ana Modül ────────────────────────────────────────────────
+// ─── Ana Modul ─────────────────────────────────────────────────
 export default function GorevlerModule({ firma }: AppCtx) {
-  const [gorevler, setGorevler]   = useState<any[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [search, setSearch]       = useState('')
-  const [durumF, setDurumF]       = useState('hepsi')
-  const [oncelikF, setOncelikF]   = useState('hepsi')
+  const [gorevler, setGorevler] = useState<any[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [search, setSearch]     = useState('')
+  const [oncelikF, setOncelikF] = useState('hepsi')
   const [kategoriF, setKategoriF] = useState('hepsi')
-  const [modal, setModal]         = useState(false)
-  const [editing, setEditing]     = useState<any | null>(null)
-  const [delId, setDelId]         = useState<string | null>(null)
-  const [saving, setSaving]       = useState(false)
-  const [form, setForm]           = useState(emptyForm)
-  const [ertelemeModal, setErtelemeModal] = useState<any | null>(null)
-  const [ertelemeForm, setErtelemeForm]   = useState(emptyErteleme)
-  const [detayId, setDetayId]     = useState<string | null>(null)
+  const [modal, setModal]       = useState(false)
+  const [editing, setEditing]   = useState<any | null>(null)
+  const [delId, setDelId]       = useState<string | null>(null)
+  const [saving, setSaving]     = useState(false)
+  const [form, setForm]         = useState(emptyForm)
+  const [detayGorev, setDetayGorev] = useState<any | null>(null)
+  const [dragId, setDragId]     = useState<string | null>(null)
+  const [filtrePaneli, setFiltrePaneli] = useState(false)
+  // Yeni kart inline ekleme
+  const [inlineKolon, setInlineKolon] = useState<string | null>(null)
+  const [inlineBaslik, setInlineBaslik] = useState('')
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('gorevler')
-      .select('*')
-      .eq('firma_id', firma.id)
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('gorevler').select('*')
+      .eq('firma_id', firma.id).order('created_at', { ascending: false })
     setGorevler(data || [])
     setLoading(false)
   }
   useEffect(() => { load() }, [firma.id])
 
-  // Hatırlatma kontrolü
   const hatirlatmalar = useMemo(() => {
-    const bugun = new Date(); bugun.setHours(0,0,0,0)
     return gorevler.filter(g => {
-      if (g.durum === 'tamamlandi' || g.durum === 'iptal') return false
+      if (['tamamlandi','iptal'].includes(g.durum)) return false
       if (g.hatirlatma_tarihi && new Date(g.hatirlatma_tarihi) <= new Date()) return true
       if (g.son_tarih) {
-        const st = new Date(g.son_tarih); st.setHours(0,0,0,0)
-        const fark = Math.floor((st.getTime() - bugun.getTime()) / 86400000)
+        const fark = Math.floor((new Date(g.son_tarih).getTime() - Date.now()) / 86400000)
         return fark <= 1
       }
       return false
@@ -87,218 +82,229 @@ export default function GorevlerModule({ firma }: AppCtx) {
   }, [gorevler])
 
   const filtered = useMemo(() => gorevler.filter(g => {
-    if (durumF !== 'hepsi' && g.durum !== durumF) return false
     if (oncelikF !== 'hepsi' && g.oncelik !== oncelikF) return false
     if (kategoriF !== 'hepsi' && g.kategori !== kategoriF) return false
     if (search) {
       const q = search.toLowerCase()
-      return g.baslik?.toLowerCase().includes(q) || g.aciklama?.toLowerCase().includes(q) || g.atanan_kisi?.toLowerCase().includes(q)
+      return g.baslik?.toLowerCase().includes(q) || g.atanan_kisi?.toLowerCase().includes(q)
     }
     return true
-  }), [gorevler, durumF, oncelikF, kategoriF, search])
+  }), [gorevler, oncelikF, kategoriF, search])
+
+  const kolonGorevler = useMemo(() => {
+    const map: Record<string, any[]> = {}
+    KOLONLAR.forEach(k => { map[k.id] = [] })
+    filtered.forEach(g => { if (map[g.durum]) map[g.durum].push(g) })
+    return map
+  }, [filtered])
 
   const summary = useMemo(() => ({
     toplam:     gorevler.length,
     bekliyor:   gorevler.filter(g => g.durum === 'bekliyor').length,
     devam:      gorevler.filter(g => g.durum === 'devam').length,
     tamamlandi: gorevler.filter(g => g.durum === 'tamamlandi').length,
-    gecikti:    gorevler.filter(g => g.durum !== 'tamamlandi' && g.durum !== 'iptal' && g.son_tarih && new Date(g.son_tarih) < new Date()).length,
+    gecikti:    gorevler.filter(g => !['tamamlandi','iptal'].includes(g.durum) && g.son_tarih && new Date(g.son_tarih) < new Date()).length,
   }), [gorevler])
 
-  function openNew() { setForm(emptyForm); setEditing(null); setModal(true) }
+  function openNew(durum = 'bekliyor') {
+    setForm({ ...emptyForm, durum })
+    setEditing(null); setModal(true)
+  }
   function openEdit(g: any) {
-    setForm({
-      baslik: g.baslik || '', aciklama: g.aciklama || '',
-      oncelik: g.oncelik || 'normal', kategori: g.kategori || 'genel',
-      durum: g.durum || 'bekliyor', atanan_kisi: g.atanan_kisi || '',
-      son_tarih: g.son_tarih || '',
-      hatirlatma_tarihi: g.hatirlatma_tarihi ? g.hatirlatma_tarihi.split('T')[0] : '',
-    })
+    setForm({ baslik: g.baslik||'', aciklama: g.aciklama||'', oncelik: g.oncelik||'normal', kategori: g.kategori||'genel', durum: g.durum||'bekliyor', atanan_kisi: g.atanan_kisi||'', son_tarih: g.son_tarih||'', hatirlatma_tarihi: g.hatirlatma_tarihi ? g.hatirlatma_tarihi.split('T')[0] : '' })
     setEditing(g); setModal(true)
   }
 
   async function save() {
-    if (!form.baslik) return alert('Başlık zorunludur')
+    if (!form.baslik) return alert('Baslik zorunludur')
     setSaving(true)
-    const payload = {
-      baslik: form.baslik, aciklama: form.aciklama || null,
-      oncelik: form.oncelik, kategori: form.kategori,
-      durum: form.durum, atanan_kisi: form.atanan_kisi || null,
-      son_tarih: form.son_tarih || null,
-      hatirlatma_tarihi: form.hatirlatma_tarihi ? new Date(form.hatirlatma_tarihi).toISOString() : null,
-      updated_at: new Date().toISOString(),
-    }
-    if (editing) {
-      await supabase.from('gorevler').update(payload).eq('id', editing.id)
-    } else {
-      await supabase.from('gorevler').insert({ ...payload, firma_id: firma.id })
-    }
+    const payload = { baslik: form.baslik, aciklama: form.aciklama||null, oncelik: form.oncelik, kategori: form.kategori, durum: form.durum, atanan_kisi: form.atanan_kisi||null, son_tarih: form.son_tarih||null, hatirlatma_tarihi: form.hatirlatma_tarihi ? new Date(form.hatirlatma_tarihi).toISOString() : null, updated_at: new Date().toISOString() }
+    if (editing) { await supabase.from('gorevler').update(payload).eq('id', editing.id) }
+    else { await supabase.from('gorevler').insert({ ...payload, firma_id: firma.id }) }
     setSaving(false); setModal(false); load()
   }
 
+  async function inlineEkle(durum: string) {
+    if (!inlineBaslik.trim()) { setInlineKolon(null); return }
+    await supabase.from('gorevler').insert({ firma_id: firma.id, baslik: inlineBaslik.trim(), durum, oncelik: 'normal', kategori: 'genel' })
+    setInlineBaslik(''); setInlineKolon(null); load()
+  }
+
   async function durumGuncelle(id: string, durum: string) {
-    await supabase.from('gorevler').update({
-      durum,
-      tamamlanma_tarihi: durum === 'tamamlandi' ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', id)
+    await supabase.from('gorevler').update({ durum, tamamlanma_tarihi: durum === 'tamamlandi' ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('id', id)
     load()
   }
 
-  async function ertele() {
-    if (!ertelemeForm.erteleme_tarihi) return alert('Erteleme tarihi zorunludur')
-    await supabase.from('gorevler').update({
-      durum: 'ertelendi',
-      erteleme_tarihi: ertelemeForm.erteleme_tarihi,
-      erteleme_notu: ertelemeForm.erteleme_notu || null,
-      son_tarih: ertelemeForm.erteleme_tarihi,
-      updated_at: new Date().toISOString(),
-    }).eq('id', ertelemeModal.id)
-    setErtelemeModal(null); setErtelemeForm(emptyErteleme); load()
+  // Drag & Drop
+  function onDragStart(e: React.DragEvent, id: string) {
+    setDragId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  function onDragOver(e: React.DragEvent) { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }
+  async function onDrop(e: React.DragEvent, kolonId: string) {
+    e.preventDefault()
+    if (!dragId || dragId === kolonId) return
+    await durumGuncelle(dragId, kolonId)
+    setDragId(null)
   }
 
-  const sf = (k: keyof typeof emptyForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setForm(p => ({ ...p, [k]: e.target.value }))
-
-  // Bugün gecikmiş mi?
-  function isGecikti(g: any) {
-    return g.durum !== 'tamamlandi' && g.durum !== 'iptal' && g.son_tarih && new Date(g.son_tarih) < new Date()
-  }
+  const sf = (k: keyof typeof emptyForm) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>) => setForm(p => ({ ...p, [k]: e.target.value }))
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        icon={<CheckSquare className="w-5 h-5 text-violet-600" />}
-        title="Görev Takibi"
-        subtitle="Günlük iş listesi, hatırlatmalar ve evrak yönetimi"
-        iconBg="bg-violet-50"
-        action={
-          <div className="flex items-center gap-2">
-            {hatirlatmalar.length > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-                <Bell className="w-4 h-4 text-amber-500" />
-                <span className="text-xs font-semibold text-amber-700">{hatirlatmalar.length} hatırlatma</span>
-              </div>
-            )}
-            <Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni Görev</Btn>
+    <div className="space-y-4">
+      {/* Baslik */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <span className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center"><CheckSquare className="w-4 h-4 text-violet-600" /></span>
+            Gorev Takibi
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5 ml-10">
+            {summary.toplam} gorev &middot; {summary.devam} devam &middot; {summary.tamamlandi} tamamlandi
+            {summary.gecikti > 0 && <span className="text-red-500 ml-2">· {summary.gecikti} gecikti</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {hatirlatmalar.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <Bell className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-xs font-semibold text-amber-700">{hatirlatmalar.length} hatirlatma</span>
+            </div>
+          )}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="Ara..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-violet-500 w-36" />
           </div>
-        }
-      />
-
-      {/* Özet Kartlar */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          { l: 'Toplam',      v: summary.toplam,     c: 'text-gray-700',   bg: 'bg-white'       },
-          { l: 'Bekliyor',    v: summary.bekliyor,   c: 'text-gray-600',   bg: 'bg-white'       },
-          { l: 'Devam',       v: summary.devam,      c: 'text-yellow-600', bg: 'bg-yellow-50'   },
-          { l: 'Tamamlandı',  v: summary.tamamlandi, c: 'text-green-600',  bg: 'bg-green-50'    },
-          { l: 'Gecikmiş',    v: summary.gecikti,    c: 'text-red-600',    bg: summary.gecikti > 0 ? 'bg-red-50' : 'bg-white' },
-        ].map((s, i) => (
-          <div key={i} className={`${s.bg} rounded-xl border border-gray-200 p-4`}>
-            <p className="text-xs text-gray-500 mb-1">{s.l}</p>
-            <p className={`text-2xl font-bold ${s.c}`}>{s.v}</p>
-          </div>
-        ))}
+          <button onClick={() => setFiltrePaneli(p => !p)} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors ${filtrePaneli || oncelikF !== 'hepsi' || kategoriF !== 'hepsi' ? 'bg-violet-50 border-violet-300 text-violet-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            <Filter className="w-3.5 h-3.5" />Filtre
+          </button>
+          <Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={() => openNew()}>Yeni Gorev</Btn>
+        </div>
       </div>
 
-      {/* Hatırlatma Bandı */}
-      {hatirlatmalar.length > 0 && (
-        <div className="space-y-2">
-          {hatirlatmalar.map(g => {
-            const onc = ONCELIK[g.oncelik as keyof typeof ONCELIK]
+      {/* Filtre Paneli */}
+      {filtrePaneli && (
+        <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-wrap gap-3">
+          <select value={oncelikF} onChange={e => setOncelikF(e.target.value)} className={inputCls + ' w-auto text-sm'}>
+            <option value="hepsi">Tum Oncelikler</option>
+            {Object.entries(ONCELIK).map(([k,v]) => <option key={k} value={k}>{v.l}</option>)}
+          </select>
+          <select value={kategoriF} onChange={e => setKategoriF(e.target.value)} className={inputCls + ' w-auto text-sm'}>
+            <option value="hepsi">Tum Kategoriler</option>
+            {Object.entries(KATEGORI).map(([k,v]) => <option key={k} value={k}>{v.emoji} {v.l}</option>)}
+          </select>
+          {(oncelikF !== 'hepsi' || kategoriF !== 'hepsi') && (
+            <button onClick={() => { setOncelikF('hepsi'); setKategoriF('hepsi') }} className="text-xs text-red-500 hover:underline flex items-center gap-1"><X className="w-3 h-3" />Temizle</button>
+          )}
+        </div>
+      )}
+
+      {/* Kanban Board */}
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" /></div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '70vh' }}>
+          {KOLONLAR.map(kolon => {
+            const gorevListesi = kolonGorevler[kolon.id] || []
             return (
-              <div key={g.id} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                <Bell className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-semibold text-amber-900">{g.baslik}</span>
-                  {g.son_tarih && <span className="text-xs text-amber-700 ml-2">Son: {fmtDate(g.son_tarih)}</span>}
+              <div key={kolon.id}
+                className={`flex-shrink-0 w-72 rounded-xl border-2 ${kolon.renk} ${kolon.bg} flex flex-col`}
+                onDragOver={onDragOver}
+                onDrop={e => onDrop(e, kolon.id)}
+              >
+                {/* Kolon Baslik */}
+                <div className={`flex items-center justify-between px-3 py-2.5 rounded-t-xl ${kolon.baslik}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{kolon.l}</span>
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${kolon.sayi}`}>{gorevListesi.length}</span>
+                  </div>
+                  <button onClick={() => { setInlineKolon(kolon.id); setInlineBaslik('') }} className="p-0.5 rounded hover:bg-black/10 transition-colors" title="Hizli Ekle">
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={() => setDetayId(g.id)} className="text-xs text-amber-700 hover:underline">Görüntüle</button>
+
+                {/* Kartlar */}
+                <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+                  {gorevListesi.map(g => (
+                    <KanbanKart
+                      key={g.id}
+                      gorev={g}
+                      firmaId={firma.id}
+                      onEdit={() => openEdit(g)}
+                      onDelete={() => setDelId(g.id)}
+                      onDetay={() => setDetayGorev(g)}
+                      onDurumGuncelle={durumGuncelle}
+                      onDragStart={e => onDragStart(e, g.id)}
+                      isDragging={dragId === g.id}
+                    />
+                  ))}
+
+                  {/* Inline Ekle */}
+                  {inlineKolon === kolon.id ? (
+                    <div className="bg-white rounded-lg border-2 border-violet-300 p-2 space-y-2">
+                      <textarea
+                        autoFocus
+                        rows={2}
+                        value={inlineBaslik}
+                        onChange={e => setInlineBaslik(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); inlineEkle(kolon.id) } if (e.key === 'Escape') setInlineKolon(null) }}
+                        placeholder="Gorev basligini yaz..."
+                        className="w-full text-sm border-0 outline-none resize-none text-gray-800 placeholder-gray-400"
+                      />
+                      <div className="flex gap-2">
+                        <Btn size="sm" onClick={() => inlineEkle(kolon.id)}>Ekle</Btn>
+                        <button onClick={() => setInlineKolon(null)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setInlineKolon(kolon.id); setInlineBaslik('') }}
+                      className="w-full text-left text-xs text-gray-400 hover:text-gray-600 hover:bg-white/60 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5" /> Kart ekle
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Filtreler */}
-      <Card className="p-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-48">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Görev ara..." value={search}
-              onChange={e => setSearch(e.target.value)} className={`${inputCls} pl-9`} />
-          </div>
-          <select value={durumF} onChange={e => setDurumF(e.target.value)} className={inputCls + ' w-auto'}>
-            <option value="hepsi">Tüm Durumlar</option>
-            {Object.entries(DURUM).map(([k, v]) => <option key={k} value={k}>{v.l}</option>)}
-          </select>
-          <select value={oncelikF} onChange={e => setOncelikF(e.target.value)} className={inputCls + ' w-auto'}>
-            <option value="hepsi">Tüm Öncelikler</option>
-            {Object.entries(ONCELIK).map(([k, v]) => <option key={k} value={k}>{v.l}</option>)}
-          </select>
-          <select value={kategoriF} onChange={e => setKategoriF(e.target.value)} className={inputCls + ' w-auto'}>
-            <option value="hepsi">Tüm Kategoriler</option>
-            {Object.entries(KATEGORI).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.l}</option>)}
-          </select>
-        </div>
-      </Card>
+      {/* Gorev Detay Modal */}
+      {detayGorev && (
+        <GorevDetayModal
+          gorev={detayGorev}
+          firmaId={firma.id}
+          onClose={() => setDetayGorev(null)}
+          onEdit={() => { openEdit(detayGorev); setDetayGorev(null) }}
+          onDurumGuncelle={async (id, durum) => { await durumGuncelle(id, durum); setDetayGorev(null) }}
+        />
+      )}
 
-      {/* Görev Listesi */}
-      <div className="space-y-2">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <Card><EmptyState icon={<CheckSquare className="w-10 h-10" />} message="Görev bulunamadı" /></Card>
-        ) : (
-          filtered.map(g => (
-            <GorevKarti
-              key={g.id}
-              gorev={g}
-              firma={firma}
-              isDetay={detayId === g.id}
-              onDetay={() => setDetayId(detayId === g.id ? null : g.id)}
-              onEdit={() => openEdit(g)}
-              onDelete={() => setDelId(g.id)}
-              onDurumGuncelle={durumGuncelle}
-              onErtele={() => { setErtelemeModal(g); setErtelemeForm(emptyErteleme) }}
-              gecikti={isGecikti(g)}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Yeni/Düzenle Modal */}
+      {/* Yeni/Duzenle Modal */}
       {modal && (
-        <Modal
-          title={editing ? 'Görevi Düzenle' : 'Yeni Görev'}
-          onClose={() => setModal(false)}
-          size="lg"
-          footer={<><Btn variant="secondary" onClick={() => setModal(false)}>İptal</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</Btn></>}
-        >
+        <Modal title={editing ? 'Gorevi Duzenle' : 'Yeni Gorev'} onClose={() => setModal(false)} size="lg"
+          footer={<><Btn variant="secondary" onClick={() => setModal(false)}>Iptal</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</Btn></>}>
           <div className="space-y-4">
-            <Field label="Başlık" required>
-              <input type="text" value={form.baslik} onChange={sf('baslik')} className={inputCls} placeholder="Görev başlığı..." />
+            <Field label="Baslik" required>
+              <input type="text" value={form.baslik} onChange={sf('baslik')} className={inputCls} placeholder="Gorev basligi..." />
             </Field>
-            <Field label="Açıklama">
-              <textarea rows={3} value={form.aciklama} onChange={sf('aciklama')} className={inputCls} placeholder="Detaylı açıklama..." />
+            <Field label="Aciklama">
+              <textarea rows={3} value={form.aciklama} onChange={sf('aciklama')} className={inputCls} />
             </Field>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="Öncelik">
+              <Field label="Oncelik">
                 <select value={form.oncelik} onChange={sf('oncelik')} className={inputCls}>
-                  {Object.entries(ONCELIK).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.l}</option>)}
+                  {Object.entries(ONCELIK).map(([k,v]) => <option key={k} value={k}>{v.l}</option>)}
                 </select>
               </Field>
               <Field label="Kategori">
                 <select value={form.kategori} onChange={sf('kategori')} className={inputCls}>
-                  {Object.entries(KATEGORI).map(([k, v]) => <option key={k} value={k}>{v.emoji} {v.l}</option>)}
+                  {Object.entries(KATEGORI).map(([k,v]) => <option key={k} value={k}>{v.emoji} {v.l}</option>)}
                 </select>
               </Field>
               <Field label="Durum">
                 <select value={form.durum} onChange={sf('durum')} className={inputCls}>
-                  {Object.entries(DURUM).map(([k, v]) => <option key={k} value={k}>{v.l}</option>)}
+                  {KOLONLAR.map(k => <option key={k.id} value={k.id}>{k.l}</option>)}
                 </select>
               </Field>
             </div>
@@ -306,272 +312,217 @@ export default function GorevlerModule({ firma }: AppCtx) {
               <Field label="Son Tarih">
                 <input type="date" value={form.son_tarih} onChange={sf('son_tarih')} className={inputCls} />
               </Field>
-              <Field label="Hatırlatma Tarihi">
+              <Field label="Hatirlatma">
                 <input type="datetime-local" value={form.hatirlatma_tarihi} onChange={sf('hatirlatma_tarihi')} className={inputCls} />
               </Field>
             </div>
-            <Field label="Atanan Kişi">
+            <Field label="Atanan Kisi">
               <input type="text" value={form.atanan_kisi} onChange={sf('atanan_kisi')} className={inputCls} placeholder="Ad Soyad" />
             </Field>
           </div>
         </Modal>
       )}
 
-      {/* Erteleme Modal */}
-      {ertelemeModal && (
-        <Modal
-          title={`Görevi Ertele — ${ertelemeModal.baslik}`}
-          onClose={() => setErtelemeModal(null)}
-          size="sm"
-          footer={<><Btn variant="secondary" onClick={() => setErtelemeModal(null)}>İptal</Btn><Btn onClick={ertele}>Ertele</Btn></>}
-        >
-          <div className="space-y-4">
-            <Field label="Yeni Tarih" required>
-              <input type="date" value={ertelemeForm.erteleme_tarihi}
-                onChange={e => setErtelemeForm(p => ({ ...p, erteleme_tarihi: e.target.value }))}
-                className={inputCls} min={new Date().toISOString().split('T')[0]} />
-            </Field>
-            <Field label="Erteleme Notu">
-              <textarea rows={2} value={ertelemeForm.erteleme_notu}
-                onChange={e => setErtelemeForm(p => ({ ...p, erteleme_notu: e.target.value }))}
-                className={inputCls} placeholder="Neden erteleniyor?" />
-            </Field>
-          </div>
-        </Modal>
-      )}
-
       {delId && (
-        <ConfirmDialog
-          message="Bu görevi silmek istediğinize emin misiniz?"
+        <ConfirmDialog message="Bu gorevi silmek istediginize emin misiniz?"
           onConfirm={async () => { await supabase.from('gorevler').delete().eq('id', delId); setDelId(null); load() }}
-          onCancel={() => setDelId(null)}
-        />
+          onCancel={() => setDelId(null)} />
       )}
     </div>
   )
 }
 
-// ─── Görev Kartı ─────────────────────────────────────────────
-interface GorevKartiProps {
-  gorev: any
-  firma: { id: string }
-  isDetay: boolean
-  onDetay: () => void
-  onEdit: () => void
-  onDelete: () => void
+// ─── Kanban Kart ──────────────────────────────────────────────
+function KanbanKart({ gorev: g, firmaId, onEdit, onDelete, onDetay, onDurumGuncelle, onDragStart, isDragging }: {
+  gorev: any; firmaId: string
+  onEdit: () => void; onDelete: () => void; onDetay: () => void
   onDurumGuncelle: (id: string, durum: string) => void
-  onErtele: () => void
-  gecikti: boolean
-}
-
-function GorevKarti({ gorev: g, firma, isDetay, onDetay, onEdit, onDelete, onDurumGuncelle, onErtele, gecikti }: GorevKartiProps) {
-  const [belgeler, setBelgeler] = useState<any[]>([])
-  const [loadingB, setLoadingB] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const detayInputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-
-  const onc   = ONCELIK[g.oncelik as keyof typeof ONCELIK] || ONCELIK.normal
-  const kat   = KATEGORI[g.kategori as keyof typeof KATEGORI] || KATEGORI.genel
-  const dur   = DURUM[g.durum as keyof typeof DURUM] || DURUM.bekliyor
-  const DurIcon = dur.icon
-
-  useEffect(() => {
-    if (isDetay && belgeler.length === 0) loadBelgeler()
-  }, [isDetay])
-
-  async function loadBelgeler() {
-    setLoadingB(true)
-    const { data } = await supabase.from('gorev_belgeler').select('*').eq('gorev_id', g.id).order('created_at')
-    setBelgeler(data || [])
-    setLoadingB(false)
-  }
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    const safeName = file.name
-      .replace(/[ğ]/g,'g').replace(/[Ğ]/g,'G').replace(/[ü]/g,'u').replace(/[Ü]/g,'U')
-      .replace(/[ş]/g,'s').replace(/[Ş]/g,'S').replace(/[ı]/g,'i').replace(/[İ]/g,'I')
-      .replace(/[ö]/g,'o').replace(/[Ö]/g,'O').replace(/[ç]/g,'c').replace(/[Ç]/g,'C')
-      .replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_')
-    const ext  = file.name.split('.').pop()?.toLowerCase() || 'bin'
-    const path = `${firma.id}/${g.id}/${Date.now()}_${safeName}`
-    const { error } = await supabase.storage.from('gorev-belgeler').upload(path, file)
-    if (error) { alert('Yükleme hatası: ' + error.message); setUploading(false); return }
-    await supabase.from('gorev_belgeler').insert({
-      gorev_id: g.id, firma_id: firma.id,
-      dosya_adi: file.name, storage_path: path, belge_tipi: ext,
-    })
-    setUploading(false)
-    if (inputRef.current) inputRef.current.value = ''
-    if (detayInputRef.current) detayInputRef.current.value = ''
-    loadBelgeler()
-  }
-
-  async function belgeIndir(belge: any) {
-    const { data } = await supabase.storage.from('gorev-belgeler').createSignedUrl(belge.storage_path, 60)
-    if (data?.signedUrl) { const a = document.createElement('a'); a.href = data.signedUrl; a.download = belge.dosya_adi; a.click() }
-  }
-
-  async function belgeSil(belge: any) {
-    if (!confirm(`"${belge.dosya_adi}" silinsin mi?`)) return
-    await supabase.storage.from('gorev-belgeler').remove([belge.storage_path])
-    await supabase.from('gorev_belgeler').delete().eq('id', belge.id)
-    loadBelgeler()
-  }
-
+  onDragStart: (e: React.DragEvent) => void; isDragging: boolean
+}) {
+  const onc = ONCELIK[g.oncelik as keyof typeof ONCELIK] || ONCELIK.normal
+  const kat = KATEGORI[g.kategori as keyof typeof KATEGORI] || KATEGORI.genel
+  const gecikti = !['tamamlandi','iptal'].includes(g.durum) && g.son_tarih && new Date(g.son_tarih) < new Date()
   const tamamlandi = g.durum === 'tamamlandi'
-  const iptal      = g.durum === 'iptal'
 
   return (
-    <div className={`bg-white rounded-xl border-2 transition-all ${
-      gecikti && !tamamlandi ? 'border-red-200 bg-red-50/30' :
-      tamamlandi ? 'border-green-200 bg-green-50/20 opacity-75' :
-      g.durum === 'ertelendi' ? 'border-blue-200' :
-      g.oncelik === 'kritik' ? 'border-orange-200' : 'border-gray-200'
-    }`}>
-      {/* Ana Satır */}
-      <div className="flex items-start gap-3 p-4">
-        {/* Tamamla Checkbox */}
-        <button
-          onClick={() => onDurumGuncelle(g.id, tamamlandi ? 'bekliyor' : 'tamamlandi')}
-          className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-            tamamlandi ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-400'
-          }`}
-        >
-          {tamamlandi && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-        </button>
-
-        {/* İçerik */}
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={onDetay}>
-          <div className="flex items-start gap-2 flex-wrap">
-            <span className={`font-semibold text-sm ${tamamlandi ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-              {g.baslik}
-            </span>
-            {/* Öncelik */}
-            <span className={`text-xs font-bold ${onc.renk}`}>{onc.icon} {onc.l}</span>
-            {/* Kategori */}
-            <span className="text-xs text-gray-500">{kat.emoji} {kat.l}</span>
-            {/* Durum */}
-            <Badge label={dur.l} variant={dur.v} />
-            {/* Gecikmiş */}
-            {gecikti && !tamamlandi && (
-              <span className="text-xs font-semibold text-red-600 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />Gecikmiş
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            {g.son_tarih && (
-              <span className={`text-xs flex items-center gap-1 ${gecikti && !tamamlandi ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-                <Calendar className="w-3 h-3" />{fmtDate(g.son_tarih)}
-              </span>
-            )}
-            {g.atanan_kisi && <span className="text-xs text-gray-400">👤 {g.atanan_kisi}</span>}
-            {g.erteleme_tarihi && <span className="text-xs text-blue-500">↷ {fmtDate(g.erteleme_tarihi)}'e ertelendi</span>}
-            {g.tamamlanma_tarihi && <span className="text-xs text-green-500">✓ {fmtDate(g.tamamlanma_tarihi)}</span>}
-          </div>
-
-          {g.aciklama && !isDetay && (
-            <p className="text-xs text-gray-500 mt-1 truncate">{g.aciklama}</p>
-          )}
+    <div
+      draggable
+      onDragStart={onDragStart}
+      className={`bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all group ${isDragging ? 'opacity-40 scale-95' : ''} ${gecikti ? 'border-l-4 border-l-red-400' : g.oncelik === 'kritik' ? 'border-l-4 border-l-red-500' : g.oncelik === 'yuksek' ? 'border-l-4 border-l-orange-400' : ''}`}
+    >
+      {/* Ust kisim */}
+      <div className="flex items-start justify-between gap-1 mb-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${onc.dot}`} />
+          <span className="text-xs text-gray-500">{kat.emoji} {kat.l}</span>
         </div>
-
-        {/* Aksiyonlar */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {!tamamlandi && !iptal && (
-            <>
-              {g.durum !== 'devam' && (
-                <button onClick={() => onDurumGuncelle(g.id, 'devam')}
-                  className="text-xs px-2 py-1 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 font-medium border border-yellow-200 transition-colors">
-                  Başla
-                </button>
-              )}
-              <button onClick={onErtele}
-                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="Ertele">
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </>
-          )}
-          {/* Evrak Yükle — her zaman görünür */}
-          <div>
-            <input ref={inputRef} type="file" onChange={handleUpload} className="hidden"
-              id={`gorev-up-${g.id}`} accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png" />
-            <label htmlFor={`gorev-up-${g.id}`}
-              title="Evrak Yükle"
-              className={`p-1.5 rounded-lg cursor-pointer flex items-center transition-colors ${uploading ? 'text-gray-300' : 'text-gray-400 hover:text-violet-600 hover:bg-violet-50'}`}>
-              {uploading
-                ? <div className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-                : <Upload className="w-4 h-4" />}
-            </label>
-          </div>
-          <button onClick={onEdit} className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50">
-            <Edit className="w-4 h-4" />
-          </button>
-          <button onClick={onDelete} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50">
-            <Trash2 className="w-4 h-4" />
-          </button>
-          <button onClick={onDetay} className={`p-1.5 rounded-lg transition-colors ${isDetay ? 'text-violet-600 bg-violet-50' : 'text-gray-400 hover:text-violet-600 hover:bg-violet-50'}`}
-            title={isDetay ? 'Kapat' : 'Detay & Ekler'}>
-            <ChevronDown className={`w-4 h-4 transition-transform ${isDetay ? 'rotate-180' : ''}`} />
-          </button>
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <button onClick={onEdit} className="p-1 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-3 h-3" /></button>
+          <button onClick={onDelete} className="p-1 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3 h-3" /></button>
         </div>
       </div>
 
-      {/* Detay Panel */}
-      {isDetay && (
-        <div className="border-t border-gray-100 px-4 py-4 bg-gray-50/50 space-y-4">
-          {/* Açıklama */}
+      {/* Baslik */}
+      <p onClick={onDetay} className={`text-sm font-medium leading-snug mb-2 cursor-pointer hover:text-violet-700 ${tamamlandi ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+        {g.baslik}
+      </p>
+
+      {/* Aciklama ozeti */}
+      {g.aciklama && (
+        <p className="text-xs text-gray-400 truncate mb-2">{g.aciklama}</p>
+      )}
+
+      {/* Alt bilgiler */}
+      <div className="flex items-center justify-between gap-2 mt-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          {g.son_tarih && (
+            <span className={`text-xs flex items-center gap-0.5 ${gecikti ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+              <Calendar className="w-3 h-3" />{fmtDate(g.son_tarih)}
+            </span>
+          )}
+          {g.atanan_kisi && (
+            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+              {g.atanan_kisi.split(' ')[0]}
+            </span>
+          )}
+        </div>
+        {/* Hizli tamamla */}
+        {!tamamlandi && (
+          <button onClick={() => onDurumGuncelle(g.id, 'tamamlandi')}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-300 hover:text-green-500 rounded" title="Tamamla">
+            <CheckCircle className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Gorev Detay Modal ────────────────────────────────────────
+function GorevDetayModal({ gorev: g, firmaId, onClose, onEdit, onDurumGuncelle }: {
+  gorev: any; firmaId: string
+  onClose: () => void; onEdit: () => void
+  onDurumGuncelle: (id: string, durum: string) => void
+}) {
+  const [belgeler, setBelgeler] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const onc = ONCELIK[g.oncelik as keyof typeof ONCELIK] || ONCELIK.normal
+  const kat = KATEGORI[g.kategori as keyof typeof KATEGORI] || KATEGORI.genel
+  const gecikti = !['tamamlandi','iptal'].includes(g.durum) && g.son_tarih && new Date(g.son_tarih) < new Date()
+
+  useEffect(() => { loadBelgeler() }, [])
+
+  async function loadBelgeler() {
+    const { data } = await supabase.from('gorev_belgeler').select('*').eq('gorev_id', g.id).order('created_at')
+    setBelgeler(data || [])
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return
+    setUploading(true)
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_')
+    const path = `${firmaId}/${g.id}/${Date.now()}_${safeName}`
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    const { error } = await supabase.storage.from('gorev-belgeler').upload(path, file)
+    if (error) { alert('Yukleme hatasi: ' + error.message); setUploading(false); return }
+    await supabase.from('gorev_belgeler').insert({ gorev_id: g.id, firma_id: firmaId, dosya_adi: file.name, storage_path: path, belge_tipi: ext })
+    setUploading(false)
+    if (inputRef.current) inputRef.current.value = ''
+    loadBelgeler()
+  }
+
+  async function belgeIndir(b: any) {
+    const { data } = await supabase.storage.from('gorev-belgeler').createSignedUrl(b.storage_path, 60)
+    if (data?.signedUrl) { const a = document.createElement('a'); a.href = data.signedUrl; a.download = b.dosya_adi; a.click() }
+  }
+
+  async function belgeSil(b: any) {
+    if (!confirm(`"${b.dosya_adi}" silinsin mi?`)) return
+    await supabase.storage.from('gorev-belgeler').remove([b.storage_path])
+    await supabase.from('gorev_belgeler').delete().eq('id', b.id)
+    loadBelgeler()
+  }
+
+  const kolon = KOLONLAR.find(k => k.id === g.durum)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className={`px-5 py-4 rounded-t-2xl ${kolon?.baslik || 'bg-gray-100'}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className={`w-2.5 h-2.5 rounded-full ${onc.dot}`} />
+                <span className="text-xs font-semibold">{onc.l}</span>
+                <span className="text-xs">{kat.emoji} {kat.l}</span>
+                {gecikti && <span className="text-xs text-red-600 font-semibold flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" />Gecikti</span>}
+              </div>
+              <h2 className="font-bold text-gray-900 text-base leading-snug">{g.baslik}</h2>
+            </div>
+            <div className="flex gap-1 flex-shrink-0">
+              <button onClick={onEdit} className="p-1.5 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-white/50"><Edit className="w-4 h-4" /></button>
+              <button onClick={onClose} className="p-1.5 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-white/50"><X className="w-4 h-4" /></button>
+            </div>
+          </div>
+        </div>
+
+        {/* Icerik */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Meta bilgiler */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            {g.atanan_kisi && <div><p className="text-xs text-gray-400 mb-0.5">Atanan</p><p className="font-medium text-gray-700">👤 {g.atanan_kisi}</p></div>}
+            {g.son_tarih && <div><p className="text-xs text-gray-400 mb-0.5">Son Tarih</p><p className={`font-medium ${gecikti ? 'text-red-600' : 'text-gray-700'}`}>📅 {fmtDate(g.son_tarih)}</p></div>}
+            {g.hatirlatma_tarihi && <div><p className="text-xs text-gray-400 mb-0.5">Hatirlatma</p><p className="font-medium text-gray-700">🔔 {new Date(g.hatirlatma_tarihi).toLocaleString('tr-TR')}</p></div>}
+            {g.tamamlanma_tarihi && <div><p className="text-xs text-gray-400 mb-0.5">Tamamlandi</p><p className="font-medium text-green-600">✓ {fmtDate(g.tamamlanma_tarihi)}</p></div>}
+          </div>
+
+          {/* Aciklama */}
           {g.aciklama && (
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
-              <p className="text-xs font-semibold text-gray-500 mb-1">AÇIKLAMA</p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{g.aciklama}</p>
+            <div>
+              <p className="text-xs font-semibold text-gray-400 mb-1.5">ACIKLAMA</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{g.aciklama}</p>
             </div>
           )}
 
-          {/* Erteleme Notu */}
-          {g.erteleme_notu && (
-            <div className="bg-blue-50 rounded-lg border border-blue-200 p-3">
-              <p className="text-xs font-semibold text-blue-600 mb-1">ERTELEME NOTU</p>
-              <p className="text-sm text-blue-800">{g.erteleme_notu}</p>
+          {/* Durum Degistir */}
+          <div>
+            <p className="text-xs font-semibold text-gray-400 mb-2">DURUMU DEGISTIR</p>
+            <div className="flex flex-wrap gap-2">
+              {KOLONLAR.map(k => (
+                <button key={k.id} onClick={() => onDurumGuncelle(g.id, k.id)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${g.durum === k.id ? `${k.baslik} border-current` : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                  {k.l}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Belgeler */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-500 flex items-center gap-1">
-                <Paperclip className="w-3 h-3" />EKLER ({belgeler.length})
-              </p>
+              <p className="text-xs font-semibold text-gray-400 flex items-center gap-1"><Paperclip className="w-3 h-3" />EKLER ({belgeler.length})</p>
               <div>
-                <input ref={detayInputRef} type="file" onChange={handleUpload} className="hidden"
-                  id={`gorev-up-detay-${g.id}`} accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png" />
-                <label htmlFor={`gorev-up-detay-${g.id}`}
-                  className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg cursor-pointer border transition-colors ${uploading ? 'border-gray-300 text-gray-400' : 'border-violet-300 text-violet-600 hover:bg-violet-50'}`}>
-                  {uploading ? <><div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />Yükleniyor</> : <><Upload className="w-3 h-3" />Evrak Yükle</>}
+                <input ref={inputRef} type="file" onChange={handleUpload} className="hidden" id={`detay-up-${g.id}`} accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png" />
+                <label htmlFor={`detay-up-${g.id}`} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg cursor-pointer border transition-colors ${uploading ? 'border-gray-300 text-gray-400' : 'border-violet-300 text-violet-600 hover:bg-violet-50'}`}>
+                  {uploading ? <><div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" />Yukleniyor</> : <><Upload className="w-3 h-3" />Evrak Yukle</>}
                 </label>
               </div>
             </div>
-
-            {loadingB ? (
-              <div className="flex justify-center py-3"><div className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
-            ) : belgeler.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-3">Henüz evrak eklenmedi</p>
+            {belgeler.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-3 bg-gray-50 rounded-lg">Henuz evrak eklenmedi</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="space-y-1.5">
                 {belgeler.map(b => {
-                  const ICONS: Record<string, string> = { pdf: '📄', doc: '📝', docx: '📝', xlsx: '📊', xls: '📊', jpg: '🖼', jpeg: '🖼', png: '🖼' }
-                  const icon = ICONS[b.belge_tipi] || '📎'
+                  const ICONS: Record<string,string> = { pdf:'📄', doc:'📝', docx:'📝', xlsx:'📊', xls:'📊', jpg:'🖼', jpeg:'🖼', png:'🖼' }
                   return (
-                    <div key={b.id} className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 px-3 py-2 group">
-                      <span className="text-sm flex-shrink-0">{icon}</span>
-                      <span className="text-xs text-gray-700 truncate flex-1 min-w-0" title={b.dosya_adi}>{b.dosya_adi}</span>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                        <button onClick={() => belgeIndir(b)} className="p-0.5 text-gray-400 hover:text-green-600"><Download className="w-3 h-3" /></button>
-                        <button onClick={() => belgeSil(b)} className="p-0.5 text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                    <div key={b.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 group">
+                      <span className="text-sm">{ICONS[b.belge_tipi]||'📎'}</span>
+                      <span className="text-xs text-gray-700 truncate flex-1">{b.dosya_adi}</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => belgeIndir(b)} className="p-0.5 text-gray-400 hover:text-green-600"><Download className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => belgeSil(b)} className="p-0.5 text-gray-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
                   )
@@ -579,28 +530,8 @@ function GorevKarti({ gorev: g, firma, isDetay, onDetay, onEdit, onDelete, onDur
               </div>
             )}
           </div>
-
-          {/* Hızlı Durum Değiştir */}
-          {!tamamlandi && !iptal && (
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => onDurumGuncelle(g.id, 'tamamlandi')}
-                className="flex-1 text-xs py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-semibold border border-green-200 transition-colors flex items-center justify-center gap-1">
-                <CheckCircle className="w-3.5 h-3.5" />Tamamlandı
-              </button>
-              <button onClick={() => onDurumGuncelle(g.id, 'iptal')}
-                className="text-xs px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium transition-colors">
-                İptal
-              </button>
-            </div>
-          )}
-          {tamamlandi && (
-            <button onClick={() => onDurumGuncelle(g.id, 'bekliyor')}
-              className="w-full text-xs py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium transition-colors">
-              Tamamlandıyı Geri Al
-            </button>
-          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
   PageHeader, StatCard, Card, Modal, Btn, Field,
   inputCls, ConfirmDialog, Badge, EmptyState, fmt, fmtDate
 } from '@/components/ui'
+import GorevEklePrompt from '@/components/ui/GorevEklePrompt'
 import type { AppCtx } from '@/app/page'
 import type { Proje } from '@/types'
 
@@ -216,6 +217,7 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
   const [editingGider, setEditingGider] = useState<any|null>(null)
   const [savingG, setSavingG] = useState(false)
   const [preview, setPreview] = useState<{url:string;adi:string}|null>(null)
+  const [gorevPrompt, setGorevPrompt] = useState<{baslik:string;aciklama:string;kategori:string}|null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const giderFaturaRef = useRef<Record<string,HTMLInputElement|null>>({})
 
@@ -316,6 +318,14 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
       }
     }
     setSavingG(false); setGiderModal(false); setEditingGider(null); loadBelgeler()
+    // Gorev takibine ekle prompt
+    if (!editingGider) {
+      setGorevPrompt({
+        baslik: `${giderForm.gider_kalemi} - ${giderForm.cari_unvan}`,
+        aciklama: `Proje: ${r.proje_adi} | Tutar: ${net.toLocaleString('tr-TR')} TL${giderForm.vade_tarihi ? ` | Vade: ${giderForm.vade_tarihi}` : ''}`,
+        kategori: 'proje',
+      })
+    }
   }
 
   async function giderSil(g: any) {
