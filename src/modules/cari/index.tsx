@@ -1,9 +1,9 @@
-'use client'
-import React, { useEffect, useState, useMemo, useRef } from 'react'
+﻿'use client'
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import {
   BookUser, Plus, Edit, Trash2, Search, Download, Eye, X,
   Upload, FileText, ChevronDown, ChevronRight, RefreshCw,
-  TrendingUp, TrendingDown, Wallet
+  TrendingUp, TrendingDown, Wallet, Filter, FileSpreadsheet
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Card, Modal, Btn, Field, inputCls, ConfirmDialog, Badge, EmptyState, fmt, fmtDate } from '@/components/ui'
@@ -127,6 +127,7 @@ export default function CariModule({ firma }: AppCtx) {
             <option value="hepsi">Tum Tipler</option>
             {CARI_TIPLER.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
           </select>
+          <Btn variant="secondary" size="sm" icon={<FileSpreadsheet className="w-4 h-4" />} onClick={() => exportExcel()}>Excel</Btn>
           <Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni Cari</Btn>
         </div>
       </div>
