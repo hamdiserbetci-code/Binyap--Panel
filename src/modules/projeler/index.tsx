@@ -229,7 +229,7 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
 
   const d = PROJE_DURUM[r.durum] || PROJE_DURUM.planlama
 
-  useEffect(() => { if (expanded && belgeler.length === 0) loadBelgeler() }, [expanded])
+  useEffect(() => { if (expanded) loadBelgeler() }, [expanded])
 
   async function loadBelgeler() {
     setLoadingB(true)
