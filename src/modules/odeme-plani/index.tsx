@@ -510,6 +510,7 @@ export default function OdemePlaniModule({ firma }: AppCtx) {
       cek_kesideci:    extra.cek_kesideci || '',
       cek_tarihi:      extra.cek_tarihi || '',
       cari_unvan:      extra.cari_unvan || '',
+      cari_hesap_id:   extra.cari_hesap_id || '',
       vergi_turu:      extra.vergi_turu || '',
       vergi_donemi:    extra.vergi_donemi || '',
       sgk_donemi:      extra.sgk_donemi || '',
