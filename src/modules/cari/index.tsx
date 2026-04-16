@@ -62,11 +62,30 @@ export default function CariModule({ firma }: AppCtx) {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
+    const { data: cariData } = await supabase
       .from('cari_hesaplar').select('*')
       .eq('firma_id', firma.id)
       .order('ad')
-    setCariler(data || [])
+    const rows = cariData || []
+
+    // Tum hareketleri cek, bakiyeleri hesapla
+    if (rows.length > 0) {
+      const ids = rows.map((c: any) => c.id)
+      const { data: hareketData } = await supabase
+        .from('cari_hareketler').select('cari_hesap_id,tur,tutar')
+        .in('cari_hesap_id', ids)
+      const bakiyeMap: Record<string, number> = {}
+      ;(hareketData || []).forEach((h: any) => {
+        if (!bakiyeMap[h.cari_hesap_id]) bakiyeMap[h.cari_hesap_id] = 0
+        const t = Number(h.tutar || 0)
+        const isAlacak = ['alacak', 'tahsilat', 'cek_alindi'].includes(h.tur)
+        bakiyeMap[h.cari_hesap_id] += isAlacak ? t : -t
+      })
+      // bakiye alanini gercek degerle guncelle
+      rows.forEach((c: any) => { c.bakiye = bakiyeMap[c.id] ?? 0 })
+    }
+
+    setCariler(rows)
     setLoading(false)
   }
   useEffect(() => { load() }, [firma.id])
