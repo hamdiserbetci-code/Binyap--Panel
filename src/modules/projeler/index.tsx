@@ -1,4 +1,4 @@
-'use client'
+﻿ï»¿'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import { FolderOpen, Plus, RefreshCw, Search, Edit, Trash2, Calendar, Users, DollarSign } from 'lucide-react'
@@ -16,8 +16,8 @@ function formatDate(s: string) {
 const STATUS_OPTIONS = [
   { value: 'planlama', label: 'Planlama', color: 'bg-gray-100 text-gray-800' },
   { value: 'devam', label: 'Devam Ediyor', color: 'bg-blue-100 text-blue-800' },
-  { value: 'tamamlandi', label: 'Tamamlandı', color: 'bg-green-100 text-green-800' },
-  { value: 'iptal', label: 'İptal Edildi', color: 'bg-red-100 text-red-800' },
+  { value: 'tamamlandi', label: 'Tamamlandâ”€â–’', color: 'bg-green-100 text-green-800' },
+  { value: 'iptal', label: 'â”€â–‘ptal Edildi', color: 'bg-red-100 text-red-800' },
 ]
 
 export default function ProjeTakibi({ firma }: AppCtx) {
@@ -50,7 +50,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
       .order('baslangic_tarihi', { ascending: false })
 
     if (error) {
-      console.error('Proje verisi çekme hatası:', error)
+      console.error('Proje verisi â”œÄŸekme hatasâ”€â–’:', error)
       return
     }
 
@@ -114,7 +114,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
 
   async function saveProject() {
     if (!form.proje_adi || !form.baslangic_tarihi) {
-      alert('Proje adı ve başlangıç tarihi zorunludur')
+      alert('Proje adâ”€â–’ ve baâ”¼ÅŸlangâ”€â–’â”œÄŸ tarihi zorunludur')
       return
     }
 
@@ -144,8 +144,8 @@ export default function ProjeTakibi({ firma }: AppCtx) {
       setShowModal(false)
       fetchProjects()
     } catch (error) {
-      console.error('Kaydetme hatası:', error)
-      alert('Kaydetme sırasında hata oluştu')
+      console.error('Kaydetme hatasâ”€â–’:', error)
+      alert('Kaydetme sâ”€â–’rasâ”€â–’nda hata oluâ”¼ÅŸtu')
     } finally {
       setSaving(false)
     }
@@ -157,8 +157,8 @@ export default function ProjeTakibi({ firma }: AppCtx) {
       setDeletingId(null)
       fetchProjects()
     } catch (error) {
-      console.error('Silme hatası:', error)
-      alert('Silme sırasında hata oluştu')
+      console.error('Silme hatasâ”€â–’:', error)
+      alert('Silme sâ”€â–’rasâ”€â–’nda hata oluâ”¼ÅŸtu')
     }
   }
 
@@ -181,7 +181,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Proje Takibi</h1>
-              <p className="text-sm text-gray-500">Şirket projelerini yönetin ve takip edin</p>
+              <p className="text-sm text-gray-500">â”¼Åžirket projelerini yâ”œÃ‚netin ve takip edin</p>
             </div>
           </div>
           <button
@@ -235,7 +235,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
               <DollarSign className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Toplam Bütçe</p>
+              <p className="text-sm text-gray-500">Toplam Bâ”œâ•tâ”œÄŸe</p>
               <p className="text-xl font-bold text-gray-900">{formatCurrency(summary.totalBudget)}</p>
             </div>
           </div>
@@ -250,7 +250,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Proje adı, açıklama veya sorumlu kişi ile ara..."
+                placeholder="Proje adâ”€â–’, aâ”œÄŸâ”€â–’klama veya sorumlu kiâ”¼ÅŸi ile ara..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -262,7 +262,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
-            <option value="all">Tüm Durumlar</option>
+            <option value="all">Tâ”œâ•m Durumlar</option>
             {STATUS_OPTIONS.map(status => (
               <option key={status.value} value={status.value}>{status.label}</option>
             ))}
@@ -283,13 +283,13 @@ export default function ProjeTakibi({ firma }: AppCtx) {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proje Adı</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Başlangıç</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bitiş</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bütçe</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proje Adâ”€â–’</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Baâ”¼ÅŸlangâ”€â–’â”œÄŸ</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bitiâ”¼ÅŸ</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bâ”œâ•tâ”œÄŸe</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sorumlu</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">â”€â–‘â”¼ÅŸlemler</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -347,7 +347,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
         {filteredProjects.length === 0 && (
           <div className="text-center py-12">
             <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">Proje bulunamadı</p>
+            <p className="text-gray-500">Proje bulunamadâ”€â–’</p>
           </div>
         )}
       </div>
@@ -358,42 +358,42 @@ export default function ProjeTakibi({ firma }: AppCtx) {
           <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">
-                {editingProject ? 'Proje Düzenle' : 'Yeni Proje'}
+                {editingProject ? 'Proje Dâ”œâ•zenle' : 'Yeni Proje'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                ✕
+                Ã”Â£Ã²
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Proje Adı *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Proje Adâ”€â–’ *</label>
                 <input
                   type="text"
                   value={form.proje_adi}
                   onChange={(e) => setForm({...form, proje_adi: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Proje adını girin"
+                  placeholder="Proje adâ”€â–’nâ”€â–’ girin"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Aâ”œÄŸâ”€â–’klama</label>
                 <textarea
                   value={form.aciklama}
                   onChange={(e) => setForm({...form, aciklama: e.target.value})}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Proje açıklaması..."
+                  placeholder="Proje aâ”œÄŸâ”€â–’klamasâ”€â–’..."
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Başlangıç Tarihi *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Baâ”¼ÅŸlangâ”€â–’â”œÄŸ Tarihi *</label>
                   <input
                     type="date"
                     value={form.baslangic_tarihi}
@@ -402,7 +402,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bitiş Tarihi</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bitiâ”¼ÅŸ Tarihi</label>
                   <input
                     type="date"
                     value={form.bitis_tarihi}
@@ -414,7 +414,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bütçe (TL)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bâ”œâ•tâ”œÄŸe (TL)</label>
                   <input
                     type="number"
                     value={form.butce}
@@ -438,7 +438,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kişi</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sorumlu Kiâ”¼ÅŸi</label>
                 <input
                   type="text"
                   value={form.sorumlu_kisi}
@@ -465,7 +465,7 @@ export default function ProjeTakibi({ firma }: AppCtx) {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                İptal
+                â”€â–‘ptal
               </button>
               <button
                 onClick={saveProject}
@@ -484,13 +484,13 @@ export default function ProjeTakibi({ firma }: AppCtx) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Projeyi Sil</h2>
-            <p className="text-gray-600 mb-6">Bu projeyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.</p>
+            <p className="text-gray-600 mb-6">Bu projeyi silmek istediâ”€ÅŸinizden emin misiniz? Bu iâ”¼ÅŸlem geri alâ”€â–’namaz.</p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeletingId(null)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                İptal
+                â”€â–‘ptal
               </button>
               <button
                 onClick={() => deleteProject(deletingId)}

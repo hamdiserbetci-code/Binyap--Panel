@@ -1,71 +1,40 @@
-/* ── ETM Panel Service Worker ── push bildirimleri ── */
+// ETM Binyapı ERP — Service Worker
+const CACHE = 'etm-erp-v1'
+
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()))
 
-/* ── Push (sunucu kaynaklı) ─────────────────────────────────────────────── */
+// Push bildirimi al
 self.addEventListener('push', e => {
-  if (!e.data) return
-  const data = e.data.json()
+  const data = e.data?.json() || {}
+  const title   = data.title   || 'ETM Binyapı ERP'
+  const body    = data.body    || 'Yeni bildirim'
+  const icon    = data.icon    || '/icon-192.png'
+  const badge   = data.badge   || '/icon-192.png'
+  const url     = data.url     || '/'
+  const tag     = data.tag     || 'etm-notification'
+
   e.waitUntil(
-    self.registration.showNotification(data.title || 'Görev Hatırlatıcısı', {
-      body:    data.body  || '',
-      icon:    data.icon  || '/favicon.ico',
-      badge:   '/favicon.ico',
-      tag:     data.tag   || 'gunluk-is',
-      data:    { url: data.url || '/', isId: data.isId },
-      actions: [
-        { action: 'done',   title: '✓ Tamamlandı' },
-        { action: 'snooze', title: '⏰ 1 saat ertele' },
-      ],
-      requireInteraction: true,
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge,
+      tag,
+      data: { url },
       vibrate: [200, 100, 200],
+      requireInteraction: false,
     })
   )
 })
 
-/* ── showNotification (uygulama içi tetikli) aynı handler'ı kullanır ─────── */
-
-/* ── Notification tıklama ───────────────────────────────────────────────── */
+// Bildirime tıklanınca uygulamayı aç
 self.addEventListener('notificationclick', e => {
-  const notif  = e.notification
-  const isId   = notif.data && notif.data.isId
-  const action = e.action
-
-  notif.close()
-
-  if (action === 'done' && isId) {
-    /* Aktif sekmeye mesaj gönder → uygulamada tamamlansın */
-    e.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-        for (const c of clients) {
-          c.postMessage({ type: 'TASK_DONE', isId })
-        }
-        /* Sekme yoksa aç */
-        if (!clients.length) return self.clients.openWindow('/')
-      })
-    )
-    return
-  }
-
-  if (action === 'snooze' && isId) {
-    e.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-        for (const c of clients) {
-          c.postMessage({ type: 'TASK_SNOOZE', isId, mins: 60 })
-        }
-        if (!clients.length) return self.clients.openWindow('/')
-      })
-    )
-    return
-  }
-
-  /* Varsayılan: uygulamayı aç / öne getir */
-  const url = (notif.data && notif.data.url) || '/'
+  e.notification.close()
+  const url = e.notification.data?.url || '/'
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-      for (const c of clients) {
-        if (c.url.includes(self.location.origin)) { c.focus(); return }
-      }
+      const existing = clients.find(c => c.url.includes(self.location.origin))
+      if (existing) return existing.focus()
       return self.clients.openWindow(url)
     })
   )

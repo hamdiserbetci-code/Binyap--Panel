@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
+  turbopack: {},
+  webpack: (config, { dev }) => {
+    config.resolve = { ...config.resolve, symlinks: false }
     config.externals = [...(config.externals || []), { canvas: 'canvas' }]
+    if (!dev) config.cache = false
 
     // pdfjs worker .mjs dosyasını asset olarak kopyala, import.meta.url hatasını önle
     config.module.rules.push({

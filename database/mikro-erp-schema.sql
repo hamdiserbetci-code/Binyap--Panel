@@ -86,20 +86,6 @@ CREATE TABLE IF NOT EXISTS cari_bakiyeler (
     UNIQUE(firma_id, cari_id, tarih)
 );
 
--- Cari tahsilat/ödeme
-CREATE TABLE IF NOT EXISTS cari_tahsilat_odeme (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    firma_id UUID NOT NULL REFERENCES firmalar(id),
-    cari_id UUID NOT NULL REFERENCES cariler(id),
-    islem_tipi VARCHAR(20) NOT NULL CHECK (islem_tipi IN ('tahsilat', 'odeme')),
-    odeme_tipi VARCHAR(20) NOT NULL CHECK (odeme_tipi IN ('nakit', 'banka', 'cek', 'senet')),
-    banka_hesap_id UUID REFERENCES banka_hesaplari(id),
-    tutar DECIMAL(15,2) NOT NULL,
-    aciklama TEXT,
-    tarih DATE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- ==========================================
 -- 2. FİNANS - BANKA - KASA
 -- ==========================================
@@ -116,6 +102,20 @@ CREATE TABLE IF NOT EXISTS banka_hesaplari (
     aktif BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Cari tahsilat/ödeme
+CREATE TABLE IF NOT EXISTS cari_tahsilat_odeme (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    firma_id UUID NOT NULL REFERENCES firmalar(id),
+    cari_id UUID NOT NULL REFERENCES cariler(id),
+    islem_tipi VARCHAR(20) NOT NULL CHECK (islem_tipi IN ('tahsilat', 'odeme')),
+    odeme_tipi VARCHAR(20) NOT NULL CHECK (odeme_tipi IN ('nakit', 'banka', 'cek', 'senet')),
+    banka_hesap_id UUID REFERENCES banka_hesaplari(id),
+    tutar DECIMAL(15,2) NOT NULL,
+    aciklama TEXT,
+    tarih DATE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Banka hareketleri
@@ -381,10 +381,10 @@ CREATE TABLE IF NOT EXISTS sgk_bildirge_kayitlari (
 CREATE TABLE IF NOT EXISTS projeler (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     firma_id UUID NOT NULL REFERENCES firmalar(id),
-    proje_kodu VARCHAR(50) NOT NULL,
-    proje_adi VARCHAR(200) NOT NULL,
+    proje_kodu VARCHAR(50),
+    proje_adi VARCHAR(200),
     musteri_id UUID REFERENCES cariler(id),
-    baslangic_tarihi DATE NOT NULL,
+    baslangic_tarihi DATE,
     bitis_tarihi DATE,
     durum VARCHAR(20) DEFAULT 'devam' CHECK (durum IN ('devam', 'tamamlandi', 'iptal')),
     toplam_butce DECIMAL(15,2) DEFAULT 0,
@@ -392,6 +392,11 @@ CREATE TABLE IF NOT EXISTS projeler (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+ALTER TABLE projeler ADD COLUMN IF NOT EXISTS proje_kodu VARCHAR(50);
+ALTER TABLE projeler ADD COLUMN IF NOT EXISTS proje_adi VARCHAR(200);
+ALTER TABLE projeler ADD COLUMN IF NOT EXISTS toplam_butce DECIMAL(15,2) DEFAULT 0;
+ALTER TABLE projeler ADD COLUMN IF NOT EXISTS harcanan_butce DECIMAL(15,2) DEFAULT 0;
 
 -- Proje görevleri
 CREATE TABLE IF NOT EXISTS proje_gorevleri (
@@ -554,6 +559,39 @@ CREATE TRIGGER trigger_fatura_toplam_update
 -- RLS POLICIES
 -- ==========================================
 
+-- Enable RLS
+ALTER TABLE IF EXISTS cariler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS cari_hareketler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS cari_bakiyeler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS cari_tahsilat_odeme ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE IF EXISTS banka_hesaplari ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS banka_hareketleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS kasa_hareketleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS finans_fisleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS finans_fis_satirlari ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE IF EXISTS faturalar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS fatura_satirlari ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS irsaliyeler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS stok_kartlari ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE IF EXISTS cekler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS senetler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS cek_senet_hareketleri ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE IF EXISTS personel ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS bordro_donemleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS bordro_kesintileri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS bordro_ekleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS icra_kesintileri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS sgk_bildirge_kayitlari ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE IF EXISTS projeler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS proje_gorevleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS proje_maliyetleri ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS proje_faturalari ENABLE ROW LEVEL SECURITY;
+
 -- Cari tabloları için RLS
 CREATE POLICY "Cari: Kullanıcı kendi firmasının carilerini görebilir" ON cariler
     FOR ALL USING (firma_id = current_setting('app.current_firma_id')::uuid);
@@ -634,12 +672,12 @@ SELECT
     p.firma_id,
     p.proje_kodu,
     p.proje_adi,
-    p.toplam_butce,
-    p.harcanan_butce,
-    (p.toplam_butce - p.harcanan_butce) AS kar_zarar,
+    COALESCE(p.toplam_butce, 0) AS toplam_butce,
+    COALESCE(p.harcanan_butce, 0) AS harcanan_butce,
+    (COALESCE(p.toplam_butce, 0) - COALESCE(p.harcanan_butce, 0)) AS kar_zarar,
     CASE 
-        WHEN p.toplam_butce > 0 
-        THEN ROUND(((p.toplam_butce - p.harcanan_butce) / p.toplam_butce) * 100, 2)
+        WHEN COALESCE(p.toplam_butce, 0) > 0 
+        THEN ROUND(((COALESCE(p.toplam_butce, 0) - COALESCE(p.harcanan_butce, 0)) / COALESCE(p.toplam_butce, 0)) * 100, 2)
         ELSE 0 
     END AS karlilik_yuzdesi
 FROM projeler p
