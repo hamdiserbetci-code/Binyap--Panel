@@ -40,6 +40,7 @@ const empty = {
   cek_kesideci: '',
   cek_tarihi: '',
   cari_unvan: '',
+  cari_hesap_id: '',
   vergi_turu: '',
   vergi_donemi: '',
   sgk_donemi: '',
@@ -63,16 +64,17 @@ export default function OdemePlaniModule({ firma }: AppCtx) {
   const [delId, setDelId]     = useState<string | null>(null)
   const [saving, setSaving]   = useState(false)
   const [form, setForm]       = useState<FormState>(empty)
+  const [cariler, setCariler] = useState<any[]>([])
 
   async function load() {
     setLoading(true)
-    const { data: rows, error } = await supabase
-      .from('odeme_plani')
-      .select('*')
-      .eq('firma_id', firma.id)
-      .order('vade_tarihi', { ascending: true })
+    const [{ data: rows, error }, { data: cariData }] = await Promise.all([
+      supabase.from('odeme_plani').select('*').eq('firma_id', firma.id).order('vade_tarihi', { ascending: true }),
+      supabase.from('cari_hesaplar').select('id,ad,iban').eq('firma_id', firma.id).order('ad'),
+    ])
     if (error) console.error('Ödeme planı yükleme hatası:', error.message)
     setData(rows || [])
+    setCariler(cariData || [])
     setLoading(false)
   }
   useEffect(() => { load() }, [firma.id])
@@ -562,12 +564,16 @@ export default function OdemePlaniModule({ firma }: AppCtx) {
     }
     if (error) { alert('Kaydetme hatası: ' + error.message); console.error(error) }
     // Cari tipinde ise cari hesaba otomatik hareket ekle
-    if (!error && !editing && form.odeme_tipi === 'cari' && form.cari_unvan && savedId) {
-      const { data: cariHesap } = await supabase.from('cari_hesaplar')
-        .select('id').eq('firma_id', firma.id).ilike('ad', form.cari_unvan).maybeSingle()
-      if (cariHesap?.id) {
+    if (!error && !editing && form.odeme_tipi === 'cari' && savedId) {
+      let cariId = (form as any).cari_hesap_id || null
+      if (!cariId && form.cari_unvan) {
+        const { data: bulunan } = await supabase.from('cari_hesaplar')
+          .select('id').eq('firma_id', firma.id).ilike('ad', form.cari_unvan).maybeSingle()
+        cariId = bulunan?.id || null
+      }
+      if (cariId) {
         await supabase.from('cari_hareketler').insert({
-          firma_id: firma.id, cari_hesap_id: cariHesap.id,
+          firma_id: firma.id, cari_hesap_id: cariId,
           tarih: form.vade_tarihi, tur: 'borc',
           tutar: Number(form.tutar),
           aciklama: form.aciklama || null,
@@ -605,6 +611,15 @@ export default function OdemePlaniModule({ firma }: AppCtx) {
         </>
       case 'cari':
         return <>
+          <Field label="Cari Hesap Seç" className="md:col-span-2">
+            <select value={form.cari_hesap_id} onChange={e => {
+              const sec = cariler.find((c: any) => c.id === e.target.value)
+              setForm(p => ({ ...p, cari_hesap_id: e.target.value, cari_unvan: sec?.ad || p.cari_unvan, banka_hesabi: sec?.iban || p.banka_hesabi }))
+            }} className={inputCls}>
+              <option value="">-- Cari hesaptan seç (opsiyonel) --</option>
+              {cariler.map((c: any) => <option key={c.id} value={c.id}>{c.ad}{c.iban ? ` — ${c.iban}` : ''}</option>)}
+            </select>
+          </Field>
           <Field label="Cari Ünvan" required className="md:col-span-2">
             <input type="text" value={form.cari_unvan} onChange={sf('cari_unvan')} className={inputCls} placeholder="Firma / Kişi adı" />
           </Field>

@@ -205,6 +205,7 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
   const [belgeler, setBelgeler] = useState<any[]>([])
   const [odemeler, setOdemeler] = useState<any[]>([])
   const [giderler, setGiderler] = useState<any[]>([])
+  const [cariler, setCariler]   = useState<any[]>([])
   const [loadingB, setLoadingB] = useState(false)
   const [aktifTab, setAktifTab] = useState<'hakedis'|'gider'|'sozlesme'|'diger'>('hakedis')
   const [hakedisModal, setHakedisModal] = useState(false)
@@ -220,7 +221,7 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
 
   const emptyGider = {
     fatura_no:'', fatura_tarihi: new Date().toISOString().split('T')[0],
-    cari_unvan:'', cari_plaka:'', cari_iban:'',
+    cari_hesap_id:'', cari_unvan:'', cari_plaka:'', cari_iban:'',
     gider_kalemi:'', tutar:'', kdv_orani:'20', kdv_tutari:'',
     tevkifat_orani:'0', tevkifat_tutari:'', net_tutar:'',
     vade_tarihi:'', odeme_durumu:'bekliyor', aciklama:'',
@@ -233,14 +234,16 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
 
   async function loadBelgeler() {
     setLoadingB(true)
-    const [b, o, g] = await Promise.all([
+    const [b, o, g, c] = await Promise.all([
       supabase.from('proje_belgeler').select('*').eq('proje_id', r.id).order('belge_tarihi', { ascending: false }),
       supabase.from('proje_odemeler').select('*').eq('proje_id', r.id).order('odeme_tarihi', { ascending: false }),
       supabase.from('proje_giderler').select('*').eq('proje_id', r.id).order('fatura_tarihi', { ascending: false }),
+      supabase.from('cari_hesaplar').select('id,ad,iban').eq('firma_id', firma.id).order('ad'),
     ])
     setBelgeler(b.data || [])
     setOdemeler(o.data || [])
     setGiderler(g.data || [])
+    setCariler(c.data || [])
     setLoadingB(false)
   }
 
@@ -285,7 +288,18 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
         if (op?.id) await supabase.from('proje_giderler').update({ odeme_plani_id: op.id }).eq('id', yeni.id)
       }
       // Cari hesaba otomatik hareket ekle
-      if (yeni?.id && giderForm.cari_unvan) {
+      if (yeni?.id && giderForm.cari_hesap_id) {
+        await supabase.from('cari_hareketler').insert({
+          firma_id: firma.id, cari_hesap_id: giderForm.cari_hesap_id,
+          proje_id: r.id, tarih: giderForm.fatura_tarihi || new Date().toISOString().split('T')[0],
+          tur: 'borc', tutar: net,
+          aciklama: `${giderForm.gider_kalemi} - ${r.proje_adi}`,
+          belge_no: giderForm.fatura_no || null,
+          odeme_durumu: giderForm.odeme_durumu,
+          kaynak: 'proje_gider', kaynak_id: yeni.id,
+        })
+      } else if (yeni?.id && giderForm.cari_unvan) {
+        // Fallback: isim ile ara
         const { data: cariHesap } = await supabase.from('cari_hesaplar')
           .select('id').eq('firma_id', firma.id).ilike('ad', giderForm.cari_unvan).maybeSingle()
         if (cariHesap?.id) {
@@ -575,8 +589,16 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Fatura No"><input type="text" value={giderForm.fatura_no} onChange={e => setGiderForm(p=>({...p,fatura_no:e.target.value}))} className={inputCls} /></Field>
             <Field label="Fatura Tarihi"><input type="date" value={giderForm.fatura_tarihi} onChange={e => setGiderForm(p=>({...p,fatura_tarihi:e.target.value}))} className={inputCls} /></Field>
-            <Field label="Cari / Tedarikci Unvani" required className="md:col-span-2"><input type="text" value={giderForm.cari_unvan} onChange={e => setGiderForm(p=>({...p,cari_unvan:e.target.value}))} className={inputCls} /></Field>
-            <Field label="Plaka"><input type="text" value={giderForm.cari_plaka} onChange={e => setGiderForm(p=>({...p,cari_plaka:e.target.value.toUpperCase()}))} className={inputCls} /></Field>
+            <Field label="Cari Hesap Sec" className="md:col-span-2">
+              <select value={giderForm.cari_hesap_id} onChange={e => {
+                const sec = cariler.find(c => c.id === e.target.value)
+                setGiderForm(p=>({...p, cari_hesap_id: e.target.value, cari_unvan: sec?.ad || p.cari_unvan, cari_iban: sec?.iban || p.cari_iban }))
+              }} className={inputCls}>
+                <option value="">-- Cari hesaptan sec (opsiyonel) --</option>
+                {cariler.map(c => <option key={c.id} value={c.id}>{c.ad}{c.iban ? ` — ${c.iban}` : ''}</option>)}
+              </select>
+            </Field>
+            <Field label="Cari / Tedarikci Unvani" required className="md:col-span-2"><input type="text" value={giderForm.cari_unvan} onChange={e => setGiderForm(p=>({...p,cari_unvan:e.target.value}))} className={inputCls} /></Field>            <Field label="Plaka"><input type="text" value={giderForm.cari_plaka} onChange={e => setGiderForm(p=>({...p,cari_plaka:e.target.value.toUpperCase()}))} className={inputCls} /></Field>
             <Field label="IBAN"><input type="text" value={giderForm.cari_iban} onChange={e => setGiderForm(p=>({...p,cari_iban:e.target.value}))} className={`${inputCls} font-mono`} placeholder="TR..." /></Field>
             <Field label="Gider Kalemi" required className="md:col-span-2"><input type="text" value={giderForm.gider_kalemi} onChange={e => setGiderForm(p=>({...p,gider_kalemi:e.target.value}))} className={inputCls} placeholder="Malzeme, Iscilik, Nakliye..." /></Field>
             <Field label="Tutar (KDV Haric)" required>
