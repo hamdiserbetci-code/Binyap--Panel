@@ -284,6 +284,22 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
         const { data: op } = await supabase.from('odeme_plani').insert({ firma_id: firma.id, odeme_tipi: 'cari', aciklama: `${giderForm.cari_unvan} - ${giderForm.gider_kalemi}`, tutar: net, odenen_tutar: 0, kalan_tutar: net, vade_tarihi: giderForm.vade_tarihi, durum: 'bekliyor', notlar: `Proje gideri - ${r.proje_adi}`, banka_hesabi: giderForm.cari_iban || null, cari_unvan: giderForm.cari_unvan || null }).select().single()
         if (op?.id) await supabase.from('proje_giderler').update({ odeme_plani_id: op.id }).eq('id', yeni.id)
       }
+      // Cari hesaba otomatik hareket ekle
+      if (yeni?.id && giderForm.cari_unvan) {
+        const { data: cariHesap } = await supabase.from('cari_hesaplar')
+          .select('id').eq('firma_id', firma.id).ilike('ad', giderForm.cari_unvan).maybeSingle()
+        if (cariHesap?.id) {
+          await supabase.from('cari_hareketler').insert({
+            firma_id: firma.id, cari_hesap_id: cariHesap.id,
+            proje_id: r.id, tarih: giderForm.fatura_tarihi || new Date().toISOString().split('T')[0],
+            tur: 'borc', tutar: net,
+            aciklama: `${giderForm.gider_kalemi} - ${r.proje_adi}`,
+            belge_no: giderForm.fatura_no || null,
+            odeme_durumu: giderForm.odeme_durumu,
+            kaynak: 'proje_gider', kaynak_id: yeni.id,
+          })
+        }
+      }
     }
     setSavingG(false); setGiderModal(false); setEditingGider(null); loadBelgeler()
   }

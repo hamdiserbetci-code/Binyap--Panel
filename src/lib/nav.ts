@@ -1,12 +1,13 @@
 import {
   LayoutDashboard, Wallet, Clock, TrendingUp,
-  FolderOpen, Users, FileText, Scale, Settings, Briefcase, CheckSquare, ShieldCheck, BarChart2,
+  FolderOpen, Users, FileText, Scale, Settings, Briefcase, CheckSquare, ShieldCheck, BarChart2, BookUser,
 } from 'lucide-react'
 import type { NavItem } from '@/types'
 
 export const NAV: NavItem[] = [
   { id: 'dashboard',   label: 'Ana Ekran',       icon: LayoutDashboard, group: 'Genel' },
   { id: 'gorevler',    label: 'Görev Takibi',     icon: CheckSquare,     group: 'Genel' },
+  { id: 'cari',        label: 'Cari Hesaplar',    icon: BookUser,        group: 'Finans' },
   { id: 'kasa',        label: 'Kasa & Banka',     icon: Wallet,          group: 'Finans' },
   { id: 'odeme-plani', label: 'Ödeme Planı',      icon: Clock,           group: 'Finans' },
   { id: 'kar-zarar',   label: 'Kar / Zarar',      icon: TrendingUp,      group: 'Finans' },

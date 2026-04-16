@@ -22,6 +22,7 @@ import IsTakibi    from '@/modules/is-takibi'
 import PoliceModule from '@/modules/police'
 import Raporlar     from '@/modules/raporlar'
 import Ayarlar      from '@/modules/ayarlar'
+import CariModule   from '@/modules/cari'
 
 export interface AppCtx {
   firma: Firma
@@ -211,6 +212,7 @@ export default function App() {
     switch (activeModule) {
       case 'dashboard':   return <Dashboard   {...ctx} onNavigate={setActiveModule} />
       case 'gorevler':    return <Gorevler    {...ctx} />
+      case 'cari':        return <CariModule  {...ctx} />
       case 'kasa':        return <KasaModule  {...ctx} />
       case 'odeme-plani': return <OdemePlani  {...ctx} />
       case 'kar-zarar':   return <KarZarar    {...ctx} />

@@ -193,6 +193,7 @@ export interface SgkBeyan {
 export type ModuleId =
   | 'dashboard'
   | 'gorevler'
+  | 'cari'
   | 'kasa'
   | 'odeme-plani'
   | 'kar-zarar'

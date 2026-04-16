@@ -549,15 +549,33 @@ export default function OdemePlaniModule({ firma }: AppCtx) {
       maas_donemi:  form.maas_donemi || null,
       personel_sayisi: form.personel_sayisi ? Number(form.personel_sayisi) : null,
     }
+    let savedId: string | null = null
     let error: any = null
     if (editing) {
       const res = await supabase.from('odeme_plani').update(payload).eq('id', editing.id)
       error = res.error
+      savedId = editing.id
     } else {
-      const res = await supabase.from('odeme_plani').insert({ ...payload, firma_id: firma.id })
+      const res = await supabase.from('odeme_plani').insert({ ...payload, firma_id: firma.id }).select().single()
       error = res.error
+      savedId = res.data?.id || null
     }
     if (error) { alert('Kaydetme hatası: ' + error.message); console.error(error) }
+    // Cari tipinde ise cari hesaba otomatik hareket ekle
+    if (!error && !editing && form.odeme_tipi === 'cari' && form.cari_unvan && savedId) {
+      const { data: cariHesap } = await supabase.from('cari_hesaplar')
+        .select('id').eq('firma_id', firma.id).ilike('ad', form.cari_unvan).maybeSingle()
+      if (cariHesap?.id) {
+        await supabase.from('cari_hareketler').insert({
+          firma_id: firma.id, cari_hesap_id: cariHesap.id,
+          tarih: form.vade_tarihi, tur: 'borc',
+          tutar: Number(form.tutar),
+          aciklama: form.aciklama || null,
+          odeme_durumu: form.durum,
+          kaynak: 'odeme_plani', kaynak_id: savedId,
+        })
+      }
+    }
     setSaving(false)
     setModal(false)
     load()
