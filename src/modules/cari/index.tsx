@@ -78,11 +78,11 @@ export default function CariModule({ firma }: AppCtx) {
     return true
   }), [cariler, tipF, search])
 
-  const ozet = useMemo(() => ({
-    toplam:    cariler.length,
-    borc:      cariler.reduce((s, c) => s + (Number(c.bakiye) < 0 ? Math.abs(Number(c.bakiye)) : 0), 0),
-    alacak:    cariler.reduce((s, c) => s + (Number(c.bakiye) > 0 ? Number(c.bakiye) : 0), 0),
-  }), [cariler])
+  const ozet = useMemo(() => {
+    const alacak = filtered.reduce((s, c) => s + (Number(c.bakiye) > 0 ? Number(c.bakiye) : 0), 0)
+    const borc   = filtered.reduce((s, c) => s + (Number(c.bakiye) < 0 ? Math.abs(Number(c.bakiye)) : 0), 0)
+    return { toplam: filtered.length, alacak, borc, net: alacak - borc }
+  }, [filtered])
 
   const sf = (k: keyof typeof emptyCari) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }))
@@ -112,6 +112,18 @@ export default function CariModule({ firma }: AppCtx) {
 
   async function exportExcel(hedefCariler?: any[]) {
     const liste = hedefCariler || filtered
+    // Her cari icin hareketleri cek, gercek bakiyeyi hesapla
+    const cariHareketMap: Record<string, number> = {}
+    if (liste.length > 0) {
+      const ids = liste.map((c: any) => c.id)
+      const { data: tumH } = await supabase.from('cari_hareketler').select('cari_hesap_id,tur,tutar').in('cari_hesap_id', ids)
+      ;(tumH || []).forEach((h: any) => {
+        if (!cariHareketMap[h.cari_hesap_id]) cariHareketMap[h.cari_hesap_id] = 0
+        const t = Number(h.tutar || 0)
+        const isAlacak = ['alacak', 'tahsilat', 'cek_alindi'].includes(h.tur)
+        cariHareketMap[h.cari_hesap_id] += isAlacak ? t : -t
+      })
+    }
     const XLSX = await import('xlsx-js-style')
     const { utils, writeFile } = XLSX
     const KOYU='0F172A'; const BEYAZ='FFFFFF'; const SINIR='E2E8F0'; const MAVI='1E40AF'
@@ -127,7 +139,7 @@ export default function CariModule({ firma }: AppCtx) {
     merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
     ;['Cari Ad','Tip','VKN/TCKN','Telefon','IBAN','Alacak','Borc','Net Bakiye'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cv(h,sTh) }); row++
     liste.forEach((cari,idx) => {
-      const z = idx%2===1; const bak = Number(cari.bakiye||0)
+      const z = idx%2===1; const bak = cariHareketMap[cari.id] ?? Number(cari.bakiye||0)
       const alacak = bak > 0 ? bak : 0; const borc = bak < 0 ? Math.abs(bak) : 0
       ws[utils.encode_cell({r:row,c:0})] = cv(cari.ad, sTd(z))
       ws[utils.encode_cell({r:row,c:1})] = cv(CARI_TIPLER.find((t:any)=>t.v===cari.tip)?.l||cari.tip||'-', sTd(z))
@@ -227,7 +239,7 @@ export default function CariModule({ firma }: AppCtx) {
       </div>
 
       {/* Ozet Kartlar */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Toplam Cari</p>
           <p className="text-2xl font-bold text-gray-900">{ozet.toplam}</p>
@@ -240,6 +252,11 @@ export default function CariModule({ firma }: AppCtx) {
           <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><TrendingDown className="w-3 h-3 text-red-600" />Toplam Borc</p>
           <p className="text-2xl font-bold text-red-700">{fmt(ozet.borc)}</p>
         </div>
+        <div className={`rounded-xl border p-4 ${ozet.net >= 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-orange-50 border-orange-200'}`}>
+          <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><Wallet className="w-3 h-3" />Net Bakiye</p>
+          <p className={`text-2xl font-bold ${ozet.net >= 0 ? 'text-indigo-700' : 'text-orange-700'}`}>{fmt(Math.abs(ozet.net))}</p>
+          <p className="text-xs text-gray-400 mt-1">{ozet.net >= 0 ? 'Net Alacak' : 'Net Borc'}</p>
+        </div>
       </div>
 
       {/* Liste */}
@@ -251,16 +268,17 @@ export default function CariModule({ firma }: AppCtx) {
         ) : (
           <div className="divide-y divide-gray-100">
             {filtered.map(c => (
-              <CariSatiri
-                key={c.id}
-                cari={c}
-                firmaId={firma.id}
-                expanded={expanded === c.id}
-                onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
-                onEdit={() => openEdit(c)}
-                onDelete={() => setDelId(c.id)}
-                onRefresh={load}
-              />
+              <div key={c.id} onContextMenu={e => handleContextMenu(e, c)}>
+                <CariSatiri
+                  cari={c}
+                  firmaId={firma.id}
+                  expanded={expanded === c.id}
+                  onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
+                  onEdit={() => openEdit(c)}
+                  onDelete={() => setDelId(c.id)}
+                  onRefresh={load}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -305,6 +323,32 @@ export default function CariModule({ firma }: AppCtx) {
         <ConfirmDialog message="Bu cari hesabi silmek istediginize emin misiniz?"
           onConfirm={async () => { await supabase.from('cari_hesaplar').delete().eq('id', delId); setDelId(null); load() }}
           onCancel={() => setDelId(null)} />
+      )}
+
+      {/* Sag Tik Context Menu */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setContextMenu(null)} />
+          <div className="fixed z-50 bg-white rounded-xl shadow-2xl border border-gray-200 py-1 min-w-52"
+            style={{ left: contextMenu.x, top: contextMenu.y }}>
+            <div className="px-3 py-2 border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-900 truncate">{contextMenu.cari.ad}</p>
+              <p className="text-xs text-gray-400">{CARI_TIPLER.find(t => t.v === contextMenu.cari.tip)?.l}</p>
+            </div>
+            <button onClick={() => { exportCariDetay(contextMenu.cari); setContextMenu(null) }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4" /> Ekstre Excel Indir
+            </button>
+            <button onClick={() => { openEdit(contextMenu.cari); setContextMenu(null) }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+              <Edit className="w-4 h-4" /> Duzenle
+            </button>
+            <button onClick={() => { setDelId(contextMenu.cari.id); setContextMenu(null) }}
+              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Sil
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
