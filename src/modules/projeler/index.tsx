@@ -281,7 +281,7 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
       const { data: yeni, error: ie } = await supabase.from('proje_giderler').insert(payload).select().single()
       if (ie) { alert('Kayit hatasi: ' + ie.message); setSavingG(false); return }
       if (yeni?.id && giderForm.vade_tarihi) {
-        const { data: op } = await supabase.from('odeme_plani').insert({ firma_id: firma.id, odeme_tipi: 'cari', aciklama: `${giderForm.cari_unvan} - ${giderForm.gider_kalemi}`, tutar: net, odenen_tutar: 0, kalan_tutar: net, vade_tarihi: giderForm.vade_tarihi, durum: 'bekliyor', notlar: `Proje gideri - ${r.proje_adi}` }).select().single()
+        const { data: op } = await supabase.from('odeme_plani').insert({ firma_id: firma.id, odeme_tipi: 'cari', aciklama: `${giderForm.cari_unvan} - ${giderForm.gider_kalemi}`, tutar: net, odenen_tutar: 0, kalan_tutar: net, vade_tarihi: giderForm.vade_tarihi, durum: 'bekliyor', notlar: `Proje gideri - ${r.proje_adi}`, banka_hesabi: giderForm.cari_iban || null, cari_unvan: giderForm.cari_unvan || null }).select().single()
         if (op?.id) await supabase.from('proje_giderler').update({ odeme_plani_id: op.id }).eq('id', yeni.id)
       }
     }
@@ -486,6 +486,24 @@ function ProjeSatiri({ proje: r, firma, expanded, onToggle, onEdit, onDelete }: 
                     ))}
                   </div>
                   <Btn size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => { setGiderForm(emptyGider); setEditingGider(null); setGiderModal(true) }}>Yeni Gider Faturasi</Btn>
+                  <input
+                    ref={el => { giderFaturaRef.current['__yeni__'] = el }}
+                    type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                    onChange={async e => {
+                      const file = e.target.files?.[0]; if (!file) return
+                      // Once bos bir kayit olustur, sonra dosyayi yukle
+                      const { data: yeni, error } = await supabase.from('proje_giderler').insert({
+                        firma_id: firma.id, proje_id: r.id,
+                        cari_unvan: file.name.replace(/\.[^.]+$/, ''),
+                        gider_kalemi: 'Fatura', tutar: 0, kdv_orani: 0, kdv_tutari: 0,
+                        tevkifat_orani: 0, tevkifat_tutari: 0, net_tutar: 0, odeme_durumu: 'bekliyor',
+                      }).select().single()
+                      if (error) { alert('Kayit hatasi: ' + error.message); e.target.value = ''; return }
+                      await giderFaturaYukle(yeni.id, file)
+                      e.target.value = ''
+                    }}
+                  />
+                  <Btn size="sm" variant="secondary" icon={<Upload className="w-3.5 h-3.5" />} onClick={() => giderFaturaRef.current['__yeni__']?.click()}>Fatura Aktar</Btn>
                 </div>
               )}
 

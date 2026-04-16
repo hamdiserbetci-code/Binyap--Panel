@@ -633,7 +633,12 @@ export default function OdemePlaniModule({ firma }: AppCtx) {
     const x = r as any
     switch (r.odeme_tipi) {
       case 'cek':   return x.cek_no ? <span className="text-xs text-gray-500">Çek: {x.cek_no}{x.cek_kesideci ? ` · ${x.cek_kesideci}` : ''}</span> : null
-      case 'cari':  return x.cari_unvan ? <span className="text-xs text-gray-500">{x.cari_unvan}</span> : null
+      case 'cari':  return (x.cari_unvan || x.banka_hesabi) ? (
+        <div className="flex flex-col gap-0.5">
+          {x.cari_unvan && <span className="text-xs text-gray-500">{x.cari_unvan}</span>}
+          {x.banka_hesabi && <span className="text-xs font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded w-fit">{x.banka_hesabi}</span>}
+        </div>
+      ) : null
       case 'vergi': return x.vergi_turu ? <span className="text-xs text-gray-500">{x.vergi_turu.toUpperCase()}{x.vergi_donemi ? ` · ${x.vergi_donemi}` : ''}</span> : null
       case 'sgk':   return x.sgk_donemi ? <span className="text-xs text-gray-500">Dönem: {x.sgk_donemi}</span> : null
       case 'maas':  return x.maas_donemi ? <span className="text-xs text-gray-500">{x.maas_donemi}{x.personel_sayisi ? ` · ${x.personel_sayisi} kişi` : ''}</span> : null
