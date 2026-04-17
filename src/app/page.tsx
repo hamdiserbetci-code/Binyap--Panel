@@ -24,6 +24,7 @@ import Raporlar     from '@/modules/raporlar'
 import Ayarlar      from '@/modules/ayarlar'
 import CariModule   from '@/modules/cari'
 import ArsivModule  from '@/modules/arsiv'
+import TeminatModule from '@/modules/teminat'
 
 export interface AppCtx {
   firma: Firma
@@ -225,6 +226,7 @@ export default function App() {
       case 'icra':        return <Icra        {...ctx} />
       case 'is-takibi':   return <IsTakibi    {...ctx} />
       case 'police':      return <PoliceModule {...ctx} />
+      case 'teminat':     return <TeminatModule {...ctx} />
       case 'arsiv':       return <ArsivModule  {...ctx} />
       case 'raporlar':    return <Raporlar    {...ctx} />
       case 'ayarlar':     return <Ayarlar     {...ctx} />

@@ -69,6 +69,17 @@ export default function KarZararModule({ firma }: AppCtx) {
   const [saving, setSaving]   = useState(false)
   const [form, setForm]       = useState<Form>(emptyForm)
   const [acikAy, setAcikAy]   = useState<string|null>(null)
+  const [acikBolum, setAcikBolum] = useState<Record<string, Record<string,boolean>>>({})
+
+  function bolumToggle(ayId: string, bolum: string) {
+    setAcikBolum(prev => ({
+      ...prev,
+      [ayId]: { ...(prev[ayId] || { gelir: true, gider: true, sonuc: true }), [bolum]: !(prev[ayId]?.[bolum] ?? true) }
+    }))
+  }
+  function bolumAcik(ayId: string, bolum: string) {
+    return acikBolum[ayId]?.[bolum] ?? true
+  }
   const [yilF, setYilF]       = useState(new Date().getFullYear().toString())
 
   async function load() {
@@ -565,7 +576,11 @@ export default function KarZararModule({ firma }: AppCtx) {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Gelirler */}
                       <div>
-                        <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-3 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" />Gelirler</p>
+                        <button onClick={() => bolumToggle(r.id, 'gelir')} className="w-full flex items-center justify-between text-xs font-bold text-green-700 uppercase tracking-wide mb-3 hover:text-green-800 transition-colors">
+                          <span className="flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" />Gelirler</span>
+                          {bolumAcik(r.id,'gelir') ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                        {bolumAcik(r.id,'gelir') && (
                         <div className="space-y-2">
                           <SatirItem label="Hakedisler" deger={h.hakedisler} renk="green" />
                           <SatirItem label="Diger Satislar" deger={h.digerSatislar} renk="green" />
@@ -573,11 +588,16 @@ export default function KarZararModule({ firma }: AppCtx) {
                             <SatirItem label="TOPLAM GELİR" deger={h.toplamGelir} renk="green" bold />
                           </div>
                         </div>
+                        )}
                       </div>
 
                       {/* Giderler */}
                       <div>
-                        <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-3 flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5" />Giderler</p>
+                        <button onClick={() => bolumToggle(r.id, 'gider')} className="w-full flex items-center justify-between text-xs font-bold text-red-600 uppercase tracking-wide mb-3 hover:text-red-700 transition-colors">
+                          <span className="flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5" />Giderler</span>
+                          {bolumAcik(r.id,'gider') ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                        {bolumAcik(r.id,'gider') && (
                         <div className="space-y-2">
                           <SatirItem label="Donem Basi Stok" deger={h.donemBasiStok} renk="red" />
                           <SatirItem label="Malzeme Alislari" deger={h.malzemeAlis} renk="red" />
@@ -596,11 +616,16 @@ export default function KarZararModule({ firma }: AppCtx) {
                             <SatirItem label="TOPLAM GİDER" deger={h.toplamGider} renk="red" bold />
                           </div>
                         </div>
+                        )}
                       </div>
 
                       {/* Sonuc */}
                       <div>
-                        <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5" />Sonuc</p>
+                        <button onClick={() => bolumToggle(r.id, 'sonuc')} className="w-full flex items-center justify-between text-xs font-bold text-gray-600 uppercase tracking-wide mb-3 hover:text-gray-800 transition-colors">
+                          <span className="flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5" />Sonuc</span>
+                          {bolumAcik(r.id,'sonuc') ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                        {bolumAcik(r.id,'sonuc') && (
                         <div className="space-y-3">
                           <div className={`rounded-xl p-4 ${h.brutKarZarar >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                             <p className="text-xs text-gray-500 mb-1">Donem Kar / Zarar</p>
@@ -620,6 +645,7 @@ export default function KarZararModule({ firma }: AppCtx) {
                           </div>
                           {r.notlar && <p className="text-xs text-gray-500 bg-white rounded-lg p-3 border border-gray-200">{r.notlar}</p>}
                         </div>
+                        )}
                       </div>
                     </div>
                   </div>

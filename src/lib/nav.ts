@@ -11,6 +11,7 @@ export const NAV: NavItem[] = [
   { id: 'kasa',        label: 'Kasa & Banka',     icon: Wallet,          group: 'Finans' },
   { id: 'odeme-plani', label: 'Ödeme Planı',      icon: Clock,           group: 'Finans' },
   { id: 'kar-zarar',   label: 'Kar / Zarar',      icon: TrendingUp,      group: 'Finans' },
+  { id: 'teminat',     label: 'Teminat Takibi',   icon: ShieldCheck,     group: 'Finans' },
   { id: 'projeler',    label: 'Projeler',          icon: FolderOpen,      group: 'Proje' },
   { id: 'ekipler',     label: 'Ekipler',           icon: Users,           group: 'Proje' },
   { id: 'personel',    label: 'Personel',          icon: Users,           group: 'İK & Bordro' },
