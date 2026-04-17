@@ -206,6 +206,7 @@ export type ModuleId =
   | 'sgk'
   | 'is-takibi'
   | 'police'
+  | 'arsiv'
   | 'raporlar'
   | 'ayarlar'
 

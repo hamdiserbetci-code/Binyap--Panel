@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Wallet, Clock, TrendingUp,
-  FolderOpen, Users, FileText, Scale, Settings, Briefcase, CheckSquare, ShieldCheck, BarChart2, BookUser,
+  FolderOpen, Users, FileText, Scale, Settings, Briefcase, CheckSquare, ShieldCheck, BarChart2, BookUser, Archive,
 } from 'lucide-react'
 import type { NavItem } from '@/types'
 
@@ -20,5 +20,6 @@ export const NAV: NavItem[] = [
   { id: 'is-takibi',   label: 'İş Takibi',         icon: Briefcase,       group: 'Vergi & Beyanname' },
   { id: 'police',      label: 'Poliçe Takibi',     icon: ShieldCheck,     group: 'Sigorta' },
   { id: 'raporlar',    label: 'Raporlar',           icon: BarChart2,       group: 'Sistem' },
+  { id: 'arsiv',       label: 'Arşiv',              icon: Archive,         group: 'Sistem' },
   { id: 'ayarlar',     label: 'Ayarlar',           icon: Settings,        group: 'Sistem' },
 ]
