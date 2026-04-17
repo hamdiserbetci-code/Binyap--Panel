@@ -96,15 +96,16 @@ export default function ArsivModule({ firma }: AppCtx) {
     const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_')
     const ext = uploadFile.name.split('.').pop()?.toLowerCase() || 'bin'
     const path = `${firma.id}/arsiv/${Date.now()}_${safeName}`
-    const { error } = await supabase.storage.from('arsiv-belgeler').upload(path, uploadFile)
-    if (error) { alert('Yukleme hatasi: ' + error.message); setUploading(false); return }
-    await supabase.from('arsiv_belgeler').insert({
+    const { error: storageErr } = await supabase.storage.from('arsiv-belgeler').upload(path, uploadFile)
+    if (storageErr) { alert('Storage hatasi: ' + storageErr.message); setUploading(false); return }
+    const { error: dbErr } = await supabase.from('arsiv_belgeler').insert({
       firma_id: firma.id, baslik: uploadForm.baslik, aciklama: uploadForm.aciklama || null,
       kategori_id: uploadForm.kategori_id || null, belge_tarihi: uploadForm.belge_tarihi || null,
       gonderen: uploadForm.gonderen || null, alici: uploadForm.alici || null,
       onemli: uploadForm.onemli, dosya_adi: uploadFile.name,
       storage_path: path, dosya_tipi: ext, dosya_boyutu: uploadFile.size,
     })
+    if (dbErr) { alert('Veritabani hatasi: ' + dbErr.message); setUploading(false); return }
     setUploading(false); setUploadModal(false); setUploadFile(null)
     setUploadForm({ baslik:'', aciklama:'', kategori_id:'', belge_tarihi:'', gonderen:'', alici:'', onemli: false })
     load()
