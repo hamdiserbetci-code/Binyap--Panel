@@ -1,17 +1,17 @@
 'use client'
 import React, { useEffect, useState, useMemo, useRef } from 'react'
-import { Shield, Plus, Edit, Trash2, Search, Download, Eye, X, Upload, AlertTriangle, CheckCircle, Clock, Filter } from 'lucide-react'
+import { Shield, Plus, Edit, Trash2, Search, Download, Eye, X, Upload, AlertTriangle, Clock, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Card, Modal, Btn, Field, inputCls, ConfirmDialog, Badge, EmptyState, fmt, fmtDate } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 
 const TURLER = [
-  { v: 'nakit',                l: 'Nakit Teminat',           emoji: '', renk: 'bg-green-50 text-green-700 border-green-200'   },
-  { v: 'banka_teminat_mektubu',l: 'Banka Teminat Mektubu',   emoji: '', renk: 'bg-blue-50 text-blue-700 border-blue-200'     },
-  { v: 'cek',                  l: 'Cek',                     emoji: '', renk: 'bg-purple-50 text-purple-700 border-purple-200'},
-  { v: 'senet',                l: 'Senet',                   emoji: '', renk: 'bg-amber-50 text-amber-700 border-amber-200'   },
-  { v: 'gayrimenkul',          l: 'Gayrimenkul Ipotegi',     emoji: '', renk: 'bg-orange-50 text-orange-700 border-orange-200'},
-  { v: 'diger',                l: 'Diger',                   emoji: '', renk: 'bg-gray-50 text-gray-700 border-gray-200'      },
+  { v: 'nakit',                l: 'Nakit Teminat',           emoji: '💵', renk: 'bg-green-50 text-green-700 border-green-200'   },
+  { v: 'banka_teminat_mektubu',l: 'Banka Teminat Mektubu',   emoji: '🏦', renk: 'bg-blue-50 text-blue-700 border-blue-200'     },
+  { v: 'cek',                  l: 'Cek',                     emoji: '📄', renk: 'bg-purple-50 text-purple-700 border-purple-200'},
+  { v: 'senet',                l: 'Senet',                   emoji: '📃', renk: 'bg-amber-50 text-amber-700 border-amber-200'   },
+  { v: 'gayrimenkul',          l: 'Gayrimenkul Ipotegi',     emoji: '🏠', renk: 'bg-orange-50 text-orange-700 border-orange-200'},
+  { v: 'diger',                l: 'Diger',                   emoji: '📎', renk: 'bg-gray-50 text-gray-700 border-gray-200'      },
 ]
 
 const DURUMLAR: Record<string, { l: string; v: 'green'|'yellow'|'red'|'blue'|'gray' }> = {
@@ -22,6 +22,14 @@ const DURUMLAR: Record<string, { l: string; v: 'green'|'yellow'|'red'|'blue'|'gr
   iptal:           { l: 'Iptal',           v: 'gray'   },
 }
 
+const HAREKET_TURLERI = [
+  { v: 'kesinti',     l: 'Hakedisten Kesinti',  renk: 'text-red-600'   },
+  { v: 'cozum',       l: 'Kismi Cozum / Iade',  renk: 'text-green-600' },
+  { v: 'tam_iade',    l: 'Tam Iade',            renk: 'text-blue-600'  },
+  { v: 'nakde_cevir', l: 'Nakde Cevrildi',      renk: 'text-orange-600'},
+  { v: 'diger',       l: 'Diger',               renk: 'text-gray-600'  },
+]
+
 const emptyForm = {
   teminat_turu: 'nakit', baslik: '', aciklama: '',
   veren_firma: '', alan_firma: '', proje_id: '',
@@ -30,6 +38,11 @@ const emptyForm = {
   gecerlilik_tarihi: '', iade_tarihi: '',
   banka_adi: '', belge_no: '', sube: '',
   durum: 'aktif', notlar: '',
+}
+
+const emptyHareket = {
+  hareket_turu: 'kesinti', tutar: '', tarih: new Date().toISOString().split('T')[0],
+  aciklama: '', belge_no: '', proje_id: '',
 }
 
 export default function TeminatModule({ firma }: AppCtx) {
@@ -48,6 +61,12 @@ export default function TeminatModule({ firma }: AppCtx) {
   const [uploading, setUploading] = useState(false)
   const [uploadFile, setUploadFile] = useState<File|null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Hareket state
+  const [hareketModal, setHareketModal] = useState<any|null>(null) // teminat objesi
+  const [hareketler, setHareketler]     = useState<Record<string,any[]>>({})
+  const [hForm, setHForm]               = useState(emptyHareket)
+  const [savingH, setSavingH]           = useState(false)
+  const [acikTeminat, setAcikTeminat]   = useState<string|null>(null)
 
   async function load() {
     setLoading(true)
@@ -57,6 +76,18 @@ export default function TeminatModule({ firma }: AppCtx) {
     ])
     setData(t.data || [])
     setProjeler(p.data || [])
+    // Hareketleri de yükle
+    if (t.data && t.data.length > 0) {
+      const ids = t.data.map((x: any) => x.id)
+      const { data: hData } = await supabase.from('teminat_hareketler')
+        .select('*').in('teminat_id', ids).order('tarih', { ascending: false })
+      const map: Record<string,any[]> = {}
+      ;(hData || []).forEach((h: any) => {
+        if (!map[h.teminat_id]) map[h.teminat_id] = []
+        map[h.teminat_id].push(h)
+      })
+      setHareketler(map)
+    }
     setLoading(false)
   }
   useEffect(() => { load() }, [firma.id])
@@ -136,6 +167,109 @@ export default function TeminatModule({ firma }: AppCtx) {
     load()
   }
 
+  async function hareketKaydet() {
+    if (!hForm.tutar || !hareketModal) return alert('Tutar zorunludur')
+    setSavingH(true)
+    const tutar = Number(hForm.tutar)
+    await supabase.from('teminat_hareketler').insert({
+      firma_id: firma.id, teminat_id: hareketModal.id,
+      proje_id: hForm.proje_id || null,
+      hareket_turu: hForm.hareket_turu, tutar,
+      tarih: hForm.tarih, aciklama: hForm.aciklama || null,
+      belge_no: hForm.belge_no || null,
+    })
+    // Kalan tutarı güncelle
+    const mevcutKalan = Number(hareketModal.kalan_tutar || hareketModal.tutar || 0)
+    const isAzaltan = ['kesinti', 'nakde_cevir'].includes(hForm.hareket_turu)
+    const isArtan   = ['cozum', 'tam_iade'].includes(hForm.hareket_turu)
+    let yeniKalan = mevcutKalan
+    if (isAzaltan) yeniKalan = Math.max(0, mevcutKalan - tutar)
+    if (isArtan)   yeniKalan = Math.min(Number(hareketModal.tutar), mevcutKalan + tutar)
+    // Durum güncelle
+    let yeniDurum = hareketModal.durum
+    if (hForm.hareket_turu === 'tam_iade') yeniDurum = 'iade_edildi'
+    if (hForm.hareket_turu === 'nakde_cevir') yeniDurum = 'nakde_cevirildi'
+    if (yeniKalan === 0 && isAzaltan) yeniDurum = 'iade_edildi'
+    await supabase.from('teminatlar').update({ kalan_tutar: yeniKalan, durum: yeniDurum }).eq('id', hareketModal.id)
+    setSavingH(false); setHareketModal(null); setHForm(emptyHareket); load()
+  }
+
+  async function exportExcel() {
+    const XLSX = await import('xlsx-js-style')
+    const { utils, writeFile } = XLSX
+    const KOYU='0F172A'; const BEYAZ='FFFFFF'; const SINIR='CBD5E1'; const MAVI='1E3A5F'
+    const brd = { top:{style:'thin',color:{rgb:SINIR}}, bottom:{style:'thin',color:{rgb:SINIR}}, left:{style:'thin',color:{rgb:SINIR}}, right:{style:'thin',color:{rgb:SINIR}} }
+    const cv = (v:any,s:any) => ({ v:v??'', s, t:typeof v==='number'?'n':'s' })
+    const para = (v:number,s:any) => ({ v, s:{...s,numFmt:'#,##0.00 ₺'}, t:'n' })
+    const sTh = { font:{name:'Calibri',sz:9,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:MAVI}}, alignment:{horizontal:'center',vertical:'center'}, border:brd }
+    const sTd = (z:boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:KOYU}}, fill:{fgColor:{rgb:z?'F8FAFC':BEYAZ}}, alignment:{vertical:'center'}, border:brd })
+    const sPara = (z:boolean,renk?:string) => ({ ...sTd(z), alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺', font:{name:'Calibri',sz:9,color:{rgb:renk||KOYU}} })
+
+    const ws:any = {}; const merges:any[] = []; const COLS=11; let row=0
+
+    // Baslik
+    ws[utils.encode_cell({r:row,c:0})] = cv(`${firma.ad.toUpperCase()} — TEMİNAT TAKİP RAPORU`, {font:{name:'Calibri',sz:13,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'left',vertical:'center'}})
+    for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',{fill:{fgColor:{rgb:KOYU}}})
+    ws[utils.encode_cell({r:row,c:COLS-1})] = cv(new Date().toLocaleDateString('tr-TR'),{font:{name:'Calibri',sz:9,color:{rgb:'BFDBFE'}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'right',vertical:'center'}})
+    merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+
+    ;['Baslik','Tur','Veren Firma','Proje','Belge No','Banka','Verilis','Gecerlilik','Tutar','Kalan','Durum'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cv(h,sTh) }); row++
+
+    filtered.forEach((t,idx) => {
+      const z = idx%2===1
+      const tur = TURLER.find(x=>x.v===t.teminat_turu)?.l||t.teminat_turu
+      const proje = projeler.find(p=>p.id===t.proje_id)?.proje_adi||'-'
+      const dur = DURUMLAR[t.durum]?.l||t.durum
+      const kalan = Number(t.kalan_tutar||t.tutar||0)
+      const tutar = Number(t.tutar||0)
+      ws[utils.encode_cell({r:row,c:0})] = cv(t.baslik, sTd(z))
+      ws[utils.encode_cell({r:row,c:1})] = cv(tur, sTd(z))
+      ws[utils.encode_cell({r:row,c:2})] = cv(t.veren_firma, sTd(z))
+      ws[utils.encode_cell({r:row,c:3})] = cv(proje, sTd(z))
+      ws[utils.encode_cell({r:row,c:4})] = cv(t.belge_no||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:5})] = cv(t.banka_adi||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:6})] = cv(t.verilis_tarihi ? new Date(t.verilis_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+      ws[utils.encode_cell({r:row,c:7})] = cv(t.gecerlilik_tarihi ? new Date(t.gecerlilik_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+      ws[utils.encode_cell({r:row,c:8})] = para(tutar, sPara(z))
+      ws[utils.encode_cell({r:row,c:9})] = para(kalan, sPara(z, kalan<tutar?'991B1B':'166534'))
+      ws[utils.encode_cell({r:row,c:10})] = cv(dur, {...sTd(z), font:{name:'Calibri',sz:9,bold:true,color:{rgb:t.durum==='aktif'?'166534':t.durum==='iade_edildi'?'1D4ED8':'991B1B'}}})
+      row++
+
+      // Hareketler
+      const tHareketler = hareketler[t.id] || []
+      tHareketler.forEach((h:any) => {
+        const hTur = HAREKET_TURLERI.find(x=>x.v===h.hareket_turu)?.l||h.hareket_turu
+        const hPrj = projeler.find(p=>p.id===h.proje_id)?.proje_adi||''
+        const hS = { font:{name:'Calibri',sz:8,color:{rgb:'64748B'}}, fill:{fgColor:{rgb:'F1F5F9'}}, alignment:{vertical:'center'}, border:brd }
+        ws[utils.encode_cell({r:row,c:0})] = cv(`  ↳ ${hTur}`, hS)
+        ws[utils.encode_cell({r:row,c:1})] = cv(h.tarih ? new Date(h.tarih).toLocaleDateString('tr-TR') : '', hS)
+        ws[utils.encode_cell({r:row,c:2})] = cv(h.aciklama||'', hS)
+        ws[utils.encode_cell({r:row,c:3})] = cv(hPrj, hS)
+        ws[utils.encode_cell({r:row,c:4})] = cv(h.belge_no||'', hS)
+        for(let i=5;i<9;i++) ws[utils.encode_cell({r:row,c:i})] = cv('', hS)
+        ws[utils.encode_cell({r:row,c:9})] = para(Number(h.tutar||0), {...hS, alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺', font:{name:'Calibri',sz:8,color:{rgb:['kesinti','nakde_cevir'].includes(h.hareket_turu)?'991B1B':'166534'}}})
+        ws[utils.encode_cell({r:row,c:10})] = cv('', hS)
+        row++
+      })
+    })
+
+    // Toplam
+    const topS = {font:{name:'Calibri',sz:10,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:'1E293B'}},alignment:{horizontal:'right',vertical:'center'},numFmt:'#,##0.00 ₺',border:{top:{style:'medium',color:{rgb:KOYU}},bottom:{style:'medium',color:{rgb:KOYU}},left:{style:'thin',color:{rgb:KOYU}},right:{style:'thin',color:{rgb:KOYU}}}}
+    const topL = {...topS, alignment:{horizontal:'left',vertical:'center'}}
+    ws[utils.encode_cell({r:row,c:0})] = cv(`TOPLAM: ${filtered.length} teminat`, topL)
+    for(let i=1;i<8;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',topL)
+    ws[utils.encode_cell({r:row,c:8})] = para(filtered.reduce((s,t)=>s+Number(t.tutar||0),0), topS)
+    ws[utils.encode_cell({r:row,c:9})] = para(filtered.reduce((s,t)=>s+Number(t.kalan_tutar||t.tutar||0),0), topS)
+    ws[utils.encode_cell({r:row,c:10})] = cv('',topL)
+    merges.push({s:{r:row,c:0},e:{r:row,c:7}}); row++
+
+    ws['!cols'] = [{wch:28},{wch:18},{wch:22},{wch:18},{wch:14},{wch:16},{wch:12},{wch:12},{wch:16},{wch:16},{wch:14}]
+    ws['!merges'] = merges
+    ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}})
+    const wb = utils.book_new(); utils.book_append_sheet(wb, ws, 'Teminatlar')
+    writeFile(wb, `teminatlar-${firma.ad}-${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
   async function belgeOnizle(t: any) {
     const { data } = await supabase.storage.from('teminat-belgeler').createSignedUrl(t.storage_path, 60)
     if (data?.signedUrl) setPreview({ url: data.signedUrl, adi: t.dosya_adi })
@@ -178,6 +312,7 @@ export default function TeminatModule({ firma }: AppCtx) {
             <option value="hepsi">Tum Durumlar</option>
             {Object.entries(DURUMLAR).map(([k,v]) => <option key={k} value={k}>{v.l}</option>)}
           </select>
+          <Btn variant="secondary" size="sm" icon={<FileSpreadsheet className="w-4 h-4" />} onClick={exportExcel}>Excel</Btn>
           <Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni Teminat</Btn>
         </div>
       </div>
@@ -244,6 +379,12 @@ export default function TeminatModule({ firma }: AppCtx) {
                     <span className="text-gray-400">Tutar</span>
                     <span className="font-bold text-gray-900">{fmt(Number(t.tutar))} {t.para_birimi !== 'TRY' ? t.para_birimi : ''}</span>
                   </div>
+                  {Number(t.kalan_tutar) !== Number(t.tutar) && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Kalan</span>
+                      <span className="font-bold text-red-600">{fmt(Number(t.kalan_tutar||0))}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-400">Verilis</span>
                     <span>{fmtDate(t.verilis_tarihi)}</span>
@@ -284,6 +425,45 @@ export default function TeminatModule({ firma }: AppCtx) {
                     <button onClick={() => setDelId(t.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
+
+                {/* Hareket listesi */}
+                {(hareketler[t.id]||[]).length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <button onClick={() => setAcikTeminat(acikTeminat===t.id?null:t.id)}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 mb-1">
+                      {acikTeminat===t.id ? <ChevronDown className="w-3 h-3"/> : <ChevronRight className="w-3 h-3"/>}
+                      {(hareketler[t.id]||[]).length} hareket
+                    </button>
+                    {acikTeminat===t.id && (
+                      <div className="space-y-1">
+                        {(hareketler[t.id]||[]).map((h:any) => {
+                          const hTur = HAREKET_TURLERI.find(x=>x.v===h.hareket_turu)
+                          const isAzaltan = ['kesinti','nakde_cevir'].includes(h.hareket_turu)
+                          return (
+                            <div key={h.id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
+                              <div>
+                                <span className={`font-medium ${hTur?.renk||'text-gray-600'}`}>{hTur?.l||h.hareket_turu}</span>
+                                {h.aciklama && <span className="text-gray-400 ml-1">— {h.aciklama}</span>}
+                                <span className="text-gray-400 ml-1">{fmtDate(h.tarih)}</span>
+                              </div>
+                              <span className={`font-bold ${isAzaltan?'text-red-600':'text-green-600'}`}>
+                                {isAzaltan?'-':'+'}{fmt(Number(h.tutar))}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Hareket Ekle Butonu */}
+                {t.durum === 'aktif' && (
+                  <button onClick={() => { setHareketModal(t); setHForm({...emptyHareket, proje_id: t.proje_id||''}) }}
+                    className="mt-2 w-full text-xs py-1.5 rounded-lg border border-dashed border-cyan-300 text-cyan-600 hover:bg-cyan-50 transition-colors flex items-center justify-center gap-1">
+                    <Plus className="w-3 h-3" /> Hareket Ekle
+                  </button>
+                )}
               </div>
             )
           })}
@@ -385,6 +565,44 @@ export default function TeminatModule({ firma }: AppCtx) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Hareket Modal */}
+      {hareketModal && (
+        <Modal title={`Hareket Ekle — ${hareketModal.baslik}`} onClose={() => setHareketModal(null)} size="md"
+          footer={<><Btn variant="secondary" onClick={() => setHareketModal(null)}>Iptal</Btn><Btn onClick={hareketKaydet} disabled={savingH}>{savingH?'Kaydediliyor...':'Kaydet'}</Btn></>}>
+          <div className="space-y-4">
+            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-3 text-xs text-cyan-700 flex justify-between">
+              <span>Toplam Tutar: <strong>{fmt(Number(hareketModal.tutar))}</strong></span>
+              <span>Kalan: <strong>{fmt(Number(hareketModal.kalan_tutar||hareketModal.tutar))}</strong></span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Hareket Turu" required>
+                <select value={hForm.hareket_turu} onChange={e => setHForm(p=>({...p,hareket_turu:e.target.value}))} className={inputCls}>
+                  {HAREKET_TURLERI.map(h => <option key={h.v} value={h.v}>{h.l}</option>)}
+                </select>
+              </Field>
+              <Field label="Tarih" required>
+                <input type="date" value={hForm.tarih} onChange={e => setHForm(p=>({...p,tarih:e.target.value}))} className={inputCls} />
+              </Field>
+              <Field label="Tutar (TL)" required>
+                <input type="number" step="0.01" value={hForm.tutar} onChange={e => setHForm(p=>({...p,tutar:e.target.value}))} className={inputCls} />
+              </Field>
+              <Field label="Belge No">
+                <input type="text" value={hForm.belge_no} onChange={e => setHForm(p=>({...p,belge_no:e.target.value}))} className={inputCls} />
+              </Field>
+              <Field label="Ilgili Proje" className="col-span-2">
+                <select value={hForm.proje_id} onChange={e => setHForm(p=>({...p,proje_id:e.target.value}))} className={inputCls}>
+                  <option value="">-- Proje sec --</option>
+                  {projeler.map(p => <option key={p.id} value={p.id}>{p.proje_adi}</option>)}
+                </select>
+              </Field>
+              <Field label="Aciklama" className="col-span-2">
+                <textarea rows={2} value={hForm.aciklama} onChange={e => setHForm(p=>({...p,aciklama:e.target.value}))} className={inputCls} placeholder="Hakedis no, kesinti sebebi..." />
+              </Field>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {delId && (
