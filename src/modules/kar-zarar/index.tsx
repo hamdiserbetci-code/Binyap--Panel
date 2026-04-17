@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState, useMemo } from 'react'
-import { TrendingUp, TrendingDown, Plus, Edit, Trash2, ChevronDown, ChevronRight, BarChart2, ArrowRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, Edit, Trash2, ChevronDown, ChevronRight, BarChart2, ArrowRight, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Card, Modal, Btn, Field, inputCls, ConfirmDialog, fmt } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
@@ -101,8 +101,264 @@ export default function KarZararModule({ firma }: AppCtx) {
     }, { gelir: 0, gider: 0, net: 0 })
   }, [filtreliData])
 
+  async function exportExcel() {
+    const XLSX = await import('xlsx-js-style')
+    const { utils, writeFile } = XLSX
+
+    // ─── Stil Paleti ─────────────────────────────────────────
+    const KOYU    = '0F172A'
+    const BEYAZ   = 'FFFFFF'
+    const YESIL   = '166534'
+    const YESIL_BG= 'DCFCE7'
+    const KIRMIZI = '991B1B'
+    const KIRMIZI_BG = 'FEE2E2'
+    const MAVI    = '1E3A5F'
+    const MAVI_AC = 'DBEAFE'
+    const GRI     = 'F8FAFC'
+    const SINIR   = 'CBD5E1'
+    const ALTIN   = 'B45309'
+    const ALTIN_BG= 'FEF3C7'
+
+    const brd = (c = SINIR) => ({ top:{style:'thin',color:{rgb:c}}, bottom:{style:'thin',color:{rgb:c}}, left:{style:'thin',color:{rgb:c}}, right:{style:'thin',color:{rgb:c}} })
+    const brdMed = { top:{style:'medium',color:{rgb:KOYU}}, bottom:{style:'medium',color:{rgb:KOYU}}, left:{style:'medium',color:{rgb:KOYU}}, right:{style:'medium',color:{rgb:KOYU}} }
+
+    const cv = (v: any, s: any) => ({ v: v ?? '', s, t: typeof v === 'number' ? 'n' : 's' })
+    const para = (v: number, s: any) => ({ v, s: { ...s, numFmt: '#,##0.00 ₺' }, t: 'n' })
+
+    // Temel stiller
+    const sBaslik = { font:{name:'Calibri',sz:16,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:KOYU}}, alignment:{horizontal:'left',vertical:'center'} }
+    const sAltBaslik = { font:{name:'Calibri',sz:10,color:{rgb:'94A3B8'}}, fill:{fgColor:{rgb:KOYU}}, alignment:{horizontal:'left',vertical:'center'} }
+    const sTarih = { font:{name:'Calibri',sz:9,color:{rgb:'BFDBFE'}}, fill:{fgColor:{rgb:KOYU}}, alignment:{horizontal:'right',vertical:'center'} }
+    const sBolumBaslik = (bg: string, fg: string) => ({ font:{name:'Calibri',sz:10,bold:true,color:{rgb:fg}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:'left',vertical:'center'}, border: brd(bg) })
+    const sSatirBaslik = { font:{name:'Calibri',sz:9,color:{rgb:'475569'}}, fill:{fgColor:{rgb:GRI}}, alignment:{horizontal:'left',vertical:'center'}, border: brd() }
+    const sSatirDeger = (z: boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:KOYU}}, fill:{fgColor:{rgb:z?GRI:BEYAZ}}, alignment:{horizontal:'right',vertical:'center'}, border: brd(), numFmt:'#,##0.00 ₺' })
+    const sToplam = (bg: string, fg: string) => ({ font:{name:'Calibri',sz:10,bold:true,color:{rgb:fg}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:'right',vertical:'center'}, border: brdMed, numFmt:'#,##0.00 ₺' })
+    const sToplamL = (bg: string, fg: string) => ({ font:{name:'Calibri',sz:10,bold:true,color:{rgb:fg}}, fill:{fgColor:{rgb:bg}}, alignment:{horizontal:'left',vertical:'center'}, border: brdMed })
+    const sNetKar = { font:{name:'Calibri',sz:12,bold:true,color:{rgb:YESIL}}, fill:{fgColor:{rgb:YESIL_BG}}, alignment:{horizontal:'right',vertical:'center'}, border: brdMed, numFmt:'#,##0.00 ₺' }
+    const sNetZarar = { font:{name:'Calibri',sz:12,bold:true,color:{rgb:KIRMIZI}}, fill:{fgColor:{rgb:KIRMIZI_BG}}, alignment:{horizontal:'right',vertical:'center'}, border: brdMed, numFmt:'#,##0.00 ₺' }
+    const sNetL = (kar: boolean) => ({ font:{name:'Calibri',sz:12,bold:true,color:{rgb:kar?YESIL:KIRMIZI}}, fill:{fgColor:{rgb:kar?YESIL_BG:KIRMIZI_BG}}, alignment:{horizontal:'left',vertical:'center'}, border: brdMed })
+    const sAyBaslik = { font:{name:'Calibri',sz:11,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:MAVI}}, alignment:{horizontal:'left',vertical:'center'}, border: brd(MAVI) }
+    const sThAy = { font:{name:'Calibri',sz:9,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:'334155'}}, alignment:{horizontal:'center',vertical:'center'}, border: brd('334155') }
+
+    // ─── SAYFA 1: YILLIK OZET ────────────────────────────────
+    const ws1: any = {}
+    const m1: any[] = []
+    const COLS1 = 4
+    let r1 = 0
+
+    // Firma + Rapor Basligi
+    ws1[utils.encode_cell({r:r1,c:0})] = cv(`${firma.ad.toUpperCase()}`, sBaslik)
+    ws1[utils.encode_cell({r:r1,c:1})] = cv('', sBaslik)
+    ws1[utils.encode_cell({r:r1,c:2})] = cv('', sBaslik)
+    ws1[utils.encode_cell({r:r1,c:3})] = cv(new Date().toLocaleDateString('tr-TR'), sTarih)
+    m1.push({s:{r:r1,c:0},e:{r:r1,c:2}}); r1++
+
+    ws1[utils.encode_cell({r:r1,c:0})] = cv(`KAR / ZARAR RAPORU — ${yilF} YILI`, sAltBaslik)
+    for(let i=1;i<COLS1;i++) ws1[utils.encode_cell({r:r1,c:i})] = cv('', sAltBaslik)
+    m1.push({s:{r:r1,c:0},e:{r:r1,c:COLS1-1}}); r1+=2
+
+    // Sutun Basliklari
+    ;['', 'Tutar (₺)', 'Oran (%)', 'Not'].forEach((h,i) => {
+      ws1[utils.encode_cell({r:r1,c:i})] = cv(h, sThAy)
+    }); r1++
+
+    // Yillik hesapla
+    const yilH = filtreliData.reduce((acc, row) => {
+      const h = hesapla({
+        hakedisler: String(row.hakedisler||0), diger_satislar: String(row.diger_satislar||row.diger_gelirler||0),
+        donem_basi_stok: String(row.donem_basi_stok||0), malzeme_alis: String(row.malzeme_alis||row.malzeme_giderleri||0),
+        iscilik: String(row.iscilik||row.iscilik_giderleri||0), finans_gideri: String(row.finans_gideri||row.finans_giderleri||0),
+        sigorta_gideri: String(row.sigorta_gideri||0), amortisman: String(row.amortisman||0),
+        diger_giderler: String(row.diger_giderler||0), onceki_donem_devir: String(row.onceki_donem_devir||0),
+        yil:'', ay:'', notlar:'',
+      })
+      acc.hakedisler    += h.hakedisler
+      acc.digerSatislar += h.digerSatislar
+      acc.toplamGelir   += h.toplamGelir
+      acc.donemBasiStok += h.donemBasiStok
+      acc.malzemeAlis   += h.malzemeAlis
+      acc.iscilik       += h.iscilik
+      acc.toplamUretim  += h.toplamUretimGider
+      acc.finans        += h.finansGideri
+      acc.sigorta       += h.sigortaGideri
+      acc.amortisman    += h.amortisman
+      acc.diger         += h.digerGiderler
+      acc.toplamGenel   += h.toplamGenelGider
+      acc.toplamGider   += h.toplamGider
+      acc.brutKar       += h.brutKarZarar
+      acc.netKar        += h.netKarZarar
+      return acc
+    }, { hakedisler:0, digerSatislar:0, toplamGelir:0, donemBasiStok:0, malzemeAlis:0, iscilik:0, toplamUretim:0, finans:0, sigorta:0, amortisman:0, diger:0, toplamGenel:0, toplamGider:0, brutKar:0, netKar:0 })
+
+    const oran = (v: number) => yilH.toplamGelir > 0 ? Math.round(v / yilH.toplamGelir * 1000) / 10 : 0
+
+    const satirEkle = (label: string, deger: number, z: boolean, bold = false, bg?: string, fg?: string) => {
+      const sL = bold && bg ? sToplamL(bg, fg||KOYU) : { ...sSatirBaslik, fill:{fgColor:{rgb:z?GRI:BEYAZ}} }
+      const sD = bold && bg ? sToplam(bg, fg||KOYU) : sSatirDeger(z)
+      ws1[utils.encode_cell({r:r1,c:0})] = cv(label, sL)
+      ws1[utils.encode_cell({r:r1,c:1})] = para(deger, sD)
+      ws1[utils.encode_cell({r:r1,c:2})] = cv(deger !== 0 ? `%${oran(deger).toFixed(1)}` : '', { ...sD, numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
+      ws1[utils.encode_cell({r:r1,c:3})] = cv('', sD)
+      r1++
+    }
+
+    // GELİRLER
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('A. GELİRLER', sBolumBaslik('D1FAE5', YESIL))
+    for(let i=1;i<COLS1;i++) ws1[utils.encode_cell({r:r1,c:i})] = cv('', sBolumBaslik('D1FAE5', YESIL))
+    m1.push({s:{r:r1,c:0},e:{r:r1,c:COLS1-1}}); r1++
+    satirEkle('  Hakedisler', yilH.hakedisler, false)
+    satirEkle('  Diger Satislar', yilH.digerSatislar, true)
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('TOPLAM GELİR', sToplamL(YESIL_BG, YESIL))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(yilH.toplamGelir, sToplam(YESIL_BG, YESIL))
+    ws1[utils.encode_cell({r:r1,c:2})] = cv('%100.0', { ...sToplam(YESIL_BG, YESIL), numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('', sToplam(YESIL_BG, YESIL))
+    r1+=2
+
+    // GİDERLER
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('B. ÜRETİM GİDERLERİ', sBolumBaslik('FEE2E2', KIRMIZI))
+    for(let i=1;i<COLS1;i++) ws1[utils.encode_cell({r:r1,c:i})] = cv('', sBolumBaslik('FEE2E2', KIRMIZI))
+    m1.push({s:{r:r1,c:0},e:{r:r1,c:COLS1-1}}); r1++
+    satirEkle('  Donem Basi Stok', yilH.donemBasiStok, false)
+    satirEkle('  Malzeme Alislari', yilH.malzemeAlis, true)
+    satirEkle('  Iscilik Giderleri', yilH.iscilik, false)
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('TOPLAM ÜRETİM GİDERİ', sToplamL(KIRMIZI_BG, KIRMIZI))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(yilH.toplamUretim, sToplam(KIRMIZI_BG, KIRMIZI))
+    ws1[utils.encode_cell({r:r1,c:2})] = cv(yilH.toplamGelir > 0 ? `%${oran(yilH.toplamUretim).toFixed(1)}` : '', { ...sToplam(KIRMIZI_BG, KIRMIZI), numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('', sToplam(KIRMIZI_BG, KIRMIZI))
+    r1+=2
+
+    // GENEL YÖNETİM
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('C. GENEL YÖNETİM GİDERLERİ', sBolumBaslik('FEF3C7', ALTIN))
+    for(let i=1;i<COLS1;i++) ws1[utils.encode_cell({r:r1,c:i})] = cv('', sBolumBaslik('FEF3C7', ALTIN))
+    m1.push({s:{r:r1,c:0},e:{r:r1,c:COLS1-1}}); r1++
+    satirEkle('  Finans Giderleri', yilH.finans, false)
+    satirEkle('  Sigorta Giderleri', yilH.sigorta, true)
+    satirEkle('  Amortisman', yilH.amortisman, false)
+    satirEkle('  Diger Giderler', yilH.diger, true)
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('TOPLAM GENEL GİDER', sToplamL(ALTIN_BG, ALTIN))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(yilH.toplamGenel, sToplam(ALTIN_BG, ALTIN))
+    ws1[utils.encode_cell({r:r1,c:2})] = cv(yilH.toplamGelir > 0 ? `%${oran(yilH.toplamGenel).toFixed(1)}` : '', { ...sToplam(ALTIN_BG, ALTIN), numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('', sToplam(ALTIN_BG, ALTIN))
+    r1+=2
+
+    // TOPLAM GİDER
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('TOPLAM GİDER (B+C)', sToplamL('334155', BEYAZ))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(yilH.toplamGider, sToplam('334155', BEYAZ))
+    ws1[utils.encode_cell({r:r1,c:2})] = cv(yilH.toplamGelir > 0 ? `%${oran(yilH.toplamGider).toFixed(1)}` : '', { ...sToplam('334155', BEYAZ), numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('', sToplam('334155', BEYAZ))
+    r1+=2
+
+    // NET SONUÇ
+    const kar = yilH.brutKar >= 0
+    ws1[utils.encode_cell({r:r1,c:0})] = cv(kar ? '✓ NET KAR (A - B - C)' : '✗ NET ZARAR (A - B - C)', sNetL(kar))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(Math.abs(yilH.brutKar), kar ? sNetKar : sNetZarar)
+    ws1[utils.encode_cell({r:r1,c:2})] = cv(yilH.toplamGelir > 0 ? `%${oran(Math.abs(yilH.brutKar)).toFixed(1)}` : '', { ...(kar?sNetKar:sNetZarar), numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('', kar ? sNetKar : sNetZarar)
+    r1++
+
+    ws1['!cols'] = [{wch:36},{wch:20},{wch:12},{wch:20}]
+    ws1['!merges'] = m1
+    ws1['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:r1,c:COLS1-1}})
+
+    // ─── SAYFA 2: AYLIK DETAY ────────────────────────────────
+    const ws2: any = {}
+    const m2: any[] = []
+    const aylar = [...filtreliData].reverse()
+    const COLS2 = aylar.length + 1
+    let r2 = 0
+
+    // Baslik
+    ws2[utils.encode_cell({r:r2,c:0})] = cv(`${firma.ad.toUpperCase()} — AYLIK KAR/ZARAR DETAYI ${yilF}`, sBaslik)
+    for(let i=1;i<COLS2;i++) ws2[utils.encode_cell({r:r2,c:i})] = cv('', sBaslik)
+    m2.push({s:{r:r2,c:0},e:{r:r2,c:COLS2-1}}); r2+=2
+
+    // Ay basliklari
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('KALEM', sThAy)
+    aylar.forEach((row, i) => {
+      const ay = row.ay || (new Date(row.donem||'').getMonth()+1)
+      ws2[utils.encode_cell({r:r2,c:i+1})] = cv(AYLAR[Number(ay)-1] || row.donem, sThAy)
+    })
+    r2++
+
+    // Hesapla tum aylar
+    const ayHesaplar = aylar.map(row => hesapla({
+      hakedisler: String(row.hakedisler||0), diger_satislar: String(row.diger_satislar||row.diger_gelirler||0),
+      donem_basi_stok: String(row.donem_basi_stok||0), malzeme_alis: String(row.malzeme_alis||row.malzeme_giderleri||0),
+      iscilik: String(row.iscilik||row.iscilik_giderleri||0), finans_gideri: String(row.finans_gideri||row.finans_giderleri||0),
+      sigorta_gideri: String(row.sigorta_gideri||0), amortisman: String(row.amortisman||0),
+      diger_giderler: String(row.diger_giderler||0), onceki_donem_devir: String(row.onceki_donem_devir||0),
+      yil:'', ay:'', notlar:'',
+    }))
+
+    const satirEkle2 = (label: string, getter: (h: ReturnType<typeof hesapla>) => number, z: boolean, bold = false, bg?: string, fg?: string) => {
+      const sL = bold && bg ? sToplamL(bg, fg||KOYU) : { ...sSatirBaslik, fill:{fgColor:{rgb:z?GRI:BEYAZ}} }
+      const sD = bold && bg ? sToplam(bg, fg||KOYU) : sSatirDeger(z)
+      ws2[utils.encode_cell({r:r2,c:0})] = cv(label, sL)
+      ayHesaplar.forEach((h, i) => { ws2[utils.encode_cell({r:r2,c:i+1})] = para(getter(h), sD) })
+      r2++
+    }
+
+    const bolumBaslik2 = (label: string, bg: string, fg: string) => {
+      ws2[utils.encode_cell({r:r2,c:0})] = cv(label, sBolumBaslik(bg, fg))
+      for(let i=1;i<COLS2;i++) ws2[utils.encode_cell({r:r2,c:i})] = cv('', sBolumBaslik(bg, fg))
+      m2.push({s:{r:r2,c:0},e:{r:r2,c:COLS2-1}}); r2++
+    }
+
+    bolumBaslik2('A. GELİRLER', 'D1FAE5', YESIL)
+    satirEkle2('  Hakedisler', h => h.hakedisler, false)
+    satirEkle2('  Diger Satislar', h => h.digerSatislar, true)
+    satirEkle2('TOPLAM GELİR', h => h.toplamGelir, false, true, YESIL_BG, YESIL)
+    r2++
+
+    bolumBaslik2('B. ÜRETİM GİDERLERİ', 'FEE2E2', KIRMIZI)
+    satirEkle2('  Donem Basi Stok', h => h.donemBasiStok, false)
+    satirEkle2('  Malzeme Alislari', h => h.malzemeAlis, true)
+    satirEkle2('  Iscilik Giderleri', h => h.iscilik, false)
+    satirEkle2('TOPLAM ÜRETİM GİDERİ', h => h.toplamUretimGider, false, true, KIRMIZI_BG, KIRMIZI)
+    r2++
+
+    bolumBaslik2('C. GENEL YÖNETİM GİDERLERİ', 'FEF3C7', ALTIN)
+    satirEkle2('  Finans Giderleri', h => h.finansGideri, false)
+    satirEkle2('  Sigorta Giderleri', h => h.sigortaGideri, true)
+    satirEkle2('  Amortisman', h => h.amortisman, false)
+    satirEkle2('  Diger Giderler', h => h.digerGiderler, true)
+    satirEkle2('TOPLAM GENEL GİDER', h => h.toplamGenelGider, false, true, ALTIN_BG, ALTIN)
+    r2++
+
+    satirEkle2('TOPLAM GİDER (B+C)', h => h.toplamGider, false, true, '334155', BEYAZ)
+    r2++
+
+    // Net sonuc satiri
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('NET KAR / ZARAR', sNetL(true))
+    ayHesaplar.forEach((h, i) => {
+      const kar2 = h.brutKarZarar >= 0
+      ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.brutKarZarar, kar2 ? sNetKar : sNetZarar)
+    })
+    r2++
+
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('DEVIR (Onceki Ay)', { ...sSatirBaslik, fill:{fgColor:{rgb:MAVI_AC}} })
+    ayHesaplar.forEach((h, i) => { ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.oncekiDevir, { ...sSatirDeger(false), fill:{fgColor:{rgb:MAVI_AC}} }) })
+    r2++
+
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('NET SONUÇ (Devir Dahil)', sNetL(yilH.netKar >= 0))
+    ayHesaplar.forEach((h, i) => {
+      const kar2 = h.netKarZarar >= 0
+      ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.netKarZarar, kar2 ? sNetKar : sNetZarar)
+    })
+    r2++
+
+    ws2['!cols'] = [{wch:32}, ...aylar.map(() => ({wch:16}))]
+    ws2['!merges'] = m2
+    ws2['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:r2,c:COLS2-1}})
+
+    // ─── Kaydet ───────────────────────────────────────────────
+    const wb = utils.book_new()
+    utils.book_append_sheet(wb, ws1, `${yilF} Yillik Ozet`)
+    utils.book_append_sheet(wb, ws2, `${yilF} Aylik Detay`)
+    writeFile(wb, `kar-zarar-${firma.ad}-${yilF}.xlsx`)
+  }
+
   function openNew() {
-    // Son ayin net karini devir olarak al
     const sonAy = data[0]
     let devir = '0'
     if (sonAy) {
@@ -184,6 +440,7 @@ export default function KarZararModule({ firma }: AppCtx) {
             {yillar.map(y => <option key={y} value={String(y)}>{y}</option>)}
             {!yillar.includes(Number(yilF)) && <option value={yilF}>{yilF}</option>}
           </select>
+          <Btn variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportExcel}>Excel</Btn>
           <Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni Ay</Btn>
         </div>
       </div>
