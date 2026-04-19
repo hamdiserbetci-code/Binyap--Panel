@@ -160,13 +160,37 @@ async function buildKasaSheet(utils: any, firma: Firma) {
 
 async function buildKarZararSheet(utils: any, firma: Firma) {
   const { data } = await supabase
-    .from('kar_zarar').select('*').eq('firma_id', firma.id).order('donem', { ascending: true })
+    .from('kar_zarar').select('*').eq('firma_id', firma.id).order('yil', { ascending: true }).order('ay', { ascending: true })
 
   const ws: any = {}
   const merges: any[] = []
-  const rows = (data || []).sort((a, b) => a.donem.localeCompare(b.donem))
+  const rows = data || []
   const TOPLAM_COLS = 1 + rows.length + (rows.length > 1 ? 1 : 0)
   let row = 0
+
+  // Her satır için hesapla
+  const calc = (d: any) => {
+    const hakedisler    = Number(d.hakedisler    || 0)
+    const digerSatislar = Number(d.diger_satislar || d.diger_gelirler || 0)
+    const toplamGelir   = hakedisler + digerSatislar
+    const donemBasi     = Number(d.donem_basi_stok || 0)
+    const malzeme       = Number(d.malzeme_alis   || d.malzeme_giderleri || 0)
+    const iscilik       = Number(d.iscilik        || d.iscilik_giderleri || 0)
+    const toplamUretim  = donemBasi + malzeme + iscilik
+    const finans        = Number(d.finans_gideri  || d.finans_giderleri  || 0)
+    const sigorta       = Number(d.sigorta_gideri || 0)
+    const amortisman    = Number(d.amortisman     || 0)
+    const diger         = Number(d.diger_giderler || 0)
+    const toplamGenel   = finans + sigorta + amortisman + diger
+    const toplamGider   = toplamUretim + toplamGenel
+    const oncekiDevir   = Number(d.onceki_donem_devir || 0)
+    const brutKar       = toplamGelir - toplamGider
+    const netKar        = brutKar + oncekiDevir
+    const yaygınGelir   = Number(d.yaygin_gelir   || d.yillara_yaygin_gelir || 0)
+    const yaygınGider   = Number(d.yaygin_gider   || d.yillara_yaygin_gider || 0)
+    return { hakedisler, digerSatislar, toplamGelir, donemBasi, malzeme, iscilik, toplamUretim, finans, sigorta, amortisman, diger, toplamGenel, toplamGider, oncekiDevir, brutKar, netKar, yaygınGelir, yaygınGider }
+  }
+  const hesaplar = rows.map(calc)
 
   ws[utils.encode_cell({ r: row, c: 0 })] = cell(`${firma.ad.toUpperCase()} — KAR / ZARAR`, sBaslik(YESIL))
   for (let i = 1; i < TOPLAM_COLS; i++) ws[utils.encode_cell({ r: row, c: i })] = cell('', sBaslik(YESIL))
@@ -177,68 +201,78 @@ async function buildKarZararSheet(utils: any, firma: Firma) {
   const donemTh = (idx: number) => ({
     font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: BEYAZ } },
     fill: { fgColor: { rgb: idx % 2 === 0 ? '1E3A5F' : MAVI } },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border,
+    alignment: { horizontal: 'center', vertical: 'center' }, border,
   })
-
   ws[utils.encode_cell({ r: row, c: 0 })] = cell('Kalem', donemTh(0))
   rows.forEach((d, i) => {
-    ws[utils.encode_cell({ r: row, c: i + 1 })] = cell(d.donem, donemTh(i))
+    const ay = d.ay || (new Date(d.donem||'').getMonth()+1)
+    const yil = d.yil || new Date(d.donem||'').getFullYear()
+    const ayAdi = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][Number(ay)-1] || d.donem
+    ws[utils.encode_cell({ r: row, c: i + 1 })] = cell(`${ayAdi} ${yil}`, donemTh(i))
   })
-  if (rows.length > 1) ws[utils.encode_cell({ r: row, c: rows.length + 1 })] = cell('GENEL TOPLAM', donemTh(rows.length))
+  if (rows.length > 1) ws[utils.encode_cell({ r: row, c: rows.length + 1 })] = cell('YILLIK TOPLAM', donemTh(rows.length))
   row++
 
-  const kalemler = [
-    { grup: 'GELİRLER', baslik: true, renk: YESIL },
-    { label: 'Hakedişler',                            key: 'hakedisler',           tip: 'gelir' },
-    { label: 'Yıllara Yaygın Gelirler',               key: 'yillara_yaygin_gelir', tip: 'gelir' },
-    { label: 'Diğer Gelirler',                        key: 'diger_gelirler',        tip: 'gelir' },
-    { label: 'Toplam Gelir',                          key: 'toplam_gelir',          tip: 'toplamGelir' },
-    { grup: 'GİDERLER', baslik: true, renk: KIRMIZI },
-    { label: 'Dönem Başı Stok',                       key: 'donem_basi_stok',       tip: 'gider' },
-    { label: 'Malzeme Giderleri',                     key: 'malzeme_giderleri',     tip: 'gider' },
-    { label: 'İşçilik Giderleri',                     key: 'iscilik_giderleri',     tip: 'gider' },
-    { label: 'Genel Giderler',                        key: 'genel_giderler',        tip: 'gider' },
-    { label: 'Finans Giderleri',                      key: 'finans_giderleri',      tip: 'gider' },
-    { label: 'Yıllara Yaygın Giderler',               key: 'yillara_yaygin_gider',  tip: 'gider' },
-    { label: 'Diğer Giderler',                        key: 'diger_giderler',        tip: 'gider' },
-    { label: 'Toplam Gider',                          key: 'toplam_gider',          tip: 'toplamGider' },
-    { label: 'NET KAR / ZARAR',                       key: 'net_kar_zarar',         tip: 'net' },
-  ] as any[]
-
-  kalemler.forEach((k, ki) => {
-    if (k.baslik) {
-      ws[utils.encode_cell({ r: row, c: 0 })] = cell(k.grup, sGrupBaslik(k.renk))
-      for (let i = 1; i < TOPLAM_COLS; i++) ws[utils.encode_cell({ r: row, c: i })] = cell('', sGrupBaslik(k.renk))
-      merges.push({ s: { r: row, c: 0 }, e: { r: row, c: TOPLAM_COLS - 1 } })
-      row++; return
-    }
-    const isNet = k.tip === 'net', isTG = k.tip === 'toplamGelir', isTGi = k.tip === 'toplamGider'
-    const etiketS = isNet ? sToplamlabel : isTG
-      ? { ...sTd(), font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: YESIL } }, fill: { fgColor: { rgb: 'DCFCE7' } } }
-      : isTGi
-        ? { ...sTd(), font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: KIRMIZI } }, fill: { fgColor: { rgb: 'FEE2E2' } } }
-        : sTd(ki % 2 === 0)
-    ws[utils.encode_cell({ r: row, c: 0 })] = cell(isNet || isTG || isTGi ? k.label : `  ${k.label}`, etiketS)
-    rows.forEach((d, i) => {
-      const val = Number(d[k.key] || 0)
-      const paraS = isNet ? sToplamPara(val >= 0 ? YESIL : KIRMIZI)
-        : isTG ? { font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: YESIL } }, fill: { fgColor: { rgb: 'DCFCE7' } }, alignment: { horizontal: 'right', vertical: 'center' }, numFmt: '#,##0.00 \u20BA', border }
-        : isTGi ? { font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: KIRMIZI } }, fill: { fgColor: { rgb: 'FEE2E2' } }, alignment: { horizontal: 'right', vertical: 'center' }, numFmt: '#,##0.00 \u20BA', border }
-        : { font: { name: 'Calibri', sz: 9, bold: true, color: { rgb: k.tip === 'gelir' ? (val > 0 ? YESIL : '94A3B8') : (val > 0 ? KIRMIZI : '94A3B8') } }, fill: { fgColor: { rgb: ki % 2 === 0 ? ACIK : BEYAZ } }, alignment: { horizontal: 'right', vertical: 'center' }, numFmt: '#,##0.00 \u20BA', border }
-      ws[utils.encode_cell({ r: row, c: i + 1 })] = numCell(val, paraS)
-    })
+  // Satır yardımcısı
+  const satirEkle = (label: string, getter: (h: ReturnType<typeof calc>) => number, z: boolean, tip: 'gelir'|'gider'|'toplam'|'net'|'devir'|'yaygin') => {
+    const sL = tip === 'net' ? sToplamlabel
+      : tip === 'toplam' && label.includes('GELİR') ? { ...sTd(), font:{name:'Calibri',sz:9,bold:true,color:{rgb:YESIL}}, fill:{fgColor:{rgb:'DCFCE7'}} }
+      : tip === 'toplam' ? { ...sTd(), font:{name:'Calibri',sz:9,bold:true,color:{rgb:KIRMIZI}}, fill:{fgColor:{rgb:'FEE2E2'}} }
+      : tip === 'yaygin' ? { ...sTd(z), font:{name:'Calibri',sz:9,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:z?'EEF2FF':'F5F3FF'}} }
+      : sTd(z)
+    const sP = (v: number) => tip === 'net' ? sToplamPara(v >= 0 ? YESIL : KIRMIZI)
+      : tip === 'toplam' && label.includes('GELİR') ? { font:{name:'Calibri',sz:9,bold:true,color:{rgb:YESIL}}, fill:{fgColor:{rgb:'DCFCE7'}}, alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺', border }
+      : tip === 'toplam' ? { font:{name:'Calibri',sz:9,bold:true,color:{rgb:KIRMIZI}}, fill:{fgColor:{rgb:'FEE2E2'}}, alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺', border }
+      : tip === 'yaygin' ? { ...sTdR(z), font:{name:'Calibri',sz:9,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:z?'EEF2FF':'F5F3FF'}} }
+      : tip === 'devir' ? { ...sTdR(z), fill:{fgColor:{rgb:'DBEAFE'}} }
+      : { ...sTdR(z), font:{name:'Calibri',sz:9,color:{rgb:tip==='gelir'?(v>0?YESIL:'94A3B8'):(v>0?KIRMIZI:'94A3B8')}} }
+    ws[utils.encode_cell({ r: row, c: 0 })] = cell(['net','toplam'].includes(tip) ? label : `  ${label}`, sL)
+    hesaplar.forEach((h, i) => { const v = getter(h); ws[utils.encode_cell({ r: row, c: i+1 })] = numCell(v, sP(v)) })
     if (rows.length > 1) {
-      const genelVal = rows.reduce((s: number, d: any) => s + Number(d[k.key] || 0), 0)
-      ws[utils.encode_cell({ r: row, c: rows.length + 1 })] = numCell(genelVal, isNet ? sToplamPara(genelVal >= 0 ? YESIL : KIRMIZI) : sTdR())
+      const tot = hesaplar.reduce((s, h) => s + getter(h), 0)
+      ws[utils.encode_cell({ r: row, c: rows.length+1 })] = numCell(tot, sP(tot))
     }
     row++
-  })
+  }
+
+  const bolum = (label: string, renk: string) => {
+    ws[utils.encode_cell({ r: row, c: 0 })] = cell(label, sGrupBaslik(renk))
+    for (let i = 1; i < TOPLAM_COLS; i++) ws[utils.encode_cell({ r: row, c: i })] = cell('', sGrupBaslik(renk))
+    merges.push({ s: { r: row, c: 0 }, e: { r: row, c: TOPLAM_COLS - 1 } }); row++
+  }
+
+  bolum('A. GELİRLER', YESIL)
+  satirEkle('Hakedişler',       h => h.hakedisler,    false, 'gelir')
+  satirEkle('Diğer Satışlar',   h => h.digerSatislar, true,  'gelir')
+  satirEkle('TOPLAM GELİR',     h => h.toplamGelir,   false, 'toplam'); row++
+
+  bolum('B. ÜRETİM GİDERLERİ', KIRMIZI)
+  satirEkle('Dönem Başı Stok',  h => h.donemBasi,     false, 'gider')
+  satirEkle('Malzeme Alışları', h => h.malzeme,       true,  'gider')
+  satirEkle('İşçilik Giderleri',h => h.iscilik,       false, 'gider')
+  satirEkle('TOPLAM ÜRETİM',    h => h.toplamUretim,  false, 'toplam'); row++
+
+  bolum('C. GENEL YÖNETİM GİDERLERİ', '92400E')
+  satirEkle('Finans Giderleri', h => h.finans,        false, 'gider')
+  satirEkle('Sigorta Giderleri',h => h.sigorta,       true,  'gider')
+  satirEkle('Amortisman',       h => h.amortisman,    false, 'gider')
+  satirEkle('Diğer Giderler',   h => h.diger,         true,  'gider')
+  satirEkle('TOPLAM GENEL GİDER',h => h.toplamGenel,  false, 'toplam'); row++
+
+  satirEkle('TOPLAM GİDER (B+C)',h => h.toplamGider,  false, 'toplam'); row++
+  satirEkle('DÖNEM KAR / ZARAR', h => h.brutKar,      false, 'net')
+  satirEkle('Önceki Dönem Devir',h => h.oncekiDevir,  false, 'devir')
+  satirEkle('NET SONUÇ',         h => h.netKar,       false, 'net'); row++
+
+  bolum('D. YILLARA YAYGIN İNŞAAT (Bağımsız)', '3730A3')
+  satirEkle('Yıllara Yaygın Gelir', h => h.yaygınGelir, false, 'yaygin')
+  satirEkle('Yıllara Yaygın Gider', h => h.yaygınGider, true,  'yaygin')
+  satirEkle('Net Yıllara Yaygın',   h => h.yaygınGelir - h.yaygınGider, false, 'yaygin')
 
   row++
-  ws[utils.encode_cell({ r: row, c: 0 })] = cell(`${firma.ad}  |  ${new Date().toLocaleDateString('tr-TR')}`, sAltNot)
+  ws[utils.encode_cell({ r: row, c: 0 })] = cell(`${firma.ad}  |  ${new Date().toLocaleDateString('tr-TR')}  |  * Yıllara yaygın ana hesaba dahil değildir`, sAltNot)
   merges.push({ s: { r: row, c: 0 }, e: { r: row, c: TOPLAM_COLS - 1 } })
-  ws['!cols'] = [{ wch: 40 }, ...rows.map(() => ({ wch: 22 })), ...(rows.length > 1 ? [{ wch: 22 }] : [])]
+  ws['!cols'] = [{ wch: 36 }, ...rows.map(() => ({ wch: 18 })), ...(rows.length > 1 ? [{ wch: 18 }] : [])]
   ws['!merges'] = merges
   ws['!ref'] = utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: TOPLAM_COLS - 1 } })
   return ws
