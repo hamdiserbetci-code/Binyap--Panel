@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import React, { useEffect, useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Plus, Edit, Trash2, ChevronDown, ChevronRight, BarChart2, ArrowRight, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -24,6 +24,9 @@ const emptyForm = {
   sigorta_gideri:    '0',
   amortisman:        '0',
   diger_giderler:    '0',
+  // YILLARA YAYGIN (bağımsız takip)
+  yaygin_gelir:      '0',
+  yaygin_gider:      '0',
   // Devir (otomatik dolar)
   onceki_donem_devir: '0',
   notlar: '',
@@ -52,11 +55,17 @@ function hesapla(f: Form) {
   const brutKarZarar   = toplamGelir - toplamGider
   const netKarZarar    = brutKarZarar + oncekiDevir
 
+  // Yıllara yaygın — bağımsız
+  const yaygınGelir    = Number((f as any).yaygin_gelir || 0)
+  const yaygınGider    = Number((f as any).yaygin_gider || 0)
+  const yaygınNet      = yaygınGelir - yaygınGider
+
   return {
     hakedisler, digerSatislar, toplamGelir,
     donemBasiStok, malzemeAlis, iscilik, toplamUretimGider,
     finansGideri, sigortaGideri, amortisman, digerGiderler, toplamGenelGider,
     toplamGider, oncekiDevir, brutKarZarar, netKarZarar,
+    yaygınGelir, yaygınGider, yaygınNet,
   }
 }
 
@@ -103,13 +112,15 @@ export default function KarZararModule({ firma }: AppCtx) {
         iscilik: String(r.iscilik||r.iscilik_giderleri||0), finans_gideri: String(r.finans_gideri||r.finans_giderleri||0),
         sigorta_gideri: String(r.sigorta_gideri||0), amortisman: String(r.amortisman||0),
         diger_giderler: String(r.diger_giderler||0), onceki_donem_devir: String(r.onceki_donem_devir||0),
-        yil:'', ay:'', notlar:'',
+        yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
       })
       acc.gelir  += h.toplamGelir
       acc.gider  += h.toplamGider
       acc.net    += h.brutKarZarar
+      acc.yaygınGelir += h.yaygınGelir
+      acc.yaygınGider += h.yaygınGider
       return acc
-    }, { gelir: 0, gider: 0, net: 0 })
+    }, { gelir: 0, gider: 0, net: 0, yaygınGelir: 0, yaygınGider: 0 })
   }, [filtreliData])
 
   async function exportExcel() {
@@ -181,7 +192,7 @@ export default function KarZararModule({ firma }: AppCtx) {
         iscilik: String(row.iscilik||row.iscilik_giderleri||0), finans_gideri: String(row.finans_gideri||row.finans_giderleri||0),
         sigorta_gideri: String(row.sigorta_gideri||0), amortisman: String(row.amortisman||0),
         diger_giderler: String(row.diger_giderler||0), onceki_donem_devir: String(row.onceki_donem_devir||0),
-        yil:'', ay:'', notlar:'',
+        yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
       })
       acc.hakedisler    += h.hakedisler
       acc.digerSatislar += h.digerSatislar
@@ -298,7 +309,7 @@ export default function KarZararModule({ firma }: AppCtx) {
       iscilik: String(row.iscilik||row.iscilik_giderleri||0), finans_gideri: String(row.finans_gideri||row.finans_giderleri||0),
       sigorta_gideri: String(row.sigorta_gideri||0), amortisman: String(row.amortisman||0),
       diger_giderler: String(row.diger_giderler||0), onceki_donem_devir: String(row.onceki_donem_devir||0),
-      yil:'', ay:'', notlar:'',
+      yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
     }))
 
     const satirEkle2 = (label: string, getter: (h: ReturnType<typeof hesapla>) => number, z: boolean, bold = false, bg?: string, fg?: string) => {
@@ -379,7 +390,7 @@ export default function KarZararModule({ firma }: AppCtx) {
         iscilik: String(sonAy.iscilik||sonAy.iscilik_giderleri||0), finans_gideri: String(sonAy.finans_gideri||sonAy.finans_giderleri||0),
         sigorta_gideri: String(sonAy.sigorta_gideri||0), amortisman: String(sonAy.amortisman||0),
         diger_giderler: String(sonAy.diger_giderler||0), onceki_donem_devir: String(sonAy.onceki_donem_devir||0),
-        yil:'', ay:'', notlar:'',
+        yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
       })
       devir = String(h.netKarZarar)
     }
@@ -400,6 +411,8 @@ export default function KarZararModule({ firma }: AppCtx) {
       sigorta_gideri:     String(r.sigorta_gideri     || 0),
       amortisman:         String(r.amortisman         || 0),
       diger_giderler:     String(r.diger_giderler     || 0),
+      yaygin_gelir:       String(r.yaygin_gelir       || r.yillara_yaygin_gelir || 0),
+      yaygin_gider:       String(r.yaygin_gider       || r.yillara_yaygin_gider || 0),
       onceki_donem_devir: String(r.onceki_donem_devir || 0),
       notlar:             r.notlar || '',
     })
@@ -422,6 +435,8 @@ export default function KarZararModule({ firma }: AppCtx) {
       sigorta_gideri:     Number(form.sigorta_gideri     || 0),
       amortisman:         Number(form.amortisman         || 0),
       diger_giderler:     Number(form.diger_giderler     || 0),
+      yaygin_gelir:       Number((form as any).yaygin_gelir || 0),
+      yaygin_gider:       Number((form as any).yaygin_gider || 0),
       onceki_donem_devir: Number(form.onceki_donem_devir || 0),
       net_kar_zarar:      h.netKarZarar,
       notlar: form.notlar || null,
@@ -457,7 +472,7 @@ export default function KarZararModule({ firma }: AppCtx) {
       </div>
 
       {/* Yillik Ozet Kartlar */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-green-50 rounded-2xl border border-green-200 p-5">
           <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Toplam Gelir</p>
           <p className="text-2xl font-bold text-green-700">{fmt(yillikOzet.gelir)}</p>
@@ -475,6 +490,13 @@ export default function KarZararModule({ firma }: AppCtx) {
           <p className={`text-2xl font-bold ${yillikOzet.net >= 0 ? 'text-emerald-700' : 'text-orange-700'}`}>{fmt(Math.abs(yillikOzet.net))}</p>
           <p className={`text-xs mt-1 ${yillikOzet.net >= 0 ? 'text-emerald-500' : 'text-orange-500'}`}>{yilF} yili net sonucu</p>
         </div>
+        <div className="bg-indigo-50 rounded-2xl border border-indigo-200 p-5">
+          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Yıllara Yaygın Net</p>
+          <p className={`text-2xl font-bold ${(yillikOzet.yaygınGelir - yillikOzet.yaygınGider) >= 0 ? 'text-indigo-700' : 'text-red-600'}`}>
+            {fmt(Math.abs(yillikOzet.yaygınGelir - yillikOzet.yaygınGider))}
+          </p>
+          <p className="text-xs text-indigo-400 mt-1">Gelir: {fmt(yillikOzet.yaygınGelir)} / Gider: {fmt(yillikOzet.yaygınGider)}</p>
+        </div>
       </div>
 
       {/* Grafik - basit bar chart */}
@@ -489,7 +511,7 @@ export default function KarZararModule({ firma }: AppCtx) {
                 iscilik: String(r.iscilik||r.iscilik_giderleri||0), finans_gideri: String(r.finans_gideri||r.finans_giderleri||0),
                 sigorta_gideri: String(r.sigorta_gideri||0), amortisman: String(r.amortisman||0),
                 diger_giderler: String(r.diger_giderler||0), onceki_donem_devir: String(r.onceki_donem_devir||0),
-                yil:'', ay:'', notlar:'',
+                yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
               })
               const maxVal = Math.max(...filtreliData.map(x => Math.max(
                 Number(x.hakedisler||0)+Number(x.diger_satislar||x.diger_gelirler||0),
@@ -533,7 +555,7 @@ export default function KarZararModule({ firma }: AppCtx) {
               iscilik: String(r.iscilik||r.iscilik_giderleri||0), finans_gideri: String(r.finans_gideri||r.finans_giderleri||0),
               sigorta_gideri: String(r.sigorta_gideri||0), amortisman: String(r.amortisman||0),
               diger_giderler: String(r.diger_giderler||0), onceki_donem_devir: String(r.onceki_donem_devir||0),
-              yil:'', ay:'', notlar:'',
+              yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
             })
             const ay = r.ay || (new Date(r.donem||'').getMonth()+1)
             const ayAdi = AYLAR[Number(ay)-1] || r.donem
@@ -648,6 +670,31 @@ export default function KarZararModule({ firma }: AppCtx) {
                         )}
                       </div>
                     </div>
+
+                    {/* Yıllara Yaygın Bölümü — bağımsız */}
+                    {(h.yaygınGelir > 0 || h.yaygınGider > 0) && (
+                      <div className="mt-4 pt-4 border-t-2 border-dashed border-indigo-200">
+                        <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide mb-3 flex items-center gap-1">
+                          <BarChart2 className="w-3.5 h-3.5" />Yıllara Yaygın İnşaat (Bağımsız Takip)
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-indigo-50 rounded-xl border border-indigo-200 p-3">
+                            <p className="text-xs text-gray-500 mb-1">Yıllara Yaygın Gelir</p>
+                            <p className="text-base font-bold text-indigo-700">{fmt(h.yaygınGelir)}</p>
+                          </div>
+                          <div className="bg-violet-50 rounded-xl border border-violet-200 p-3">
+                            <p className="text-xs text-gray-500 mb-1">Yıllara Yaygın Gider</p>
+                            <p className="text-base font-bold text-violet-700">{fmt(h.yaygınGider)}</p>
+                          </div>
+                          <div className={`rounded-xl border p-3 ${h.yaygınNet >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                            <p className="text-xs text-gray-500 mb-1">Net (Gelir - Gider)</p>
+                            <p className={`text-base font-bold ${h.yaygınNet >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmt(Math.abs(h.yaygınNet))}</p>
+                            <p className={`text-xs mt-0.5 ${h.yaygınNet >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>{h.yaygınNet >= 0 ? 'Net Gelir' : 'Net Gider'}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-indigo-400 mt-2">* Bu tutarlar ana kar/zarar hesabına dahil edilmez, ayrı takip edilir.</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
@@ -730,6 +777,32 @@ export default function KarZararModule({ firma }: AppCtx) {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Yıllara Yaygın — bağımsız bölüm */}
+            <div className="bg-indigo-50 rounded-xl p-4 border-2 border-dashed border-indigo-300">
+              <p className="text-sm font-bold text-indigo-700 mb-3 flex items-center gap-1">
+                <BarChart2 className="w-4 h-4" />Yıllara Yaygın İnşaat (Bağımsız Takip)
+              </p>
+              <p className="text-xs text-indigo-500 mb-3">Bu tutarlar ana kar/zarar hesabına dahil edilmez. Sadece bilgi amaçlı ayrı takip edilir.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Yıllara Yaygın İnşaat Geliri (TL)">
+                  <input type="number" step="0.01" value={(form as any).yaygin_gelir || '0'}
+                    onChange={e => setForm(p => ({ ...p, yaygin_gelir: e.target.value } as any))}
+                    className={inputCls} />
+                </Field>
+                <Field label="Yıllara Yaygın İnşaat Gideri (TL)">
+                  <input type="number" step="0.01" value={(form as any).yaygin_gider || '0'}
+                    onChange={e => setForm(p => ({ ...p, yaygin_gider: e.target.value } as any))}
+                    className={inputCls} />
+                </Field>
+              </div>
+              {(Number((form as any).yaygin_gelir||0) > 0 || Number((form as any).yaygin_gider||0) > 0) && (
+                <div className={`mt-3 rounded-lg px-3 py-2 flex justify-between text-sm ${formH.yaygınNet >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className="font-medium">Yıllara Yaygın Net</span>
+                  <span className="font-bold">{fmt(Math.abs(formH.yaygınNet))} ({formH.yaygınNet >= 0 ? 'Gelir' : 'Gider'})</span>
+                </div>
+              )}
             </div>
 
             {/* Canli Sonuc */}
