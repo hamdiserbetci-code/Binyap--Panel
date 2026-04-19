@@ -209,8 +209,10 @@ export default function KarZararModule({ firma }: AppCtx) {
       acc.toplamGider   += h.toplamGider
       acc.brutKar       += h.brutKarZarar
       acc.netKar        += h.netKarZarar
+      acc.yaygınGelir   += h.yaygınGelir
+      acc.yaygınGider   += h.yaygınGider
       return acc
-    }, { hakedisler:0, digerSatislar:0, toplamGelir:0, donemBasiStok:0, malzemeAlis:0, iscilik:0, toplamUretim:0, finans:0, sigorta:0, amortisman:0, diger:0, toplamGenel:0, toplamGider:0, brutKar:0, netKar:0 })
+    }, { hakedisler:0, digerSatislar:0, toplamGelir:0, donemBasiStok:0, malzemeAlis:0, iscilik:0, toplamUretim:0, finans:0, sigorta:0, amortisman:0, diger:0, toplamGenel:0, toplamGider:0, brutKar:0, netKar:0, yaygınGelir:0, yaygınGider:0 })
 
     const oran = (v: number) => yilH.toplamGelir > 0 ? Math.round(v / yilH.toplamGelir * 1000) / 10 : 0
 
