@@ -112,7 +112,7 @@ export default function KarZararModule({ firma }: AppCtx) {
         iscilik: String(r.iscilik||r.iscilik_giderleri||0), finans_gideri: String(r.finans_gideri||r.finans_giderleri||0),
         sigorta_gideri: String(r.sigorta_gideri||0), amortisman: String(r.amortisman||0),
         diger_giderler: String(r.diger_giderler||0), onceki_donem_devir: String(r.onceki_donem_devir||0),
-        yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
+        yaygin_gelir: String(row.yaygin_gelir||row.yillara_yaygin_gelir||0), yaygin_gider: String(row.yaygin_gider||row.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
       })
       acc.gelir  += h.toplamGelir
       acc.gider  += h.toplamGider
@@ -192,7 +192,7 @@ export default function KarZararModule({ firma }: AppCtx) {
         iscilik: String(row.iscilik||row.iscilik_giderleri||0), finans_gideri: String(row.finans_gideri||row.finans_giderleri||0),
         sigorta_gideri: String(row.sigorta_gideri||0), amortisman: String(row.amortisman||0),
         diger_giderler: String(row.diger_giderler||0), onceki_donem_devir: String(row.onceki_donem_devir||0),
-        yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
+        yaygin_gelir: String(row.yaygin_gelir||row.yillara_yaygin_gelir||0), yaygin_gider: String(row.yaygin_gider||row.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
       })
       acc.hakedisler    += h.hakedisler
       acc.digerSatislar += h.digerSatislar
@@ -309,7 +309,7 @@ export default function KarZararModule({ firma }: AppCtx) {
       iscilik: String(row.iscilik||row.iscilik_giderleri||0), finans_gideri: String(row.finans_gideri||row.finans_giderleri||0),
       sigorta_gideri: String(row.sigorta_gideri||0), amortisman: String(row.amortisman||0),
       diger_giderler: String(row.diger_giderler||0), onceki_donem_devir: String(row.onceki_donem_devir||0),
-      yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
+      yaygin_gelir: String(row.yaygin_gelir||row.yillara_yaygin_gelir||0), yaygin_gider: String(row.yaygin_gider||row.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
     }))
 
     const satirEkle2 = (label: string, getter: (h: ReturnType<typeof hesapla>) => number, z: boolean, bold = false, bg?: string, fg?: string) => {
@@ -390,7 +390,7 @@ export default function KarZararModule({ firma }: AppCtx) {
         iscilik: String(sonAy.iscilik||sonAy.iscilik_giderleri||0), finans_gideri: String(sonAy.finans_gideri||sonAy.finans_giderleri||0),
         sigorta_gideri: String(sonAy.sigorta_gideri||0), amortisman: String(sonAy.amortisman||0),
         diger_giderler: String(sonAy.diger_giderler||0), onceki_donem_devir: String(sonAy.onceki_donem_devir||0),
-        yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
+        yaygin_gelir: String(row.yaygin_gelir||row.yillara_yaygin_gelir||0), yaygin_gider: String(row.yaygin_gider||row.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
       })
       devir = String(h.netKarZarar)
     }
@@ -511,7 +511,7 @@ export default function KarZararModule({ firma }: AppCtx) {
                 iscilik: String(r.iscilik||r.iscilik_giderleri||0), finans_gideri: String(r.finans_gideri||r.finans_giderleri||0),
                 sigorta_gideri: String(r.sigorta_gideri||0), amortisman: String(r.amortisman||0),
                 diger_giderler: String(r.diger_giderler||0), onceki_donem_devir: String(r.onceki_donem_devir||0),
-                yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
+                yaygin_gelir: String(row.yaygin_gelir||row.yillara_yaygin_gelir||0), yaygin_gider: String(row.yaygin_gider||row.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
               })
               const maxVal = Math.max(...filtreliData.map(x => Math.max(
                 Number(x.hakedisler||0)+Number(x.diger_satislar||x.diger_gelirler||0),
@@ -555,7 +555,7 @@ export default function KarZararModule({ firma }: AppCtx) {
               iscilik: String(r.iscilik||r.iscilik_giderleri||0), finans_gideri: String(r.finans_gideri||r.finans_giderleri||0),
               sigorta_gideri: String(r.sigorta_gideri||0), amortisman: String(r.amortisman||0),
               diger_giderler: String(r.diger_giderler||0), onceki_donem_devir: String(r.onceki_donem_devir||0),
-              yaygin_gelir: String(r.yaygin_gelir||r.yillara_yaygin_gelir||0), yaygin_gider: String(r.yaygin_gider||r.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
+              yaygin_gelir: String(row.yaygin_gelir||row.yillara_yaygin_gelir||0), yaygin_gider: String(row.yaygin_gider||row.yillara_yaygin_gider||0), yil:'', ay:'', notlar:'',
             })
             const ay = r.ay || (new Date(r.donem||'').getMonth()+1)
             const ayAdi = AYLAR[Number(ay)-1] || r.donem
