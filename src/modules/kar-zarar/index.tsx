@@ -441,8 +441,25 @@ export default function KarZararModule({ firma }: AppCtx) {
       net_kar_zarar:      h.netKarZarar,
       notlar: form.notlar || null,
     }
-    if (editing) { await supabase.from('kar_zarar').update(payload).eq('id', editing.id) }
-    else { await supabase.from('kar_zarar').insert(payload) }
+    let err: any = null
+    if (editing) {
+      const res = await supabase.from('kar_zarar').update(payload).eq('id', editing.id)
+      err = res.error
+    } else {
+      const res = await supabase.from('kar_zarar').insert(payload)
+      err = res.error
+    }
+    if (err) {
+      // yaygin kolonlar yoksa onlarsiz tekrar dene
+      if (err.message?.includes('yaygin')) {
+        const { yaygin_gelir, yaygin_gider, ...payloadSansYaygin } = payload as any
+        if (editing) { await supabase.from('kar_zarar').update(payloadSansYaygin).eq('id', editing.id) }
+        else { await supabase.from('kar_zarar').insert(payloadSansYaygin) }
+      } else {
+        alert('Kayit hatasi: ' + err.message)
+        setSaving(false); return
+      }
+    }
     setSaving(false); setModal(false); load()
   }
 
