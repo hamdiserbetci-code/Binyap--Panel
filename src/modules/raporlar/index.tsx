@@ -9,11 +9,15 @@ import { KDV1_KONTROLLER } from '@/modules/is-takibi/Kdv1Checklist'
 
 // ─── Rapor Modülleri ──────────────────────────────────────────
 const MODULLER = [
-  { id: 'kasa',       label: 'Kasa & Banka',  renk: '0F766E', icon: '💰' },
-  { id: 'kar-zarar',  label: 'Kar / Zarar',   renk: '166534', icon: '📊' },
-  { id: 'odeme-plani',label: 'Ödeme Planı',   renk: '1E40AF', icon: '📅' },
-  { id: 'is-takibi',  label: 'İş Takibi',     renk: '7C3AED', icon: '📋' },
-  { id: 'projeler',   label: 'Projeler',       renk: '92400E', icon: '🏗️' },
+  { id: 'kasa',        label: 'Kasa & Banka',    renk: '0F766E', icon: '💰' },
+  { id: 'kar-zarar',   label: 'Kar / Zarar',     renk: '166534', icon: '📊' },
+  { id: 'odeme-plani', label: 'Ödeme Planı',     renk: '1E40AF', icon: '📅' },
+  { id: 'cari',        label: 'Cari Hesaplar',   renk: '4338CA', icon: '📒' },
+  { id: 'teminat',     label: 'Teminat Takibi',  renk: '0E7490', icon: '🛡️' },
+  { id: 'projeler',    label: 'Projeler',         renk: '92400E', icon: '🏗️' },
+  { id: 'personel',    label: 'Personel',         renk: '1E3A5F', icon: '👥' },
+  { id: 'gorevler',    label: 'Görev Takibi',     renk: '5B21B6', icon: '✅' },
+  { id: 'is-takibi',   label: 'İş Takibi',        renk: '7C3AED', icon: '📋' },
 ]
 
 // ─── Excel Stil Sabitleri ─────────────────────────────────────
@@ -455,12 +459,130 @@ async function buildProjelerSheet(utils: any, firma: Firma) {
 }
 
 // ─── Sheet Builder Map ────────────────────────────────────────
+
+async function buildPersonelSheet(utils: any, firma: Firma) {
+  const { data } = await supabase.from('personeller').select('*').eq('firma_id', firma.id).order('ad_soyad')
+  const ws: any = {}; const merges: any[] = []; const COLS = 9; let row = 0
+  ws[utils.encode_cell({r:row,c:0})] = cell(`${firma.ad.toUpperCase()} — PERSONEL LİSTESİ`, sBaslik('1E3A5F'))
+  for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cell('', sBaslik('1E3A5F'))
+  ws[utils.encode_cell({r:row,c:COLS-1})] = cell(new Date().toLocaleDateString('tr-TR'), sTarih)
+  merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+  ;['Ad Soyad','TC Kimlik','Telefon','Pozisyon','Maaş Tipi','Net Maaş','İşe Giriş','İşten Çıkış','Durum'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cell(h, sTh) }); row++
+  const rows = data || []
+  rows.forEach((p,idx) => {
+    const z = idx%2===1
+    ws[utils.encode_cell({r:row,c:0})] = cell(p.ad_soyad, sTd(z))
+    ws[utils.encode_cell({r:row,c:1})] = cell(p.tc_kimlik||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:2})] = cell(p.telefon||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:3})] = cell(p.pozisyon||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:4})] = cell(p.maas_tipi||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:5})] = p.net_maas ? numCell(Number(p.net_maas), sTdR(z)) : cell('-', sTd(z))
+    ws[utils.encode_cell({r:row,c:6})] = cell(p.ise_giris_tarihi ? new Date(p.ise_giris_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+    ws[utils.encode_cell({r:row,c:7})] = cell(p.isten_cikis_tarihi ? new Date(p.isten_cikis_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+    ws[utils.encode_cell({r:row,c:8})] = cell(p.aktif ? 'Aktif' : 'Pasif', {...sTd(z), font:{name:'Calibri',sz:9,bold:true,color:{rgb:p.aktif?YESIL:KIRMIZI}}})
+    row++
+  })
+  ws['!cols'] = [{wch:24},{wch:14},{wch:14},{wch:18},{wch:10},{wch:14},{wch:12},{wch:12},{wch:8}]
+  ws['!merges'] = merges; ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}}); return ws
+}
+
+async function buildCariSheet(utils: any, firma: Firma) {
+  const [{ data: cariler }, { data: hareketler }] = await Promise.all([
+    supabase.from('cari_hesaplar').select('*').eq('firma_id', firma.id).order('ad'),
+    supabase.from('cari_hareketler').select('cari_hesap_id,tur,tutar').eq('firma_id', firma.id),
+  ])
+  const bakiyeMap: Record<string,number> = {}
+  ;(hareketler||[]).forEach((h:any) => {
+    if (!bakiyeMap[h.cari_hesap_id]) bakiyeMap[h.cari_hesap_id] = 0
+    const t = Number(h.tutar||0)
+    bakiyeMap[h.cari_hesap_id] += ['alacak','tahsilat','cek_alindi'].includes(h.tur) ? t : -t
+  })
+  const ws: any = {}; const merges: any[] = []; const COLS = 7; let row = 0
+  ws[utils.encode_cell({r:row,c:0})] = cell(`${firma.ad.toUpperCase()} — CARİ HESAPLAR`, sBaslik('4338CA'))
+  for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cell('', sBaslik('4338CA'))
+  ws[utils.encode_cell({r:row,c:COLS-1})] = cell(new Date().toLocaleDateString('tr-TR'), sTarih)
+  merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+  ;['Cari Ad','Tip','VKN/TCKN','Telefon','IBAN','Bakiye','Durum'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cell(h, sTh) }); row++
+  ;(cariler||[]).forEach((c:any,idx:number) => {
+    const z = idx%2===1; const bak = bakiyeMap[c.id]??0
+    ws[utils.encode_cell({r:row,c:0})] = cell(c.ad, sTd(z))
+    ws[utils.encode_cell({r:row,c:1})] = cell(c.tip||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:2})] = cell(c.vkn_tckn||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:3})] = cell(c.telefon||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:4})] = cell(c.iban||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:5})] = numCell(Math.abs(bak), {...sTdR(z), font:{name:'Calibri',sz:9,bold:true,color:{rgb:bak>=0?YESIL:KIRMIZI}}})
+    ws[utils.encode_cell({r:row,c:6})] = cell(bak>=0?'Alacak':'Borc', sTd(z))
+    row++
+  })
+  ws['!cols'] = [{wch:28},{wch:14},{wch:14},{wch:14},{wch:26},{wch:16},{wch:10}]
+  ws['!merges'] = merges; ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}}); return ws
+}
+
+async function buildTeminatSheet(utils: any, firma: Firma) {
+  const [{ data: teminatlar }, { data: projeler }] = await Promise.all([
+    supabase.from('teminatlar').select('*').eq('firma_id', firma.id).order('verilis_tarihi', {ascending:false}),
+    supabase.from('projeler').select('id,proje_adi').eq('firma_id', firma.id),
+  ])
+  const projeMap: Record<string,string> = {}
+  ;(projeler||[]).forEach((p:any) => { projeMap[p.id] = p.proje_adi })
+  const ws: any = {}; const merges: any[] = []; const COLS = 10; let row = 0
+  ws[utils.encode_cell({r:row,c:0})] = cell(`${firma.ad.toUpperCase()} — TEMİNAT TAKİBİ`, sBaslik('0E7490'))
+  for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cell('', sBaslik('0E7490'))
+  ws[utils.encode_cell({r:row,c:COLS-1})] = cell(new Date().toLocaleDateString('tr-TR'), sTarih)
+  merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+  ;['Başlık','Tür','Veren','Proje','Belge No','Banka','Veriliş','Geçerlilik','Tutar','Kalan'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cell(h, sTh) }); row++
+  ;(teminatlar||[]).forEach((t:any,idx:number) => {
+    const z = idx%2===1; const kalan = Number(t.kalan_tutar||t.tutar||0); const tutar = Number(t.tutar||0)
+    ws[utils.encode_cell({r:row,c:0})] = cell(t.baslik, sTd(z))
+    ws[utils.encode_cell({r:row,c:1})] = cell(t.teminat_turu||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:2})] = cell(t.veren_firma, sTd(z))
+    ws[utils.encode_cell({r:row,c:3})] = cell(projeMap[t.proje_id]||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:4})] = cell(t.belge_no||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:5})] = cell(t.banka_adi||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:6})] = cell(t.verilis_tarihi ? new Date(t.verilis_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+    ws[utils.encode_cell({r:row,c:7})] = cell(t.gecerlilik_tarihi ? new Date(t.gecerlilik_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+    ws[utils.encode_cell({r:row,c:8})] = numCell(tutar, sTdR(z))
+    ws[utils.encode_cell({r:row,c:9})] = numCell(kalan, {...sTdR(z), font:{name:'Calibri',sz:9,bold:true,color:{rgb:kalan<tutar?KIRMIZI:YESIL}}})
+    row++
+  })
+  ws['!cols'] = [{wch:24},{wch:18},{wch:20},{wch:18},{wch:14},{wch:16},{wch:12},{wch:12},{wch:16},{wch:16}]
+  ws['!merges'] = merges; ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}}); return ws
+}
+
+async function buildGorevlerSheet(utils: any, firma: Firma) {
+  const { data } = await supabase.from('gorevler').select('*').eq('firma_id', firma.id).order('created_at', {ascending:false})
+  const ws: any = {}; const merges: any[] = []; const COLS = 7; let row = 0
+  ws[utils.encode_cell({r:row,c:0})] = cell(`${firma.ad.toUpperCase()} — GÖREV TAKİBİ`, sBaslik('5B21B6'))
+  for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cell('', sBaslik('5B21B6'))
+  ws[utils.encode_cell({r:row,c:COLS-1})] = cell(new Date().toLocaleDateString('tr-TR'), sTarih)
+  merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+  ;['Başlık','Kategori','Öncelik','Durum','Son Tarih','Atanan','Açıklama'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cell(h, sTh) }); row++
+  const DURUM_RENK: Record<string,string> = {bekliyor:'64748B',devam:'92400E',tamamlandi:YESIL,ertelendi:MAVI,iptal:KIRMIZI}
+  ;(data||[]).forEach((g:any,idx:number) => {
+    const z = idx%2===1; const renk = DURUM_RENK[g.durum]||KOYU
+    ws[utils.encode_cell({r:row,c:0})] = cell(g.baslik, sTd(z))
+    ws[utils.encode_cell({r:row,c:1})] = cell(g.kategori||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:2})] = cell(g.oncelik||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:3})] = cell(g.durum||'-', {...sTd(z), font:{name:'Calibri',sz:9,bold:true,color:{rgb:renk}}})
+    ws[utils.encode_cell({r:row,c:4})] = cell(g.son_tarih ? new Date(g.son_tarih).toLocaleDateString('tr-TR') : '-', sTd(z))
+    ws[utils.encode_cell({r:row,c:5})] = cell(g.atanan_kisi||'-', sTd(z))
+    ws[utils.encode_cell({r:row,c:6})] = cell(g.aciklama||'', sTd(z))
+    row++
+  })
+  ws['!cols'] = [{wch:30},{wch:12},{wch:10},{wch:14},{wch:12},{wch:16},{wch:30}]
+  ws['!merges'] = merges; ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}}); return ws
+}
+
 const SHEET_BUILDERS: Record<string, (utils: any, firma: Firma) => Promise<any>> = {
   'kasa':        buildKasaSheet,
   'kar-zarar':   buildKarZararSheet,
   'odeme-plani': buildOdemePlaniSheet,
   'is-takibi':   buildIsTakibiSheet,
   'projeler':    buildProjelerSheet,
+  'personel':    buildPersonelSheet,
+  'cari':        buildCariSheet,
+  'teminat':     buildTeminatSheet,
+  'gorevler':    buildGorevlerSheet,
 }
 
 const SHEET_NAMES: Record<string, string> = {
@@ -469,6 +591,10 @@ const SHEET_NAMES: Record<string, string> = {
   'odeme-plani': 'Ödeme Planı',
   'is-takibi':   'İş Takibi',
   'projeler':    'Projeler',
+  'personel':    'Personel',
+  'cari':        'Cari Hesaplar',
+  'teminat':     'Teminat',
+  'gorevler':    'Görevler',
 }
 
 // ─── Ana Bileşen ──────────────────────────────────────────────
