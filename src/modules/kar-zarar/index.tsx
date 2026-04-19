@@ -276,6 +276,36 @@ export default function KarZararModule({ firma }: AppCtx) {
     ws1[utils.encode_cell({r:r1,c:1})] = para(Math.abs(yilH.brutKar), kar ? sNetKar : sNetZarar)
     ws1[utils.encode_cell({r:r1,c:2})] = cv(yilH.toplamGelir > 0 ? `%${oran(Math.abs(yilH.brutKar)).toFixed(1)}` : '', { ...(kar?sNetKar:sNetZarar), numFmt:'0.0%', alignment:{horizontal:'center',vertical:'center'} })
     ws1[utils.encode_cell({r:r1,c:3})] = cv('', kar ? sNetKar : sNetZarar)
+    r1+=2
+
+    // YILLARA YAYGIN — bağımsız bölüm
+    const sYayginBaslik = { font:{name:'Calibri',sz:10,bold:true,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:'E0E7FF'}}, alignment:{horizontal:'left',vertical:'center'}, border: brd('A5B4FC') }
+    const sYayginSatir = (z:boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:z?'EEF2FF':'F5F3FF'}}, alignment:{vertical:'center'}, border: brd('A5B4FC') })
+    const sYayginPara = (z:boolean) => ({ ...sYayginSatir(z), alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺' })
+    const sYayginNet = { font:{name:'Calibri',sz:11,bold:true,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:'C7D2FE'}}, alignment:{horizontal:'right',vertical:'center'}, border:{top:{style:'medium',color:{rgb:'6366F1'}},bottom:{style:'medium',color:{rgb:'6366F1'}},left:{style:'thin',color:{rgb:'6366F1'}},right:{style:'thin',color:{rgb:'6366F1'}}}, numFmt:'#,##0.00 ₺' }
+    const sYayginNetL = { ...sYayginNet, alignment:{horizontal:'left',vertical:'center'} }
+
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('D. YILLARA YAYGIN İNŞAAT (Bağımsız Takip)', sYayginBaslik)
+    for(let i=1;i<COLS1;i++) ws1[utils.encode_cell({r:r1,c:i})] = cv('', sYayginBaslik)
+    m1.push({s:{r:r1,c:0},e:{r:r1,c:COLS1-1}}); r1++
+
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('  Yıllara Yaygın İnşaat Geliri', sYayginSatir(false))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(yilH.yaygınGelir, sYayginPara(false))
+    ws1[utils.encode_cell({r:r1,c:2})] = cv('', sYayginSatir(false))
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('Ana hesaba dahil değil', { ...sYayginSatir(false), font:{name:'Calibri',sz:8,color:{rgb:'6366F1'}}, alignment:{horizontal:'left',vertical:'center'} })
+    r1++
+
+    ws1[utils.encode_cell({r:r1,c:0})] = cv('  Yıllara Yaygın İnşaat Gideri', sYayginSatir(true))
+    ws1[utils.encode_cell({r:r1,c:1})] = para(yilH.yaygınGider, sYayginPara(true))
+    ws1[utils.encode_cell({r:r1,c:2})] = cv('', sYayginSatir(true))
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('Ana hesaba dahil değil', { ...sYayginSatir(true), font:{name:'Calibri',sz:8,color:{rgb:'6366F1'}}, alignment:{horizontal:'left',vertical:'center'} })
+    r1++
+
+    const yaygınNetYil = yilH.yaygınGelir - yilH.yaygınGider
+    ws1[utils.encode_cell({r:r1,c:0})] = cv(yaygınNetYil >= 0 ? '  Net Yıllara Yaygın Gelir' : '  Net Yıllara Yaygın Gider', sYayginNetL)
+    ws1[utils.encode_cell({r:r1,c:1})] = para(Math.abs(yaygınNetYil), sYayginNet)
+    ws1[utils.encode_cell({r:r1,c:2})] = cv('', sYayginNet)
+    ws1[utils.encode_cell({r:r1,c:3})] = cv('', sYayginNet)
     r1++
 
     ws1['!cols'] = [{wch:36},{wch:20},{wch:12},{wch:20}]
@@ -367,6 +397,28 @@ export default function KarZararModule({ firma }: AppCtx) {
       const kar2 = h.netKarZarar >= 0
       ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.netKarZarar, kar2 ? sNetKar : sNetZarar)
     })
+    r2+=2
+
+    // YILLARA YAYGIN — bağımsız bölüm
+    const sYB = { font:{name:'Calibri',sz:10,bold:true,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:'E0E7FF'}}, alignment:{horizontal:'left',vertical:'center'}, border: brd('A5B4FC') }
+    const sYS = (z:boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:z?'EEF2FF':'F5F3FF'}}, alignment:{vertical:'center'}, border: brd('A5B4FC') })
+    const sYP = (z:boolean) => ({ ...sYS(z), alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺' })
+    const sYN = { font:{name:'Calibri',sz:10,bold:true,color:{rgb:'3730A3'}}, fill:{fgColor:{rgb:'C7D2FE'}}, alignment:{horizontal:'right',vertical:'center'}, border:{top:{style:'medium',color:{rgb:'6366F1'}},bottom:{style:'medium',color:{rgb:'6366F1'}},left:{style:'thin',color:{rgb:'6366F1'}},right:{style:'thin',color:{rgb:'6366F1'}}}, numFmt:'#,##0.00 ₺' }
+
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('D. YILLARA YAYGIN İNŞAAT (Bağımsız)', sYB)
+    for(let i=1;i<COLS2;i++) ws2[utils.encode_cell({r:r2,c:i})] = cv('', sYB)
+    m2.push({s:{r:r2,c:0},e:{r:r2,c:COLS2-1}}); r2++
+
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('  Yıllara Yaygın Gelir', sYS(false))
+    ayHesaplar.forEach((h, i) => { ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.yaygınGelir, sYP(false)) })
+    r2++
+
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('  Yıllara Yaygın Gider', sYS(true))
+    ayHesaplar.forEach((h, i) => { ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.yaygınGider, sYP(true)) })
+    r2++
+
+    ws2[utils.encode_cell({r:r2,c:0})] = cv('  Net Yıllara Yaygın', { ...sYN, alignment:{horizontal:'left',vertical:'center'} })
+    ayHesaplar.forEach((h, i) => { ws2[utils.encode_cell({r:r2,c:i+1})] = para(h.yaygınNet, sYN) })
     r2++
 
     ws2['!cols'] = [{wch:32}, ...aylar.map(() => ({wch:16}))]
