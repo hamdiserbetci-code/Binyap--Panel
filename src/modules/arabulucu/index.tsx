@@ -62,6 +62,7 @@ const emptyKisi = { tc_kimlik: '', ad_soyad: '', telefon: '', adres: '', giris_t
 export default function ArabulucuModule({ firma }: AppCtx) {
   const [dosyalar, setDosyalar]   = useState<any[]>([])
   const [projeler, setProjeler]   = useState<any[]>([])
+  const [personeller, setPersoneller] = useState<any[]>([])
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
   const [durumF, setDurumF]       = useState('hepsi')
@@ -73,21 +74,102 @@ export default function ArabulucuModule({ firma }: AppCtx) {
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(emptyForm)
   const [kisiler, setKisiler]     = useState([{ ...emptyKisi }])
+  const [personelModal, setPersonelModal] = useState(false)
+  const [personelSearch, setPersonelSearch] = useState('')
+  const [seciliPersoneller, setSeciliPersoneller] = useState<Set<string>>(new Set())
 
   async function load() {
     setLoading(true)
-    const [d, p] = await Promise.all([
+    const [d, p, per] = await Promise.all([
       supabase.from('arabulucu_dosyalar')
         .select('*, projeler(proje_adi)')
         .eq('firma_id', firma.id)
         .order('created_at', { ascending: false }),
       supabase.from('projeler').select('id, proje_adi').eq('firma_id', firma.id),
+      supabase.from('personeller').select('id,ad_soyad,tc_kimlik,telefon,ise_giris_tarihi,isten_cikis_tarihi,adres').eq('firma_id', firma.id).order('ad_soyad'),
     ])
     setDosyalar(d.data || [])
     setProjeler(p.data || [])
+    setPersoneller(per.data || [])
     setLoading(false)
   }
   useEffect(() => { load() }, [firma.id])
+
+  // Personel seçimini kişi listesine aktar
+  function personeldenEkle() {
+    const secili = personeller.filter(p => seciliPersoneller.has(p.id))
+    const yeniKisiler = secili.map(p => ({
+      ...emptyKisi,
+      tc_kimlik:    p.tc_kimlik || '',
+      ad_soyad:     p.ad_soyad || '',
+      telefon:      p.telefon || '',
+      adres:        p.adres || '',
+      giris_tarihi: p.ise_giris_tarihi || '',
+      cikis_tarihi: p.isten_cikis_tarihi || '',
+    }))
+    setKisiler(prev => {
+      // Boş tek kişi varsa değiştir, yoksa ekle
+      const bos = prev.length === 1 && !prev[0].tc_kimlik && !prev[0].ad_soyad
+      return bos ? yeniKisiler : [...prev, ...yeniKisiler]
+    })
+    setSeciliPersoneller(new Set())
+    setPersonelModal(false)
+  }
+
+  // Excel export — tek sayfa, tüm kişiler
+  async function exportExcel() {
+    const XLSX = await import('xlsx-js-style')
+    const { utils, writeFile } = XLSX
+    const KOYU='0F172A'; const BEYAZ='FFFFFF'; const SINIR='E2E8F0'; const MAVI='1E3A5F'
+    const brd = { top:{style:'thin',color:{rgb:SINIR}}, bottom:{style:'thin',color:{rgb:SINIR}}, left:{style:'thin',color:{rgb:SINIR}}, right:{style:'thin',color:{rgb:SINIR}} }
+    const cv = (v:any,s:any) => ({ v:v??'', s, t:typeof v==='number'?'n':'s' })
+    const sTh = { font:{name:'Calibri',sz:9,bold:true,color:{rgb:BEYAZ}}, fill:{fgColor:{rgb:MAVI}}, alignment:{horizontal:'center',vertical:'center'}, border:brd }
+    const sTd = (z:boolean) => ({ font:{name:'Calibri',sz:9,color:{rgb:KOYU}}, fill:{fgColor:{rgb:z?'F8FAFC':BEYAZ}}, alignment:{vertical:'center'}, border:brd })
+    const sPara = (z:boolean) => ({ ...sTd(z), alignment:{horizontal:'right',vertical:'center'}, numFmt:'#,##0.00 ₺' })
+
+    const ws:any = {}; const merges:any[] = []; const COLS=12; let row=0
+
+    // Başlık
+    ws[utils.encode_cell({r:row,c:0})] = cv(`${firma.ad.toUpperCase()} — ARABULUCU DOSYALARI`, {font:{name:'Calibri',sz:13,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'left',vertical:'center'}})
+    for(let i=1;i<COLS-1;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',{fill:{fgColor:{rgb:KOYU}}})
+    ws[utils.encode_cell({r:row,c:COLS-1})] = cv(new Date().toLocaleDateString('tr-TR'),{font:{name:'Calibri',sz:9,color:{rgb:'BFDBFE'}},fill:{fgColor:{rgb:KOYU}},alignment:{horizontal:'right',vertical:'center'}})
+    merges.push({s:{r:row,c:0},e:{r:row,c:COLS-2}}); row+=2
+
+    ;['TC Kimlik','Ad Soyad','Telefon','İşe Giriş','İşten Çıkış','Çıkış Nedeni','Ödenecek Tutar','Ödeme Tarihi','Çalıştığı Firma','Ana Firma','Avukat','Durum'].forEach((h,i)=>{ ws[utils.encode_cell({r:row,c:i})] = cv(h,sTh) }); row++
+
+    const cikisNedeniL = (v:string) => CIKIS_NEDENLERI.find(c=>c.v===v)?.l || v || '-'
+
+    filtered.forEach((d,idx) => {
+      const z = idx%2===1
+      ws[utils.encode_cell({r:row,c:0})]  = cv(d.tc_kimlik||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:1})]  = cv(d.ad_soyad||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:2})]  = cv(d.telefon||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:3})]  = cv(d.giris_tarihi ? new Date(d.giris_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+      ws[utils.encode_cell({r:row,c:4})]  = cv(d.cikis_tarihi ? new Date(d.cikis_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+      ws[utils.encode_cell({r:row,c:5})]  = cv(cikisNedeniL(d.cikis_nedeni), sTd(z))
+      ws[utils.encode_cell({r:row,c:6})]  = d.odenecek_tutar ? {v:Number(d.odenecek_tutar),s:sPara(z),t:'n'} : cv('-',sTd(z))
+      ws[utils.encode_cell({r:row,c:7})]  = cv(d.odeme_tarihi ? new Date(d.odeme_tarihi).toLocaleDateString('tr-TR') : '-', sTd(z))
+      ws[utils.encode_cell({r:row,c:8})]  = cv(d.calistigi_firma||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:9})]  = cv(d.ana_firma_adi||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:10})] = cv(d.avukat_adi||'-', sTd(z))
+      ws[utils.encode_cell({r:row,c:11})] = cv(ADIMLAR.find(a=>a.kodu===d.durum)?.adi||d.durum||'-', {...sTd(z), font:{name:'Calibri',sz:9,bold:true,color:{rgb:d.durum==='tamamlandi'?'166534':'1E40AF'}}})
+      row++
+    })
+
+    // Toplam
+    const topS = {font:{name:'Calibri',sz:10,bold:true,color:{rgb:BEYAZ}},fill:{fgColor:{rgb:'1E293B'}},alignment:{horizontal:'left',vertical:'center'},border:{top:{style:'medium',color:{rgb:KOYU}},bottom:{style:'medium',color:{rgb:KOYU}},left:{style:'thin',color:{rgb:KOYU}},right:{style:'thin',color:{rgb:KOYU}}}}
+    ws[utils.encode_cell({r:row,c:0})] = cv(`TOPLAM: ${filtered.length} dosya`, topS)
+    for(let i=1;i<6;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',topS)
+    ws[utils.encode_cell({r:row,c:6})] = {v:filtered.reduce((s,d)=>s+Number(d.odenecek_tutar||0),0), s:{...topS,alignment:{horizontal:'right',vertical:'center'},numFmt:'#,##0.00 ₺'}, t:'n'}
+    for(let i=7;i<COLS;i++) ws[utils.encode_cell({r:row,c:i})] = cv('',topS)
+    merges.push({s:{r:row,c:0},e:{r:row,c:5}}); row++
+
+    ws['!cols'] = [{wch:14},{wch:22},{wch:14},{wch:12},{wch:12},{wch:22},{wch:16},{wch:12},{wch:24},{wch:22},{wch:18},{wch:20}]
+    ws['!merges'] = merges
+    ws['!ref'] = utils.encode_range({s:{r:0,c:0},e:{r:row,c:COLS-1}})
+    const wb = utils.book_new(); utils.book_append_sheet(wb, ws, 'Arabulucu Dosyalari')
+    writeFile(wb, `arabulucu-${firma.ad}-${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
 
   const filtered = useMemo(() => dosyalar.filter(d => {
     if (durumF !== 'hepsi' && d.durum !== durumF) return false
@@ -202,6 +284,7 @@ export default function ArabulucuModule({ firma }: AppCtx) {
         action={
           <div className="flex gap-2">
             <Btn variant="secondary" size="sm" icon={<RefreshCw className="w-4 h-4" />} onClick={load}>Yenile</Btn>
+            <Btn variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportExcel}>Excel</Btn>
             <Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni Dosya</Btn>
           </div>
         }
@@ -279,10 +362,16 @@ export default function ArabulucuModule({ firma }: AppCtx) {
                   <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">{kisiler.length} kişi</span>
                 </h3>
                 {!editing && (
-                  <Btn size="sm" variant="secondary" icon={<Plus className="w-3.5 h-3.5" />}
-                    onClick={() => setKisiler(p => [...p, { ...emptyKisi }])}>
-                    Kişi Ekle
-                  </Btn>
+                  <div className="flex gap-2">
+                    <Btn size="sm" variant="secondary" icon={<Users className="w-3.5 h-3.5" />}
+                      onClick={() => { setPersonelSearch(''); setSeciliPersoneller(new Set()); setPersonelModal(true) }}>
+                      Personelden Seç
+                    </Btn>
+                    <Btn size="sm" variant="secondary" icon={<Plus className="w-3.5 h-3.5" />}
+                      onClick={() => setKisiler(p => [...p, { ...emptyKisi }])}>
+                      Kişi Ekle
+                    </Btn>
+                  </div>
                 )}
               </div>
               <div className="space-y-3">
@@ -426,6 +515,44 @@ export default function ArabulucuModule({ firma }: AppCtx) {
                 💡 {kisiler.filter(k => k.tc_kimlik && k.ad_soyad).length} kişi için ayrı ayrı arabulucu dosyası oluşturulacak. Firma, avukat ve proje bilgileri hepsinde aynı olacak.
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Personel Seçim Modalı */}
+      {personelModal && (
+        <Modal title="Personelden Seç" onClose={() => setPersonelModal(false)} size="lg"
+          footer={<><Btn variant="secondary" onClick={() => setPersonelModal(false)}>İptal</Btn><Btn onClick={personeldenEkle} disabled={seciliPersoneller.size === 0}>{seciliPersoneller.size} Kişiyi Ekle</Btn></>}>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder="Ad, TC ara..." value={personelSearch}
+                onChange={e => setPersonelSearch(e.target.value)}
+                className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{seciliPersoneller.size} kişi seçildi</span>
+              <div className="flex gap-3">
+                <button onClick={() => setSeciliPersoneller(new Set(personeller.filter(p => !personelSearch || p.ad_soyad?.toLowerCase().includes(personelSearch.toLowerCase()) || p.tc_kimlik?.includes(personelSearch)).map(p => p.id)))} className="text-indigo-600 hover:underline">Tümünü Seç</button>
+                <button onClick={() => setSeciliPersoneller(new Set())} className="text-gray-500 hover:underline">Temizle</button>
+              </div>
+            </div>
+            <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+              {personeller
+                .filter(p => !personelSearch || p.ad_soyad?.toLowerCase().includes(personelSearch.toLowerCase()) || p.tc_kimlik?.includes(personelSearch))
+                .map(p => (
+                  <label key={p.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 cursor-pointer">
+                    <input type="checkbox" checked={seciliPersoneller.has(p.id)}
+                      onChange={e => setSeciliPersoneller(prev => { const s = new Set(prev); e.target.checked ? s.add(p.id) : s.delete(p.id); return s })}
+                      className="w-4 h-4 rounded text-indigo-600" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{p.ad_soyad}</p>
+                      <p className="text-xs text-gray-400">{p.tc_kimlik || '-'} {p.telefon ? `· ${p.telefon}` : ''}</p>
+                    </div>
+                    {p.isten_cikis_tarihi && <span className="text-xs text-red-500 flex-shrink-0">Çıkış: {fmtDate(p.isten_cikis_tarihi)}</span>}
+                  </label>
+                ))}
+            </div>
           </div>
         </Modal>
       )}
