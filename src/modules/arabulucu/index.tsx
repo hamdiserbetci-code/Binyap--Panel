@@ -56,6 +56,8 @@ const emptyForm = {
   proje_id: '', notlar: '',
 }
 
+const emptyKisi = { tc_kimlik: '', ad_soyad: '', telefon: '', adres: '', giris_tarihi: '', cikis_tarihi: '', cikis_nedeni: 'isveren_fesih', odenecek_tutar: '', odeme_tarihi: '' }
+
 // ─── Ana Modül ────────────────────────────────────────────────
 export default function ArabulucuModule({ firma }: AppCtx) {
   const [dosyalar, setDosyalar]   = useState<any[]>([])
@@ -70,8 +72,7 @@ export default function ArabulucuModule({ firma }: AppCtx) {
   const [delId, setDelId]         = useState<string | null>(null)
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(emptyForm)
-
-  async function load() {
+  const [kisiler, setKisiler]     = useState([{ ...emptyKisi }])
     setLoading(true)
     const [d, p] = await Promise.all([
       supabase.from('arabulucu_dosyalar')
@@ -111,6 +112,7 @@ export default function ArabulucuModule({ firma }: AppCtx) {
       calistigi_firma: firma.ad,
       firma_vergi_no:  firma.vergi_no || '',
     })
+    setKisiler([{ ...emptyKisi }])
     setEditing(null); setModal(true)
   }
 
@@ -138,40 +140,48 @@ export default function ArabulucuModule({ firma }: AppCtx) {
       proje_id:        d.proje_id || '',
       notlar:          d.notlar || '',
     })
+    setKisiler([{ tc_kimlik: d.tc_kimlik||'', ad_soyad: d.ad_soyad||'', telefon: d.telefon||'', adres: d.adres||'', giris_tarihi: d.giris_tarihi||'', cikis_tarihi: d.cikis_tarihi||'', cikis_nedeni: d.cikis_nedeni||'isveren_fesih', odenecek_tutar: String(d.odenecek_tutar||''), odeme_tarihi: d.odeme_tarihi||'' }])
     setEditing(d); setModal(true)
   }
 
   async function save() {
-    if (!form.tc_kimlik || !form.ad_soyad) return alert('TC Kimlik ve Ad Soyad zorunludur')
-    setSaving(true)
-    const payload = {
-      tc_kimlik:        form.tc_kimlik,
-      ad_soyad:         form.ad_soyad,
-      telefon:          form.telefon || null,
-      adres:            form.adres || null,
-      giris_tarihi:     form.giris_tarihi || null,
-      cikis_tarihi:     form.cikis_tarihi || null,
-      cikis_nedeni:     form.cikis_nedeni,
-      odenecek_tutar:   form.odenecek_tutar ? Number(form.odenecek_tutar) : null,
-      odeme_tarihi:     form.odeme_tarihi || null,
-      calistigi_firma:  form.calistigi_firma || null,
-      firma_vergi_no:   form.firma_vergi_no || null,
-      firma_adresi:     form.firma_adresi || null,
-      firma_vekili:     form.firma_vekili || null,
-      ana_firma_adi:    form.ana_firma_adi || null,
-      ana_firma_adresi: form.ana_firma_adresi || null,
-      ana_firma_vkn:    form.ana_firma_vkn || null,
-      avukat_adi:       form.avukat_adi || null,
-      avukat_telefon:   form.avukat_telefon || null,
-      avukat_email:     form.avukat_email || null,
-      proje_id:         form.proje_id || null,
-      notlar:           form.notlar || null,
-      updated_at:       new Date().toISOString(),
-    }
     if (editing) {
+      // Düzenleme: tek kişi
+      const k = kisiler[0]
+      if (!k.tc_kimlik || !k.ad_soyad) return alert('TC Kimlik ve Ad Soyad zorunludur')
+      setSaving(true)
+      const payload = {
+        tc_kimlik: k.tc_kimlik, ad_soyad: k.ad_soyad, telefon: k.telefon||null, adres: k.adres||null,
+        giris_tarihi: k.giris_tarihi||null, cikis_tarihi: k.cikis_tarihi||null, cikis_nedeni: k.cikis_nedeni,
+        odenecek_tutar: k.odenecek_tutar ? Number(k.odenecek_tutar) : null, odeme_tarihi: k.odeme_tarihi||null,
+        calistigi_firma: form.calistigi_firma||null, firma_vergi_no: form.firma_vergi_no||null,
+        firma_adresi: form.firma_adresi||null, firma_vekili: form.firma_vekili||null,
+        ana_firma_adi: form.ana_firma_adi||null, ana_firma_adresi: form.ana_firma_adresi||null, ana_firma_vkn: form.ana_firma_vkn||null,
+        avukat_adi: form.avukat_adi||null, avukat_telefon: form.avukat_telefon||null, avukat_email: form.avukat_email||null,
+        proje_id: form.proje_id||null, notlar: form.notlar||null, updated_at: new Date().toISOString(),
+      }
       await supabase.from('arabulucu_dosyalar').update(payload).eq('id', editing.id)
     } else {
-      await supabase.from('arabulucu_dosyalar').insert({ ...payload, firma_id: firma.id, durum: 'sablon_hazirlandi' })
+      // Yeni: her kişi için ayrı dosya
+      const gecerli = kisiler.filter(k => k.tc_kimlik && k.ad_soyad)
+      if (gecerli.length === 0) return alert('En az bir kişi için TC Kimlik ve Ad Soyad zorunludur')
+      setSaving(true)
+      const ortak = {
+        firma_id: firma.id, durum: 'sablon_hazirlandi',
+        calistigi_firma: form.calistigi_firma||null, firma_vergi_no: form.firma_vergi_no||null,
+        firma_adresi: form.firma_adresi||null, firma_vekili: form.firma_vekili||null,
+        ana_firma_adi: form.ana_firma_adi||null, ana_firma_adresi: form.ana_firma_adresi||null, ana_firma_vkn: form.ana_firma_vkn||null,
+        avukat_adi: form.avukat_adi||null, avukat_telefon: form.avukat_telefon||null, avukat_email: form.avukat_email||null,
+        proje_id: form.proje_id||null, notlar: form.notlar||null,
+      }
+      for (const k of gecerli) {
+        await supabase.from('arabulucu_dosyalar').insert({
+          ...ortak,
+          tc_kimlik: k.tc_kimlik, ad_soyad: k.ad_soyad, telefon: k.telefon||null, adres: k.adres||null,
+          giris_tarihi: k.giris_tarihi||null, cikis_tarihi: k.cikis_tarihi||null, cikis_nedeni: k.cikis_nedeni,
+          odenecek_tutar: k.odenecek_tutar ? Number(k.odenecek_tutar) : null, odeme_tarihi: k.odeme_tarihi||null,
+        })
+      }
     }
     setSaving(false); setModal(false); load()
   }
@@ -258,48 +268,89 @@ export default function ArabulucuModule({ firma }: AppCtx) {
           footer={<><Btn variant="secondary" onClick={() => setModal(false)}>İptal</Btn><Btn onClick={save} disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</Btn></>}
         >
           <div className="space-y-6">
-            {/* Personel Bilgileri */}
+            {/* Kişi Listesi */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-500" />Personel Bilgileri
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="TC Kimlik No" required>
-                  <input type="text" value={form.tc_kimlik} onChange={sf('tc_kimlik')} className={inputCls} maxLength={11} placeholder="12345678901" />
-                </Field>
-                <Field label="Ad Soyad" required>
-                  <input type="text" value={form.ad_soyad} onChange={sf('ad_soyad')} className={inputCls} />
-                </Field>
-                <Field label="Telefon">
-                  <input type="text" value={form.telefon} onChange={sf('telefon')} className={inputCls} placeholder="5XX XXX XXXX" />
-                </Field>
-                <Field label="Adres" className="md:col-span-2">
-                  <input type="text" value={form.adres} onChange={sf('adres')} className={inputCls} />
-                </Field>
-                <Field label="İşe Giriş Tarihi">
-                  <input type="date" value={form.giris_tarihi} onChange={sf('giris_tarihi')} className={inputCls} />
-                </Field>
-                <Field label="İşten Çıkış Tarihi">
-                  <input type="date" value={form.cikis_tarihi} onChange={sf('cikis_tarihi')} className={inputCls} />
-                </Field>
-                <Field label="Çıkış Nedeni">
-                  <select value={form.cikis_nedeni} onChange={sf('cikis_nedeni')} className={inputCls}>
-                    {CIKIS_NEDENLERI.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
-                  </select>
-                </Field>
-                <Field label="Proje">
-                  <select value={form.proje_id} onChange={sf('proje_id')} className={inputCls}>
-                    <option value="">Seçiniz</option>
-                    {projeler.map(p => <option key={p.id} value={p.id}>{p.proje_adi}</option>)}
-                  </select>
-                </Field>
-                <Field label="Ödenecek Tutar (₺)">
-                  <input type="number" step="0.01" value={form.odenecek_tutar} onChange={sf('odenecek_tutar')} className={inputCls} />
-                </Field>
-                <Field label="Ödeme Tarihi">
-                  <input type="date" value={form.odeme_tarihi} onChange={sf('odeme_tarihi')} className={inputCls} />
-                </Field>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-500" />
+                  Personel Listesi
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">{kisiler.length} kişi</span>
+                </h3>
+                {!editing && (
+                  <Btn size="sm" variant="secondary" icon={<Plus className="w-3.5 h-3.5" />}
+                    onClick={() => setKisiler(p => [...p, { ...emptyKisi }])}>
+                    Kişi Ekle
+                  </Btn>
+                )}
               </div>
+              <div className="space-y-3">
+                {kisiler.map((k, idx) => (
+                  <div key={idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 relative">
+                    {!editing && kisiler.length > 1 && (
+                      <button onClick={() => setKisiler(p => p.filter((_,i) => i !== idx))}
+                        className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 rounded">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div className="text-xs font-semibold text-indigo-600 mb-2">{idx + 1}. Kişi</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Field label="TC Kimlik No" required>
+                        <input type="text" value={k.tc_kimlik}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, tc_kimlik: e.target.value} : x))}
+                          className={inputCls} maxLength={11} placeholder="12345678901" />
+                      </Field>
+                      <Field label="Ad Soyad" required>
+                        <input type="text" value={k.ad_soyad}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, ad_soyad: e.target.value} : x))}
+                          className={inputCls} />
+                      </Field>
+                      <Field label="Telefon">
+                        <input type="text" value={k.telefon}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, telefon: e.target.value} : x))}
+                          className={inputCls} placeholder="5XX XXX XXXX" />
+                      </Field>
+                      <Field label="Adres">
+                        <input type="text" value={k.adres}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, adres: e.target.value} : x))}
+                          className={inputCls} />
+                      </Field>
+                      <Field label="İşe Giriş Tarihi">
+                        <input type="date" value={k.giris_tarihi}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, giris_tarihi: e.target.value} : x))}
+                          className={inputCls} />
+                      </Field>
+                      <Field label="İşten Çıkış Tarihi">
+                        <input type="date" value={k.cikis_tarihi}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, cikis_tarihi: e.target.value} : x))}
+                          className={inputCls} />
+                      </Field>
+                      <Field label="Çıkış Nedeni">
+                        <select value={k.cikis_nedeni}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, cikis_nedeni: e.target.value} : x))}
+                          className={inputCls}>
+                          {CIKIS_NEDENLERI.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Ödenecek Tutar (₺)">
+                        <input type="number" step="0.01" value={k.odenecek_tutar}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, odenecek_tutar: e.target.value} : x))}
+                          className={inputCls} />
+                      </Field>
+                      <Field label="Ödeme Tarihi">
+                        <input type="date" value={k.odeme_tarihi}
+                          onChange={e => setKisiler(p => p.map((x,i) => i===idx ? {...x, odeme_tarihi: e.target.value} : x))}
+                          className={inputCls} />
+                      </Field>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {!editing && (
+                <button onClick={() => setKisiler(p => [...p, { ...emptyKisi }])}
+                  className="mt-2 w-full text-xs py-2 rounded-lg border border-dashed border-indigo-300 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Yeni Kişi Ekle
+                </button>
+              )}
             </div>
 
             {/* Firma Bilgileri */}
@@ -362,6 +413,17 @@ export default function ArabulucuModule({ firma }: AppCtx) {
             <Field label="Notlar">
               <textarea rows={2} value={form.notlar} onChange={sf('notlar')} className={inputCls} />
             </Field>
+            <Field label="Proje">
+              <select value={form.proje_id} onChange={sf('proje_id')} className={inputCls}>
+                <option value="">Seçiniz</option>
+                {projeler.map(p => <option key={p.id} value={p.id}>{p.proje_adi}</option>)}
+              </select>
+            </Field>
+            {!editing && kisiler.length > 1 && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-xs text-indigo-700">
+                💡 {kisiler.filter(k => k.tc_kimlik && k.ad_soyad).length} kişi için ayrı ayrı arabulucu dosyası oluşturulacak. Firma, avukat ve proje bilgileri hepsinde aynı olacak.
+              </div>
+            )}
           </div>
         </Modal>
       )}
