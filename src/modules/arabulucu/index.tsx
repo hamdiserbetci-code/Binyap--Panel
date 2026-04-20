@@ -73,6 +73,8 @@ export default function ArabulucuModule({ firma }: AppCtx) {
   const [saving, setSaving]       = useState(false)
   const [form, setForm]           = useState(emptyForm)
   const [kisiler, setKisiler]     = useState([{ ...emptyKisi }])
+
+  async function load() {
     setLoading(true)
     const [d, p] = await Promise.all([
       supabase.from('arabulucu_dosyalar')
