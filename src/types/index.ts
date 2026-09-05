@@ -197,7 +197,6 @@ export type ModuleId =
   | 'kasa'
   | 'odeme-plani'
   | 'kar-zarar'
-  | 'projeler'
   | 'ekipler'
   | 'personel'
   | 'bordro'

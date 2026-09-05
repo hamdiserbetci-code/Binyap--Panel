@@ -218,7 +218,6 @@ export default function App() {
       case 'kasa':        return <KasaModule  {...ctx} />
       case 'odeme-plani': return <OdemePlani  {...ctx} />
       case 'kar-zarar':   return <KarZarar    {...ctx} />
-      case 'projeler':    return <Projeler    {...ctx} />
       case 'ekipler':     return <Ekipler     {...ctx} />
       case 'personel':    return <Personel    {...ctx} />
       case 'bordro':      return <Bordro      {...ctx} />
