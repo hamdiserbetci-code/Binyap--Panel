@@ -101,9 +101,6 @@ export default function Dashboard({ firma, onNavigate }: Props) {
           sub={fmt(stats.bekleyenOdemeTutar)}
           icon={<Clock className="w-6 h-6" />} color="text-amber-600"
           onClick={() => onNavigate('odeme-plani')} />
-        <StatCard label="Aktif Proje" value={stats.aktifProje}
-          icon={<FolderOpen className="w-6 h-6" />} color="text-purple-600"
-          onClick={() => onNavigate('projeler')} />
         <StatCard label="Aktif Personel" value={stats.aktifPersonel}
           icon={<Users className="w-6 h-6" />} color="text-sky-600"
           onClick={() => onNavigate('personel')} />
@@ -123,7 +120,6 @@ export default function Dashboard({ firma, onNavigate }: Props) {
           {([
             { id: 'kasa',        label: 'Kasa İşlemi',  icon: Wallet,     color: 'bg-emerald-50 text-emerald-700' },
             { id: 'odeme-plani', label: 'Ödeme Ekle',   icon: Clock,      color: 'bg-amber-50 text-amber-700' },
-            { id: 'projeler',    label: 'Proje Ekle',   icon: FolderOpen, color: 'bg-purple-50 text-purple-700' },
             { id: 'personel',    label: 'Personel',     icon: Users,      color: 'bg-sky-50 text-sky-700' },
           ] as const).map(item => {
             const Icon = item.icon
