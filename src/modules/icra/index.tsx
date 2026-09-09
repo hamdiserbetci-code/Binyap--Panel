@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react'
 import {
   Scale, Plus, Edit, Trash2, Search, AlertTriangle,
   CheckCircle, Clock, ChevronDown, ChevronRight,
-  Upload, Eye, Download, X, FileText, Printer
+  Upload, Eye, Download, X, FileText, Printer, BarChart3, FileSpreadsheet
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import {
@@ -106,6 +106,7 @@ export default function IcraModule({ firma }: AppCtx) {
   const [form, setForm]           = useState(emptyForm)
   // Yeni kayıt sırasında belge yükleme için geçici state
   const [yeniKayitId, setYeniKayitId] = useState<string | null>(null)
+  const [raporModal, setRaporModal] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -139,6 +140,33 @@ export default function IcraModule({ firma }: AppCtx) {
     toplamBorc:   data.filter(r => r.durum === 'aktif').reduce((s, r) => s + Number(r.kalan_borc || r.toplam_borc || 0), 0),
     aylikKesinti: data.filter(r => r.durum === 'aktif').reduce((s, r) => s + Number(r.aylik_kesinti || 0), 0),
   }), [data])
+
+  async function excelRaporuIndir() {
+    const XLSX = await import('xlsx-js-style')
+    const { utils, writeFile } = XLSX
+    const basliklar = ['Dosya No', 'Personel', 'TC Kimlik', 'İcra Türü', 'İcra Dairesi', 'Alacaklı', 'Toplam Borç', 'Ödenen', 'Kalan Borç', 'Aylık Kesinti', 'Durum', 'Başlangıç', 'Bitiş', 'Avukat']
+    const rows = filtered.map(r => [
+      r.dosya_no || '', r.personeller?.ad_soyad || r.personel_adi || '', r.personeller?.tc_kimlik || r.tc_kimlik || '',
+      TIPLER.find(t => t.v === r.icra_tipi)?.l || r.icra_tipi || '', r.icra_dairesi || '', r.alacakli || '',
+      Number(r.toplam_borc || 0), Number(r.odenen_tutar || 0), Number(r.kalan_borc ?? r.toplam_borc ?? 0),
+      Number(r.aylik_kesinti || 0), DURUMLAR[r.durum]?.l || r.durum || '', fmtDate(r.baslangic_tarihi), fmtDate(r.bitis_tarihi), r.avukat_adi || '',
+    ])
+    const ws = utils.aoa_to_sheet([
+      [`${firma.ad} - İCRA TAKİBİ RAPORU`],
+      [`Rapor tarihi: ${new Date().toLocaleDateString('tr-TR')}`, `Kayıt sayısı: ${filtered.length}`],
+      [], basliklar, ...rows,
+    ])
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: basliklar.length - 1 } }]
+    ws['!cols'] = basliklar.map((_, index) => ({ wch: [16, 24, 15, 16, 24, 24, 15, 15, 15, 15, 18, 14, 14, 22][index] }))
+    const headerRow = 3
+    for (let col = 0; col < basliklar.length; col++) {
+      const cell = ws[utils.encode_cell({ r: headerRow, c: col })]
+      if (cell) cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '9F1239' } }, alignment: { horizontal: 'center' } }
+    }
+    const workbook = utils.book_new()
+    utils.book_append_sheet(workbook, ws, 'İcra Raporu')
+    writeFile(workbook, `icra-raporu-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
   function openNew() { setForm(emptyForm); setEditing(null); setModal(true) }
   function openEdit(r: any) {
@@ -211,7 +239,7 @@ export default function IcraModule({ firma }: AppCtx) {
         title="İcra Takibi"
         subtitle="Personel icra dosyaları, belgeler ve ödeme takibi"
         iconBg="bg-rose-50"
-        action={<Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni İcra Kaydı</Btn>}
+        action={<div className="flex items-center gap-2"><Btn size="sm" variant="secondary" icon={<BarChart3 className="w-4 h-4" />} onClick={() => setRaporModal(true)}>Raporlama</Btn><Btn size="sm" icon={<Plus className="w-4 h-4" />} onClick={openNew}>Yeni İcra Kaydı</Btn></div>}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -234,6 +262,24 @@ export default function IcraModule({ firma }: AppCtx) {
           </select>
         </div>
       </Card>
+
+      {raporModal && (
+        <Modal title="İcra Takibi Raporu" onClose={() => setRaporModal(false)} size="xl"
+          footer={<><Btn variant="secondary" onClick={() => setRaporModal(false)}>Kapat</Btn><Btn icon={<FileSpreadsheet className="w-4 h-4" />} onClick={excelRaporuIndir}>Excel İndir</Btn></>}>
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard label="Rapor Kayıtları" value={filtered.length} color="text-rose-600" />
+              <StatCard label="Aktif Dosya" value={filtered.filter(r => r.durum === 'aktif').length} color="text-red-600" />
+              <StatCard label="Kalan Borç" value={fmt(filtered.reduce((sum, r) => sum + Number(r.kalan_borc ?? r.toplam_borc ?? 0), 0))} color="text-orange-600" />
+              <StatCard label="Aylık Kesinti" value={fmt(filtered.reduce((sum, r) => sum + Number(r.aylik_kesinti || 0), 0))} color="text-blue-600" />
+            </div>
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-sm"><thead className="bg-gray-50"><tr>{['Dosya No', 'Personel', 'Alacaklı', 'Kalan Borç', 'Aylık Kesinti', 'Durum'].map(header => <th key={header} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{header}</th>)}</tr></thead><tbody className="divide-y divide-gray-100">{filtered.map(row => <tr key={row.id}><td className="px-3 py-2 font-medium">{row.dosya_no}</td><td className="px-3 py-2">{row.personeller?.ad_soyad || row.personel_adi || '-'}</td><td className="px-3 py-2">{row.alacakli || '-'}</td><td className="px-3 py-2 font-semibold">{fmt(Number(row.kalan_borc ?? row.toplam_borc ?? 0))}</td><td className="px-3 py-2">{fmt(Number(row.aylik_kesinti || 0))}</td><td className="px-3 py-2"><Badge label={DURUMLAR[row.durum]?.l || row.durum} variant={DURUMLAR[row.durum]?.v || 'gray'} /></td></tr>)}</tbody></table>
+              {filtered.length === 0 && <p className="p-6 text-center text-sm text-gray-500">Raporlanacak kayıt bulunamadı.</p>}
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Master Grid */}
       <Card>
