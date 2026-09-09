@@ -163,7 +163,8 @@ export default function BordroModule({ firma }: AppCtx) {
   }
 
   const summary = useMemo(() => ({
-    toplam:      donemler.length,
+    toplam:      new Set(donemler.map(d => `${d.yil}-${d.ay}`)).size,
+    ekipSayisi:  donemler.length,
     devam:       donemler.filter(d => d.durum === 'hazirlaniyor').length,
     tamamlandi:  donemler.filter(d => d.durum === 'odendi').length,
   }), [donemler])
@@ -196,8 +197,9 @@ export default function BordroModule({ firma }: AppCtx) {
       />
 
       {/* Özet */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Toplam Dönem"  value={summary.toplam}     color="text-gray-700" />
+        <StatCard label="Toplam Ekip"    value={summary.ekipSayisi} color="text-cyan-600" />
         <StatCard label="Devam Eden"    value={summary.devam}      color="text-yellow-600" />
         <StatCard label="Tamamlanan"    value={summary.tamamlandi} color="text-green-600" />
       </div>
