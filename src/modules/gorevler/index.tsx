@@ -30,6 +30,11 @@ function nextRecurrenceDate(date: string, type: string) {
   if (type === 'yillik') next.setFullYear(next.getFullYear() + 1)
   return next.toISOString().slice(0, 10)
 }
+function monthEndReminder(date: string) {
+  const value = new Date(`${date}T09:00:00`)
+  value.setMonth(value.getMonth() + 1, 0)
+  return value.toISOString()
+}
 
 export default function GorevlerModule({ firma }: AppCtx) {
   const [tasks, setTasks] = useState<Gorev[]>([])
@@ -65,9 +70,9 @@ export default function GorevlerModule({ firma }: AppCtx) {
     if (!form.baslik.trim()) return alert('Görev başlığı zorunludur.')
     setSaving(true)
     if (form.yineleme_tipi !== 'yok' && !form.son_tarih) return alert('Yinelenen görevler için son tarih zorunludur.')
-    const payload = { baslik: form.baslik.trim(), aciklama: form.aciklama || null, durum: form.durum, oncelik: form.oncelik, kategori: form.kategori, atanan_kisi: form.atanan_kisi || null, son_tarih: form.son_tarih || null, hatirlatma_tarihi: form.hatirlatma_tarihi ? new Date(form.hatirlatma_tarihi).toISOString() : null, yineleme_tipi: form.yineleme_tipi === 'yok' ? null : form.yineleme_tipi, yineleme_bitis_tarihi: form.yineleme_tipi === 'yok' ? null : form.yineleme_bitis_tarihi || null, tamamlanma_tarihi: form.durum === 'tamamlandi' ? new Date().toISOString() : null, updated_at: new Date().toISOString() }
+    const payload = { baslik: form.baslik.trim(), aciklama: form.aciklama || null, durum: form.durum, oncelik: form.oncelik, kategori: form.kategori, atanan_kisi: form.atanan_kisi || null, son_tarih: form.son_tarih || null, hatirlatma_tarihi: form.yineleme_tipi !== 'yok' && form.son_tarih ? monthEndReminder(form.son_tarih) : form.hatirlatma_tarihi ? new Date(form.hatirlatma_tarihi).toISOString() : null, yineleme_tipi: form.yineleme_tipi === 'yok' ? null : form.yineleme_tipi, yineleme_bitis_tarihi: form.yineleme_tipi === 'yok' ? null : form.yineleme_bitis_tarihi || null, tamamlanma_tarihi: form.durum === 'tamamlandi' ? new Date().toISOString() : null, updated_at: new Date().toISOString() }
     const result = editing ? await supabase.from('gorevler').update(payload).eq('id', editing.id) : await supabase.from('gorevler').insert({ ...payload, firma_id: firma.id })
-    setSaving(false); if (result.error) return alert('Görev kaydedilemedi: ' + result.error.message)
+    setSaving(false); if (result.error) return alert(result.error.message.includes('yineleme_') ? 'Görev kaydedilemedi: Supabase veritabanı güncellemesi gerekli. database/gorev_schema.sql dosyasını Supabase SQL Editor’da çalıştırın.' : 'Görev kaydedilemedi: ' + result.error.message)
     setModal(false); setSelected(null); load()
   }
   async function updateStatus(task: Gorev, status: Durum) {
@@ -78,7 +83,7 @@ export default function GorevlerModule({ firma }: AppCtx) {
       if (!task.yineleme_bitis_tarihi || nextDate <= task.yineleme_bitis_tarihi) {
         await supabase.from('gorevler').insert({
           firma_id: firma.id, baslik: task.baslik, aciklama: task.aciklama, durum: 'bekliyor', oncelik: task.oncelik,
-          kategori: task.kategori, atanan_kisi: task.atanan_kisi, son_tarih: nextDate, hatirlatma_tarihi: null,
+          kategori: task.kategori, atanan_kisi: task.atanan_kisi, son_tarih: nextDate, hatirlatma_tarihi: monthEndReminder(nextDate),
           yineleme_tipi: task.yineleme_tipi, yineleme_bitis_tarihi: task.yineleme_bitis_tarihi,
         })
       }
