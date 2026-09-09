@@ -206,6 +206,7 @@ export type ModuleId =
   | 'is-takibi'
   | 'police'
   | 'teminat'
+  | 'beyanname'
   | 'arsiv'
   | 'raporlar'
   | 'ayarlar'

@@ -19,6 +19,7 @@ import Arabulucu   from '@/modules/arabulucu'
 import Icra        from '@/modules/icra'
 import IsTakibi    from '@/modules/is-takibi'
 import PoliceModule from '@/modules/police'
+import BeyannameModule from '@/modules/beyanname'
 import Raporlar     from '@/modules/raporlar'
 import Ayarlar      from '@/modules/ayarlar'
 import CariModule   from '@/modules/cari'
@@ -224,6 +225,7 @@ export default function App() {
       case 'icra':        return <Icra        {...ctx} />
       case 'is-takibi':   return <IsTakibi    {...ctx} />
       case 'police':      return <PoliceModule {...ctx} />
+      case 'beyanname':   return <BeyannameModule {...ctx} />
       case 'teminat':     return <TeminatModule {...ctx} />
       case 'arsiv':       return <ArsivModule  {...ctx} />
       case 'raporlar':    return <Raporlar    {...ctx} />
