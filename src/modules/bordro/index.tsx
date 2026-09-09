@@ -22,26 +22,26 @@ const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağus
 const SUREC_ADIMLARI: { kodu: SurecAdimKodu; adi: string; aciklama: string; kabul: string }[] = [
   {
     kodu: 'puantaj_toplama',
-    adi: 'Puantaj Toplama',
-    aciklama: 'Şantiyelerden puantaj listelerini topla ve yükle',
+    adi: 'Puantaj Geldi',
+    aciklama: 'Projeden ve ekipten aylık puantaj listesini al ve yükle',
     kabul: '.pdf,.xlsx,.xls,.jpg,.jpeg,.png',
   },
   {
     kodu: 'bordro_hazirlama',
-    adi: 'Bordro Hazırlama',
-    aciklama: 'Hazırlanan bordro listesini yükle',
-    kabul: '.pdf,.xlsx,.xls',
-  },
-  {
-    kodu: 'maas_odeme',
-    adi: 'Maaş Ödeme Listesi',
-    aciklama: 'Ekip bazlı maaş ödeme listesini yükle',
+    adi: 'Bordro Yapıldı',
+    aciklama: 'Hazırlanan bordro listesini kontrol için yükle',
     kabul: '.pdf,.xlsx,.xls',
   },
   {
     kodu: 'dekont_yukleme',
-    adi: 'Dekont Yükleme',
-    aciklama: 'Ödeme dekontlarını yükle',
+    adi: 'Teyit Edildi',
+    aciklama: 'Puantaj ve hazırlanan bordro kontrol edilip teyit edildi',
+    kabul: '.pdf,.xlsx,.xls,.jpg,.jpeg,.png',
+  },
+  {
+    kodu: 'maas_odeme',
+    adi: 'Maaşlar Ödendi',
+    aciklama: 'Maaş ödemeleri tamamlandı; ödeme listesi ve dekontları yükle',
     kabul: '.pdf,.xlsx,.xls,.jpg,.jpeg,.png',
   },
 ]
@@ -244,7 +244,7 @@ export default function BordroModule({ firma }: AppCtx) {
           <div className="space-y-4">
             <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-700">
               Dönem oluşturulduğunda <strong>4 süreç adımı</strong> otomatik oluşturulur:
-              Puantaj Toplama → Bordro Hazırlama → Maaş Ödeme → Dekont Yükleme
+              Puantaj Geldi → Bordro Yapıldı → Teyit Edildi → Maaşlar Ödendi
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -735,7 +735,7 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
                           <PuantajGiris donem={donem} firma={firma} />
                         )}
 
-                        {/* Maaş Ödeme adımına özel: Yüklü Excel'den Personel Oluştur */}
+                        {/* Maaş ödeme adımına özel: Yüklü Excel'den Personel Oluştur */}
                         {adimDef.kodu === 'maas_odeme' && (
                           <button
                             onClick={handlePersonelImport}
