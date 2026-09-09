@@ -44,6 +44,13 @@ CREATE INDEX IF NOT EXISTS beyanname_takibi_firma_tarih_idx ON beyanname_takibi(
 CREATE INDEX IF NOT EXISTS beyanname_odemeleri_beyanname_idx ON beyanname_odemeleri(beyanname_id);
 CREATE INDEX IF NOT EXISTS beyanname_belgeleri_beyanname_idx ON beyanname_belgeleri(beyanname_id);
 
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  beyanname_takibi,
+  beyanname_odemeleri,
+  beyanname_belgeleri
+TO authenticated;
+
 ALTER TABLE beyanname_takibi ENABLE ROW LEVEL SECURITY;
 ALTER TABLE beyanname_odemeleri ENABLE ROW LEVEL SECURITY;
 ALTER TABLE beyanname_belgeleri ENABLE ROW LEVEL SECURITY;
