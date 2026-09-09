@@ -22,20 +22,20 @@ const AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağus
 const SUREC_ADIMLARI: { kodu: SurecAdimKodu; adi: string; aciklama: string; kabul: string }[] = [
   {
     kodu: 'puantaj_toplama',
-    adi: 'Puantaj Geldi',
-    aciklama: 'Projeden ve ekipten aylık puantaj listesini al ve yükle',
+    adi: 'Puantajlar İstendi',
+    aciklama: 'Projeden ve ekipten aylık puantaj listesini talep et',
     kabul: '.pdf,.xlsx,.xls,.jpg,.jpeg,.png',
   },
   {
     kodu: 'bordro_hazirlama',
-    adi: 'Bordro Yapıldı',
-    aciklama: 'Hazırlanan bordro listesini kontrol için yükle',
+    adi: 'Puantajlar Geldi',
+    aciklama: 'Ekip puantajları teslim alındı ve kontrol için hazır',
     kabul: '.pdf,.xlsx,.xls',
   },
   {
     kodu: 'dekont_yukleme',
-    adi: 'Teyit Edildi',
-    aciklama: 'Puantaj ve hazırlanan bordro kontrol edilip teyit edildi',
+    adi: 'Bordrolama Yapıldı',
+    aciklama: 'Ekip puantajlarına göre bordro hazırlandı',
     kabul: '.pdf,.xlsx,.xls,.jpg,.jpeg,.png',
   },
   {
@@ -390,6 +390,11 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
     onRefresh()
   }
 
+  async function toggleAdim(adim: BordroSurecAdim | undefined) {
+    if (!adim) return
+    await updateAdimDurum(adim.id, adim.durum === 'tamamlandi' ? 'bekliyor' : 'tamamlandi')
+  }
+
   // ─── Yüklü Excel'den Personel Oluştur (Ekip Bazlı) ──────
   const [personelImporting, setPersonelImporting] = useState(false)
 
@@ -684,8 +689,19 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
                   return (
                     <div
                       key={adimDef.kodu}
-                      className={`bg-white rounded-xl border-2 transition-all ${
-                        isActive ? 'border-blue-400 shadow-md' : 'border-gray-200 hover:border-gray-300'
+                      onClick={() => toggleAdim(adim)}
+                      role="button"
+                      tabIndex={adim ? 0 : -1}
+                      onKeyDown={e => {
+                        if (adim && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          toggleAdim(adim)
+                        }
+                      }}
+                      className={`rounded-xl border-2 transition-all ${
+                        durum === 'tamamlandi'
+                          ? 'bg-emerald-50 border-emerald-300 opacity-70'
+                          : isActive ? 'bg-white border-blue-400 shadow-md' : 'bg-white border-gray-200 hover:border-cyan-400 hover:shadow-sm'
                       }`}
                     >
                       {/* Adım Başlık */}
@@ -703,7 +719,7 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
                       </div>
 
                       {/* Belgeler */}
-                      <div className="p-3 space-y-1.5">
+                      <div className="p-3 space-y-1.5" onClick={e => e.stopPropagation()}>
                         {adimBelgeler.map(b => (
                           <BelgeItem key={b.id} belge={b} onDelete={() => { loadDetail() }} />
                         ))}
@@ -713,7 +729,7 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
                       </div>
 
                       {/* Aksiyonlar */}
-                      <div className="px-3 pb-3 space-y-2">
+                      <div className="px-3 pb-3 space-y-2" onClick={e => e.stopPropagation()}>
                         <BelgeYukle
                           donemId={donem.id}
                           firmaId={firma.id}
