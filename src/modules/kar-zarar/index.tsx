@@ -13,11 +13,13 @@ const emptyForm = {
   ay: (new Date().getMonth() + 1).toString(),
   // GELİRLER
   hakedisler:        '0',
+  satis_faturalari:  '0',
   diger_satislar:    '0',
   // DONEM BASI STOK
   donem_basi_stok:   '0',
   // GİDERLER
   malzeme_alis:      '0',
+  alis_faturalari:   '0',
   iscilik:           '0',
   // GENEL YÖNETİM GİDERLERİ
   finans_gideri:     '0',
@@ -32,15 +34,17 @@ const emptyForm = {
   notlar: '',
 }
 
-type Form = typeof emptyForm
+type Form = Omit<typeof emptyForm, 'satis_faturalari' | 'alis_faturalari'> & { satis_faturalari?: string; alis_faturalari?: string }
 
 function hesapla(f: Form) {
   const hakedisler     = Number(f.hakedisler     || 0)
+  const satisFaturalari = Number((f as any).satis_faturalari || 0)
   const digerSatislar  = Number(f.diger_satislar || 0)
-  const toplamGelir    = hakedisler + digerSatislar
+  const toplamGelir    = hakedisler + satisFaturalari + digerSatislar
 
   const donemBasiStok  = Number(f.donem_basi_stok || 0)
-  const malzemeAlis    = Number(f.malzeme_alis    || 0)
+  const alisFaturalari = Number((f as any).alis_faturalari || 0)
+  const malzemeAlis    = Number(f.malzeme_alis    || 0) + alisFaturalari
   const iscilik        = Number(f.iscilik         || 0)
   const toplamUretimGider = donemBasiStok + malzemeAlis + iscilik
 
@@ -61,8 +65,8 @@ function hesapla(f: Form) {
   const yaygınNet      = yaygınGelir - yaygınGider
 
   return {
-    hakedisler, digerSatislar, toplamGelir,
-    donemBasiStok, malzemeAlis, iscilik, toplamUretimGider,
+    hakedisler, satisFaturalari, digerSatislar, toplamGelir,
+    donemBasiStok, alisFaturalari, malzemeAlis, iscilik, toplamUretimGider,
     finansGideri, sigortaGideri, amortisman, digerGiderler, toplamGenelGider,
     toplamGider, oncekiDevir, brutKarZarar, netKarZarar,
     yaygınGelir, yaygınGider, yaygınNet,
@@ -102,6 +106,18 @@ export default function KarZararModule({ firma }: AppCtx) {
 
   const yillar = useMemo(() => [...new Set(data.map(r => r.yil || new Date(r.donem||'').getFullYear()).filter(Boolean))].sort((a,b)=>b-a), [data])
   const filtreliData = useMemo(() => data.filter(r => String(r.yil || new Date(r.donem||'').getFullYear()) === yilF), [data, yilF])
+
+  const ucAylikOzet = useMemo(() => [0, 1, 2, 3].map(index => {
+    const aylar = filtreliData.filter(row => {
+      const ay = Number(row.ay || new Date(row.donem || '').getMonth() + 1)
+      return Math.floor((ay - 1) / 3) === index
+    })
+    return aylar.reduce((acc, row) => {
+      const h = hesapla({ ...emptyForm, hakedisler: String(row.hakedisler || 0), satis_faturalari: String(row.satis_faturalari || 0), diger_satislar: String(row.diger_satislar || 0), donem_basi_stok: String(row.donem_basi_stok || 0), alis_faturalari: String(row.alis_faturalari || 0), malzeme_alis: String(row.malzeme_alis || 0), iscilik: String(row.iscilik || 0), finans_gideri: String(row.finans_gideri || 0), sigorta_gideri: String(row.sigorta_gideri || 0), amortisman: String(row.amortisman || 0), diger_giderler: String(row.diger_giderler || 0), onceki_donem_devir: '0' })
+      acc.gelir += h.toplamGelir; acc.maliyet += h.toplamUretimGider; acc.gider += h.toplamGider; acc.net += h.brutKarZarar
+      return acc
+    }, { gelir: 0, maliyet: 0, gider: 0, net: 0 })
+  }), [filtreliData])
 
   // Yillik ozet
   const yillikOzet = useMemo(() => {
@@ -457,9 +473,11 @@ export default function KarZararModule({ firma }: AppCtx) {
       yil: String(r.yil || new Date(r.donem||'').getFullYear() || new Date().getFullYear()),
       ay:  String(r.ay  || new Date(r.donem||'').getMonth()+1  || 1),
       hakedisler:         String(r.hakedisler        || 0),
+      satis_faturalari:   String(r.satis_faturalari  || 0),
       diger_satislar:     String(r.diger_satislar    || r.diger_gelirler || 0),
       donem_basi_stok:    String(r.donem_basi_stok   || 0),
       malzeme_alis:       String(r.malzeme_alis       || r.malzeme_giderleri || 0),
+      alis_faturalari:    String(r.alis_faturalari    || 0),
       iscilik:            String(r.iscilik            || r.iscilik_giderleri || 0),
       finans_gideri:      String(r.finans_gideri      || r.finans_giderleri  || 0),
       sigorta_gideri:     String(r.sigorta_gideri     || 0),
@@ -481,9 +499,11 @@ export default function KarZararModule({ firma }: AppCtx) {
       yil: Number(form.yil), ay: Number(form.ay),
       donem: `${form.yil}-${String(form.ay).padStart(2,'0')}`,
       hakedisler:         Number(form.hakedisler        || 0),
+      satis_faturalari:   Number((form as any).satis_faturalari || 0),
       diger_satislar:     Number(form.diger_satislar    || 0),
       donem_basi_stok:    Number(form.donem_basi_stok   || 0),
       malzeme_alis:       Number(form.malzeme_alis       || 0),
+      alis_faturalari:    Number((form as any).alis_faturalari || 0),
       iscilik:            Number(form.iscilik            || 0),
       finans_gideri:      Number(form.finans_gideri      || 0),
       sigorta_gideri:     Number(form.sigorta_gideri     || 0),
@@ -569,6 +589,13 @@ export default function KarZararModule({ firma }: AppCtx) {
           <p className="text-xs text-indigo-400 mt-1">Gelir: {fmt(yillikOzet.yaygınGelir)} / Gider: {fmt(yillikOzet.yaygınGider)}</p>
         </div>
       </div>
+
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-4"><div><p className="text-sm font-semibold text-gray-800">3 Aylık Maliyet ve Kâr-Zarar</p><p className="text-xs text-gray-500">Alış faturaları + devreden stok + işçilik üzerinden dönemsel görünüm</p></div><span className="text-xs text-gray-400">{yilF}</span></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {ucAylikOzet.map((summary, index) => <div key={index} className="border border-gray-200 rounded-xl p-3"><p className="text-xs font-bold text-gray-700 mb-3">{index + 1}. Çeyrek <span className="font-normal text-gray-400">({index * 3 + 1}-{index * 3 + 3}. aylar)</span></p><div className="space-y-1 text-sm"><div className="flex justify-between"><span className="text-gray-500">Satış</span><b className="text-green-600">{fmt(summary.gelir)}</b></div><div className="flex justify-between"><span className="text-gray-500">Maliyet</span><b className="text-red-600">{fmt(summary.maliyet)}</b></div><div className="flex justify-between"><span className="text-gray-500">Toplam gider</span><b className="text-red-500">{fmt(summary.gider)}</b></div><div className={`flex justify-between border-t pt-2 mt-2 ${summary.net >= 0 ? 'text-emerald-700' : 'text-orange-600'}`}><span className="font-semibold">Net</span><b>{fmt(Math.abs(summary.net))} {summary.net >= 0 ? 'Kâr' : 'Zarar'}</b></div></div></div>)}
+        </div>
+      </Card>
 
       {/* Grafik - basit bar chart */}
       {filtreliData.length > 0 && (
@@ -676,6 +703,7 @@ export default function KarZararModule({ firma }: AppCtx) {
                         {bolumAcik(r.id,'gelir') && (
                         <div className="space-y-2">
                           <SatirItem label="Hakedisler" deger={h.hakedisler} renk="green" />
+                          <SatirItem label="Satış Faturaları" deger={h.satisFaturalari} renk="green" />
                           <SatirItem label="Diger Satislar" deger={h.digerSatislar} renk="green" />
                           <div className="border-t border-green-200 pt-2 mt-2">
                             <SatirItem label="TOPLAM GELİR" deger={h.toplamGelir} renk="green" bold />
@@ -693,6 +721,7 @@ export default function KarZararModule({ firma }: AppCtx) {
                         {bolumAcik(r.id,'gider') && (
                         <div className="space-y-2">
                           <SatirItem label="Donem Basi Stok" deger={h.donemBasiStok} renk="red" />
+                          <SatirItem label="Alış Faturaları" deger={h.alisFaturalari} renk="red" />
                           <SatirItem label="Malzeme Alislari" deger={h.malzemeAlis} renk="red" />
                           <SatirItem label="Iscilik" deger={h.iscilik} renk="red" />
                           <div className="border-t border-red-200 pt-2 mt-2">
@@ -806,6 +835,9 @@ export default function KarZararModule({ firma }: AppCtx) {
                   <Field label="Hakedisler (TL)">
                     <input type="number" step="0.01" value={form.hakedisler} onChange={sf('hakedisler')} className={inputCls} />
                   </Field>
+                  <Field label="Satış Faturaları (TL)">
+                    <input type="number" step="0.01" value={form.satis_faturalari || '0'} onChange={sf('satis_faturalari')} className={inputCls} />
+                  </Field>
                   <Field label="Diger Satislar (TL)">
                     <input type="number" step="0.01" value={form.diger_satislar} onChange={sf('diger_satislar')} className={inputCls} />
                   </Field>
@@ -825,6 +857,9 @@ export default function KarZararModule({ firma }: AppCtx) {
                   </Field>
                   <Field label="Malzeme Alislari (TL)">
                     <input type="number" step="0.01" value={form.malzeme_alis} onChange={sf('malzeme_alis')} className={inputCls} />
+                  </Field>
+                  <Field label="Alış Faturaları (TL)">
+                    <input type="number" step="0.01" value={form.alis_faturalari || '0'} onChange={sf('alis_faturalari')} className={inputCls} />
                   </Field>
                   <Field label="Iscilik Giderleri (TL)">
                     <input type="number" step="0.01" value={form.iscilik} onChange={sf('iscilik')} className={inputCls} />
