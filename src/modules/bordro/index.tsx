@@ -85,18 +85,21 @@ export default function BordroModule({ firma }: AppCtx) {
 
   async function load() {
     setLoading(true)
-    const [d] = await Promise.all([
-      supabase
-        .from('bordro_donemleri')
-        .select('*')
-        .eq('firma_id', firma.id)
-        .order('yil', { ascending: false })
-        .order('ay',  { ascending: false }),
-    ])
+    const d = await supabase
+      .from('bordro_donemleri')
+      .select('*')
+      .eq('firma_id', firma.id)
+      .order('yil', { ascending: false })
+      .order('ay',  { ascending: false })
+    if (d.error) {
+      setLoading(false)
+      alert('Bordro dönemleri yüklenemedi: ' + d.error.message)
+      return
+    }
     const now = new Date()
+    const buAy = now.getFullYear() * 12 + now.getMonth()
     const aktifDonemler = (d.data || []).filter((item: any) =>
-      Number(item.yil || 0) > now.getFullYear() ||
-      (Number(item.yil || 0) === now.getFullYear() && Number(item.ay || 0) >= now.getMonth() + 1)
+      Number(item.yil || 0) * 12 + Number(item.ay || 0) - 1 >= buAy - 1
     )
     setDonemler(aktifDonemler)
     setLoading(false)
