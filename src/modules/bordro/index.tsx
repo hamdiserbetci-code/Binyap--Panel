@@ -13,7 +13,7 @@ import {
 import type { AppCtx } from '@/app/page'
 import type {
   BordroDonemiDetay, BordroSurecAdim, BordroBelge,
-  SurecAdimKodu, SurecDurum, Proje, Ekip
+  SurecAdimKodu, SurecDurum
 } from '@/types'
 
 // ─── Sabitler ────────────────────────────────────────────────
@@ -64,8 +64,6 @@ function oncekiAy() {
 // ─── Ana Bileşen ─────────────────────────────────────────────
 export default function BordroModule({ firma }: AppCtx) {
   const [donemler, setDonemler]   = useState<BordroDonemiDetay[]>([])
-  const [projeler, setProjeler]   = useState<Pick<Proje, 'id'|'proje_adi'>[]>([])
-  const [ekipler, setEkipler]     = useState<Ekip[]>([])
   const [loading, setLoading]     = useState(true)
   const [expanded, setExpanded]   = useState<string | null>(null)
   const [modal, setModal]         = useState(false)
@@ -75,8 +73,8 @@ export default function BordroModule({ firma }: AppCtx) {
   const prev = oncekiAy()
   const [form, setForm] = useState({
     donem_adi: prev.adi,
-    proje_id: '',
-    secili_ekipler: [] as string[], // birden fazla ekip
+    proje_adi: '',
+    ekip_adi: '',
     ay: String(prev.ay),
     yil: String(prev.yil),
     baslangic_tarihi: `${prev.yil}-${String(prev.ay).padStart(2,'0')}-01`,
@@ -87,50 +85,40 @@ export default function BordroModule({ firma }: AppCtx) {
 
   async function load() {
     setLoading(true)
-    const [d, p, e] = await Promise.all([
+    const [d] = await Promise.all([
       supabase
         .from('bordro_donemleri')
-        .select('*, projeler(proje_adi), ekipler(ad)')
+        .select('*')
         .eq('firma_id', firma.id)
         .order('yil', { ascending: false })
         .order('ay',  { ascending: false }),
-      supabase.from('projeler').select('id, proje_adi').eq('firma_id', firma.id).eq('durum', 'devam'),
-      supabase.from('ekipler').select('*').eq('firma_id', firma.id).eq('aktif', true).order('ad'),
     ])
-    setDonemler(d.data || [])
-    setProjeler(p.data || [])
-    setEkipler(e.data || [])
+    const now = new Date()
+    const aktifDonemler = (d.data || []).filter((item: any) =>
+      Number(item.yil || 0) > now.getFullYear() ||
+      (Number(item.yil || 0) === now.getFullYear() && Number(item.ay || 0) >= now.getMonth() + 1)
+    )
+    setDonemler(aktifDonemler)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [firma.id])
 
-  // Proje değişince ekipleri filtrele
-  const filtreliEkipler = useMemo(() =>
-    form.proje_id ? ekipler.filter(e => e.proje_id === form.proje_id) : ekipler
-  , [ekipler, form.proje_id])
   async function saveDonem() {
-    if (!form.donem_adi || !form.proje_id || !form.baslangic_tarihi || !form.bordro_tarihi)
-      return alert('Dönem adı, proje, başlangıç ve bordro tarihi zorunludur')
-    if (form.secili_ekipler.length === 0)
-      return alert('En az bir ekip seçiniz')
+    if (!form.donem_adi || !form.proje_adi || !form.ekip_adi || !form.baslangic_tarihi || !form.bordro_tarihi)
+      return alert('Dönem, proje, ekip, başlangıç ve bordro tarihi zorunludur')
 
     setSaving(true)
 
-    // Her seçili ekip için ayrı dönem oluştur
-    for (const ekipId of form.secili_ekipler) {
-      const ekip = ekipler.find(e => e.id === ekipId)
-      const donemAdi = form.secili_ekipler.length > 1
-        ? `${form.donem_adi} — ${(ekip as any)?.ad || ekipId}`
-        : form.donem_adi
-
-      const { data: newDonem, error } = await supabase
+    const { data: newDonem, error } = await supabase
         .from('bordro_donemleri')
         .insert({
           firma_id:         firma.id,
-          donem_adi:        donemAdi,
-          proje_id:         form.proje_id,
-          ekip_id:          ekipId,
+          donem_adi:        form.donem_adi,
+          proje_id:         null,
+          ekip_id:          null,
+          proje_adi_manual: form.proje_adi,
+          ekip_adi_manual:  form.ekip_adi,
           ay:               Number(form.ay),
           yil:              Number(form.yil),
           onceki_ay:        true,
@@ -143,10 +131,9 @@ export default function BordroModule({ firma }: AppCtx) {
         .select()
         .single()
 
-      if (error || !newDonem) { setSaving(false); alert('Hata: ' + error?.message); return }
+    if (error || !newDonem) { setSaving(false); alert('Hata: ' + error?.message); return }
 
-      // Her dönem için 4 süreç adımı oluştur
-      await supabase.from('bordro_surec_adimlari').insert(
+    await supabase.from('bordro_surec_adimlari').insert(
         SUREC_ADIMLARI.map((a, i) => ({
           donem_id:  newDonem.id,
           firma_id:  firma.id,
@@ -156,7 +143,6 @@ export default function BordroModule({ firma }: AppCtx) {
           durum:     'bekliyor' as SurecDurum,
         }))
       )
-    }
 
     setSaving(false)
     setModal(false)
@@ -270,61 +256,12 @@ export default function BordroModule({ firma }: AppCtx) {
               <input type="text" value={form.donem_adi} onChange={sf('donem_adi')} className={inputCls} />
             </Field>
 
-            <Field label="Proje" required>
-              <select value={form.proje_id} onChange={e => setForm(p => ({ ...p, proje_id: e.target.value, secili_ekipler: [] }))} className={inputCls}>
-                <option value="">Proje Seçiniz</option>
-                {projeler.map(p => <option key={p.id} value={p.id}>{p.proje_adi}</option>)}
-              </select>
+            <Field label="Proje Adı" required>
+              <input type="text" value={form.proje_adi} onChange={sf('proje_adi')} className={inputCls} placeholder="Örn: A Projesi" />
             </Field>
 
-            <Field label="Ekipler" required>
-              {!form.proje_id ? (
-                <p className="text-sm text-gray-400 py-2">Önce proje seçiniz</p>
-              ) : filtreliEkipler.length === 0 ? (
-                <p className="text-sm text-amber-600 py-2">Bu projede ekip bulunamadı</p>
-              ) : (
-                <div className="space-y-2 border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
-                  {/* Tümünü seç */}
-                  <label className="flex items-center gap-2 pb-2 border-b border-gray-200 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.secili_ekipler.length === filtreliEkipler.length && filtreliEkipler.length > 0}
-                      onChange={e => setForm(p => ({
-                        ...p,
-                        secili_ekipler: e.target.checked ? filtreliEkipler.map(ek => ek.id) : []
-                      }))}
-                      className="w-4 h-4 text-cyan-600 rounded"
-                    />
-                    <span className="text-sm font-semibold text-gray-700">Tümünü Seç</span>
-                    <span className="text-xs text-gray-400 ml-auto">{filtreliEkipler.length} ekip</span>
-                  </label>
-                  {filtreliEkipler.map(ekip => (
-                    <label key={ekip.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
-                      <input
-                        type="checkbox"
-                        checked={form.secili_ekipler.includes(ekip.id)}
-                        onChange={e => setForm(p => ({
-                          ...p,
-                          secili_ekipler: e.target.checked
-                            ? [...p.secili_ekipler, ekip.id]
-                            : p.secili_ekipler.filter(id => id !== ekip.id)
-                        }))}
-                        className="w-4 h-4 text-cyan-600 rounded"
-                      />
-                      <span className="text-sm text-gray-800">{(ekip as any).ad || ekip.ekip_adi}</span>
-                      {(ekip as any).sorumlu && (
-                        <span className="text-xs text-gray-400 ml-auto">{(ekip as any).sorumlu}</span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              )}
-              {form.secili_ekipler.length > 0 && (
-                <p className="text-xs text-cyan-700 mt-1">
-                  {form.secili_ekipler.length} ekip seçildi →
-                  {form.secili_ekipler.length} ayrı bordro dönemi oluşturulacak
-                </p>
-              )}
+            <Field label="Ekip Adı" required>
+              <input type="text" value={form.ekip_adi} onChange={sf('ekip_adi')} className={inputCls} placeholder="Örn: A Ekibi" />
             </Field>
 
             <div className="grid grid-cols-2 gap-4">
@@ -635,12 +572,12 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
             {/* Proje & Ekip */}
             <span className="flex items-center gap-1 text-xs text-gray-500">
               <FolderOpen className="w-3 h-3" />
-              {(donem as any).projeler?.proje_adi || '-'}
+              {(donem as any).proje_adi_manual || (donem as any).projeler?.proje_adi || '-'}
             </span>
-            {(donem as any).ekipler?.ad && (
+            {((donem as any).ekip_adi_manual || (donem as any).ekipler?.ad) && (
               <span className="flex items-center gap-1 text-xs text-gray-500">
                 <Users className="w-3 h-3" />
-                {(donem as any).ekipler.ad}
+                {(donem as any).ekip_adi_manual || (donem as any).ekipler.ad}
               </span>
             )}
 
