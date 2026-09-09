@@ -78,13 +78,22 @@ export default function GorevlerModule({ firma }: AppCtx) {
   async function updateStatus(task: Gorev, status: Durum) {
     const { error } = await supabase.from('gorevler').update({ durum: status, tamamlanma_tarihi: status === 'tamamlandi' ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('id', task.id)
     if (error) return alert('Durum güncellenemedi: ' + error.message)
-    if (status === 'tamamlandi' && task.durum !== 'tamamlandi' && task.yineleme_tipi && task.son_tarih) {
-      const nextDate = nextRecurrenceDate(task.son_tarih, task.yineleme_tipi)
-      if (!task.yineleme_bitis_tarihi || nextDate <= task.yineleme_bitis_tarihi) {
+    if (status === 'tamamlandi' && task.durum !== 'tamamlandi') {
+      const { data: currentTask, error: currentTaskError } = await supabase.from('gorevler').select('*').eq('id', task.id).single()
+      if (currentTaskError) return alert('Yinelenen görev bilgisi okunamadı: ' + currentTaskError.message)
+      const recurrence = currentTask?.yineleme_tipi
+      const dueDate = currentTask?.son_tarih
+      if (recurrence && dueDate) {
+        const nextDate = nextRecurrenceDate(dueDate, recurrence)
+        if (currentTask.yineleme_bitis_tarihi && nextDate > currentTask.yineleme_bitis_tarihi) {
+          setSelected(previous => previous?.id === task.id ? { ...previous, durum: status } : previous)
+          await load()
+          return
+        }
         const { data: nextTask, error: nextTaskError } = await supabase.from('gorevler').insert({
-          firma_id: firma.id, baslik: task.baslik, aciklama: task.aciklama, durum: 'bekliyor', oncelik: task.oncelik,
-          kategori: task.kategori, atanan_kisi: task.atanan_kisi, son_tarih: nextDate, hatirlatma_tarihi: monthEndReminder(nextDate),
-          yineleme_tipi: task.yineleme_tipi, yineleme_bitis_tarihi: task.yineleme_bitis_tarihi,
+          firma_id: firma.id, baslik: currentTask.baslik, aciklama: currentTask.aciklama, durum: 'bekliyor', oncelik: currentTask.oncelik,
+          kategori: currentTask.kategori, atanan_kisi: currentTask.atanan_kisi, son_tarih: nextDate, hatirlatma_tarihi: monthEndReminder(nextDate),
+          yineleme_tipi: recurrence, yineleme_bitis_tarihi: currentTask.yineleme_bitis_tarihi,
         }).select('*').single()
         if (nextTaskError || !nextTask) {
           alert('Sonraki yineleme oluşturulamadı: ' + (nextTaskError?.message || 'Kayıt dönmedi'))
