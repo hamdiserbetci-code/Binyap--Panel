@@ -74,7 +74,7 @@ export default function BordroModule({ firma }: AppCtx) {
   const [form, setForm] = useState({
     donem_adi: prev.adi,
     proje_adi: '',
-    ekip_adi: '',
+    ekip_adlari: [''],
     ay: String(prev.ay),
     yil: String(prev.yil),
     baslangic_tarihi: `${prev.yil}-${String(prev.ay).padStart(2,'0')}-01`,
@@ -105,20 +105,22 @@ export default function BordroModule({ firma }: AppCtx) {
   useEffect(() => { load() }, [firma.id])
 
   async function saveDonem() {
-    if (!form.donem_adi || !form.proje_adi || !form.ekip_adi || !form.baslangic_tarihi || !form.bordro_tarihi)
+    const ekipAdlari = form.ekip_adlari.map(ad => ad.trim()).filter(Boolean)
+    if (!form.donem_adi || !form.proje_adi || ekipAdlari.length === 0 || !form.baslangic_tarihi || !form.bordro_tarihi)
       return alert('Dönem, proje, ekip, başlangıç ve bordro tarihi zorunludur')
 
     setSaving(true)
 
-    const { data: newDonem, error } = await supabase
+    for (const ekipAdi of ekipAdlari) {
+      const { data: newDonem, error } = await supabase
         .from('bordro_donemleri')
         .insert({
           firma_id:         firma.id,
-          donem_adi:        form.donem_adi,
+          donem_adi:        `${form.donem_adi} — ${ekipAdi}`,
           proje_id:         null,
           ekip_id:          null,
           proje_adi_manual: form.proje_adi,
-          ekip_adi_manual:  form.ekip_adi,
+          ekip_adi_manual:  ekipAdi,
           ay:               Number(form.ay),
           yil:              Number(form.yil),
           onceki_ay:        true,
@@ -131,9 +133,9 @@ export default function BordroModule({ firma }: AppCtx) {
         .select()
         .single()
 
-    if (error || !newDonem) { setSaving(false); alert('Hata: ' + error?.message); return }
+      if (error || !newDonem) { setSaving(false); alert('Hata: ' + error?.message); return }
 
-    await supabase.from('bordro_surec_adimlari').insert(
+      await supabase.from('bordro_surec_adimlari').insert(
         SUREC_ADIMLARI.map((a, i) => ({
           donem_id:  newDonem.id,
           firma_id:  firma.id,
@@ -143,6 +145,7 @@ export default function BordroModule({ firma }: AppCtx) {
           durum:     'bekliyor' as SurecDurum,
         }))
       )
+    }
 
     setSaving(false)
     setModal(false)
@@ -165,6 +168,15 @@ export default function BordroModule({ firma }: AppCtx) {
   const sf = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const projeGruplari = useMemo(() => {
+    const groups = new Map<string, BordroDonemiDetay[]>()
+    donemler.forEach(donem => {
+      const proje = (donem as any).proje_adi_manual || 'Projesiz'
+      groups.set(proje, [...(groups.get(proje) || []), donem])
+    })
+    return Array.from(groups.entries())
+  }, [donemler])
 
   return (
     <div className="space-y-6">
@@ -197,16 +209,27 @@ export default function BordroModule({ firma }: AppCtx) {
           <EmptyState icon={<FileText className="w-12 h-12" />} message="Henüz bordro dönemi yok" />
         ) : (
           <div className="divide-y divide-gray-100">
-            {donemler.map(d => (
-              <DonemSatir
-                key={d.id}
-                donem={d}
-                firma={firma}
-                expanded={expanded === d.id}
-                onToggle={() => setExpanded(expanded === d.id ? null : d.id)}
-                onDelete={() => setDelId(d.id)}
-                onRefresh={load}
-              />
+            {projeGruplari.map(([proje, ekipDonemleri]) => (
+              <div key={proje}>
+                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-gray-200">
+                  <FolderOpen className="w-4 h-4 text-cyan-600" />
+                  <span className="font-semibold text-gray-800">{proje}</span>
+                  <span className="text-xs text-gray-500">{ekipDonemleri.length} ekip</span>
+                </div>
+                <div className="divide-y divide-gray-100 pl-3">
+                  {ekipDonemleri.map(d => (
+                    <DonemSatir
+                      key={d.id}
+                      donem={d}
+                      firma={firma}
+                      expanded={expanded === d.id}
+                      onToggle={() => setExpanded(expanded === d.id ? null : d.id)}
+                      onDelete={() => setDelId(d.id)}
+                      onRefresh={load}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -260,8 +283,22 @@ export default function BordroModule({ firma }: AppCtx) {
               <input type="text" value={form.proje_adi} onChange={sf('proje_adi')} className={inputCls} placeholder="Örn: A Projesi" />
             </Field>
 
-            <Field label="Ekip Adı" required>
-              <input type="text" value={form.ekip_adi} onChange={sf('ekip_adi')} className={inputCls} placeholder="Örn: A Ekibi" />
+            <Field label="Ekipler" required className="md:col-span-2">
+              <div className="space-y-2">
+                {form.ekip_adlari.map((ekipAdi, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={ekipAdi}
+                      onChange={e => setForm(p => ({ ...p, ekip_adlari: p.ekip_adlari.map((ad, i) => i === index ? e.target.value : ad) }))}
+                      className={inputCls}
+                      placeholder={`Örn: ${index === 0 ? 'A Ekibi' : `Ekip ${index + 1}`}`}
+                    />
+                    {form.ekip_adlari.length > 1 && <button type="button" onClick={() => setForm(p => ({ ...p, ekip_adlari: p.ekip_adlari.filter((_, i) => i !== index) }))} className="px-3 text-gray-400 hover:text-red-600">×</button>}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setForm(p => ({ ...p, ekip_adlari: [...p.ekip_adlari, ''] }))} className="text-sm text-cyan-700 hover:text-cyan-900 font-medium">+ Ekip ekle</button>
+              </div>
             </Field>
 
             <div className="grid grid-cols-2 gap-4">
@@ -666,25 +703,6 @@ function DonemSatir({ donem, firma, expanded, onToggle, onDelete, onRefresh }: D
                           kabul={adimDef.kabul}
                           onUploaded={loadDetail}
                         />
-
-                        {/* Puantaj Toplama adımına özel: Personel listesi + gün girişi */}
-                        {adimDef.kodu === 'puantaj_toplama' && (
-                          <PuantajGiris donem={donem} firma={firma} />
-                        )}
-
-                        {/* Maaş ödeme adımına özel: Yüklü Excel'den Personel Oluştur */}
-                        {adimDef.kodu === 'maas_odeme' && (
-                          <button
-                            onClick={handlePersonelImport}
-                            disabled={personelImporting}
-                            className="w-full text-xs py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
-                          >
-                            {personelImporting
-                              ? <><Loader2 className="w-3 h-3 animate-spin" /> Oluşturuluyor...</>
-                              : <><Users className="w-3 h-3" /> Personel Modülüne Aktar</>
-                            }
-                          </button>
-                        )}
 
                         {adim && (
                           <div className="flex gap-1">
