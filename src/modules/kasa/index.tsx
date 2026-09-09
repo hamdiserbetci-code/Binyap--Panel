@@ -1,12 +1,13 @@
 'use client'
 import React, { useEffect, useState, useMemo } from 'react'
-import { Wallet, Landmark, Plus, Trash2, ArrowDownRight, ArrowUpRight, RefreshCw, Download } from 'lucide-react'
+import { Wallet, Landmark, Plus, Trash2, ArrowDownRight, ArrowUpRight, RefreshCw, Download, ClipboardCheck, Upload, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { PageHeader, StatCard, Card, Modal, Btn, Field, inputCls, ConfirmDialog, EmptyState, fmt, fmtDate } from '@/components/ui'
 import type { AppCtx } from '@/app/page'
 import type { KasaHareketi, BankaHesabi } from '@/types'
 
 type Tab = 'kasa' | 'banka'
+type Mutabakat = { id: string; banka_hesap_id: string; donem: string; ay_sonu_bakiye: number; durum: string; tamamlanma_tarihi: string | null }
 
 export default function KasaModule({ firma }: AppCtx) {
   const [tab, setTab]           = useState<Tab>('kasa')
@@ -16,6 +17,9 @@ export default function KasaModule({ firma }: AppCtx) {
   const [modal, setModal]       = useState<Tab | null>(null)
   const [delId, setDelId]       = useState<string | null>(null)
   const [saving, setSaving]     = useState(false)
+  const [mutabakatlar, setMutabakatlar] = useState<Mutabakat[]>([])
+  const [mutabakatHesap, setMutabakatHesap] = useState<BankaHesabi | null>(null)
+  const [mForm, setMForm] = useState({ donem: new Date().toISOString().slice(0, 7), ay_sonu_bakiye: '', ekstre: null as File | null, muavin: null as File | null })
 
   const [kForm, setKForm] = useState({ islem_tipi: 'giris', tutar: '', aciklama: '', tarih: today() })
   const [bForm, setBForm] = useState({ banka_adi: '', sube_adi: '', iban: '', bakiye: '' })
@@ -24,12 +28,14 @@ export default function KasaModule({ firma }: AppCtx) {
 
   async function load() {
     setLoading(true)
-    const [k, b] = await Promise.all([
+    const [k, b, m] = await Promise.all([
       supabase.from('kasa_hareketleri').select('*').eq('firma_id', firma.id).order('tarih', { ascending: false }),
       supabase.from('banka_hesaplari').select('*').eq('firma_id', firma.id).order('banka_adi'),
+      supabase.from('banka_mutabakatlari').select('*').eq('firma_id', firma.id).order('donem', { ascending: false }),
     ])
     setHareketler(k.data || [])
     setBankalar(b.data || [])
+    setMutabakatlar((m.data || []) as Mutabakat[])
     setLoading(false)
   }
 
@@ -79,6 +85,30 @@ export default function KasaModule({ firma }: AppCtx) {
     await supabase.from('kasa_hareketleri').delete().eq('id', id)
     setDelId(null)
     load()
+  }
+
+  function openMutabakat(account: BankaHesabi) {
+    const current = mutabakatlar.find(m => m.banka_hesap_id === account.id && m.donem === new Date().toISOString().slice(0, 7))
+    setMutabakatHesap(account)
+    setMForm({ donem: current?.donem || new Date().toISOString().slice(0, 7), ay_sonu_bakiye: current ? String(current.ay_sonu_bakiye) : String(account.bakiye || ''), ekstre: null, muavin: null })
+  }
+
+  async function saveMutabakat() {
+    if (!mutabakatHesap || !mForm.donem || !mForm.ay_sonu_bakiye || !mForm.ekstre || !mForm.muavin) return alert('Dönem, ay sonu bakiye, hesap ekstresi ve hesap muavini zorunludur.')
+    setSaving(true)
+    const { data: record, error } = await supabase.from('banka_mutabakatlari').upsert({
+      firma_id: firma.id, banka_hesap_id: mutabakatHesap.id, donem: mForm.donem,
+      ay_sonu_bakiye: Number(mForm.ay_sonu_bakiye), durum: 'mutabakat_yapildi', tamamlanma_tarihi: new Date().toISOString(),
+    }, { onConflict: 'banka_hesap_id,donem' }).select().single()
+    if (error || !record) { setSaving(false); return alert('Mutabakat kaydedilemedi: ' + (error?.message || 'Kayıt oluşturulamadı')) }
+    for (const [file, tur] of [[mForm.ekstre, 'hesap_ekstresi'], [mForm.muavin, 'hesap_muavini']]) {
+      const safeName = (file as File).name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${firma.id}/${mutabakatHesap.id}/${mForm.donem}/${tur}_${Date.now()}_${safeName}`
+      const upload = await supabase.storage.from('banka-mutabakat-belgeler').upload(path, file as File, { upsert: true })
+      if (upload.error) { setSaving(false); return alert('Belge yüklenemedi: ' + upload.error.message) }
+      await supabase.from('banka_mutabakat_belgeleri').insert({ mutabakat_id: record.id, firma_id: firma.id, belge_turu: tur, dosya_adi: (file as File).name, storage_path: path })
+    }
+    setSaving(false); setMutabakatHesap(null); load()
   }
 
   // ─── Kasa Excel Export ────────────────────────────────────
@@ -366,6 +396,13 @@ export default function KasaModule({ firma }: AppCtx) {
                   <p className="text-xs text-gray-500">Bakiye</p>
                   <p className="text-xl font-bold text-blue-700">{fmt(Number(b.bakiye))}</p>
                 </div>
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                  {(() => {
+                    const latest = mutabakatlar.find(m => m.banka_hesap_id === b.id)
+                    return latest ? <div><p className="text-xs text-gray-500">Son mutabakat</p><p className="text-xs font-semibold text-emerald-700">{latest.donem} · Mutabakat yapıldı</p></div> : <p className="text-xs text-amber-600">Mutabakat bekliyor</p>
+                  })()}
+                  <Btn size="sm" variant="secondary" icon={<ClipboardCheck className="w-3.5 h-3.5" />} onClick={() => openMutabakat(b)}>Mutabakat</Btn>
+                </div>
               </div>
             ))}
             {bankalar.length === 0 && <div className="col-span-full"><EmptyState icon={<Landmark className="w-10 h-10" />} message="Banka hesabı yok" /></div>}
@@ -414,6 +451,23 @@ export default function KasaModule({ firma }: AppCtx) {
             <Field label="Açılış Bakiyesi (₺)">
               <input type="number" step="0.01" value={bForm.bakiye} onChange={e => setBForm({ ...bForm, bakiye: e.target.value })} className={inputCls} placeholder="0.00" />
             </Field>
+          </div>
+        </Modal>
+      )}
+
+      {mutabakatHesap && (
+        <Modal title={`${mutabakatHesap.banka_adi} · Aylık Mutabakat`} onClose={() => setMutabakatHesap(null)} size="lg"
+          footer={<><Btn variant="secondary" onClick={() => setMutabakatHesap(null)}>İptal</Btn><Btn onClick={saveMutabakat} disabled={saving} icon={<ClipboardCheck className="w-4 h-4" />}>{saving ? 'Kaydediliyor...' : 'Mutabakat Yapılmıştır'}</Btn></>}>
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">İlgili ayın banka hesabını teyit etmek için ay sonu bakiyesini girin ve iki belgeyi ayrı ayrı yükleyin.</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Mutabakat Dönemi" required><input type="month" value={mForm.donem} onChange={e => setMForm(p => ({ ...p, donem: e.target.value }))} className={inputCls} /></Field>
+              <Field label="Ay Sonu Hesap Bakiyesi (₺)" required><input type="number" step="0.01" value={mForm.ay_sonu_bakiye} onChange={e => setMForm(p => ({ ...p, ay_sonu_bakiye: e.target.value }))} className={inputCls} /></Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-blue-300 cursor-pointer"><span className="flex items-center gap-2 font-semibold text-sm text-gray-800"><Upload className="w-4 h-4 text-blue-600" /> Hesap Ekstresi</span><span className="block text-xs text-gray-500 mt-2">İlgili aya kadar olan hesap ekstresini yükleyin.</span><input type="file" accept=".pdf,.xlsx,.xls,.csv" className="mt-3 text-xs w-full" onChange={e => setMForm(p => ({ ...p, ekstre: e.target.files?.[0] || null }))} />{mForm.ekstre && <span className="block text-xs text-emerald-600 mt-2">{mForm.ekstre.name}</span>}</label>
+              <label className="border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-blue-300 cursor-pointer"><span className="flex items-center gap-2 font-semibold text-sm text-gray-800"><FileText className="w-4 h-4 text-blue-600" /> Hesap Muavini</span><span className="block text-xs text-gray-500 mt-2">İlgili aya kadar olan hesap muavinini yükleyin.</span><input type="file" accept=".pdf,.xlsx,.xls,.csv" className="mt-3 text-xs w-full" onChange={e => setMForm(p => ({ ...p, muavin: e.target.files?.[0] || null }))} />{mForm.muavin && <span className="block text-xs text-emerald-600 mt-2">{mForm.muavin.name}</span>}</label>
+            </div>
           </div>
         </Modal>
       )}
