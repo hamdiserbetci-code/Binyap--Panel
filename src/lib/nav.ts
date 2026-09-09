@@ -1,11 +1,12 @@
 import {
-  Wallet, Clock, Scale, Settings, ShieldCheck, BarChart2, ClipboardCheck, FileText, CheckSquare,
+  Wallet, Clock, Scale, Settings, ShieldCheck, BarChart2, ClipboardCheck, FileText, CheckSquare, TrendingUp,
 } from 'lucide-react'
 import type { NavItem } from '@/types'
 
 export const NAV: NavItem[] = [
   { id: 'kasa',        label: 'Kasa & Banka',     icon: Wallet,          group: 'Finans' },
   { id: 'odeme-plani', label: 'Ödeme Planı',      icon: Clock,           group: 'Finans' },
+  { id: 'kar-zarar',   label: 'Kar / Zarar',      icon: TrendingUp,      group: 'Finans' },
   { id: 'gorevler',    label: 'Görev Takibi',     icon: CheckSquare,     group: 'Operasyon' },
   { id: 'arabulucu',   label: 'Arabulucu',         icon: Scale,           group: 'İK & Bordro' },
   { id: 'icra',        label: 'İcra Takibi',       icon: Scale,           group: 'İK & Bordro' },
