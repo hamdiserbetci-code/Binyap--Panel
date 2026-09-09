@@ -76,8 +76,6 @@ export default function GorevlerModule({ firma }: AppCtx) {
     setModal(false); setSelected(null); load()
   }
   async function updateStatus(task: Gorev, status: Durum) {
-    const { error } = await supabase.from('gorevler').update({ durum: status, tamamlanma_tarihi: status === 'tamamlandi' ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('id', task.id)
-    if (error) return alert('Durum güncellenemedi: ' + error.message)
     if (status === 'tamamlandi' && task.durum !== 'tamamlandi') {
       const { data: currentTask, error: currentTaskError } = await supabase.from('gorevler').select('*').eq('id', task.id).single()
       if (currentTaskError) return alert('Yinelenen görev bilgisi okunamadı: ' + currentTaskError.message)
@@ -85,23 +83,22 @@ export default function GorevlerModule({ firma }: AppCtx) {
       const dueDate = currentTask?.son_tarih
       if (recurrence && dueDate) {
         const nextDate = nextRecurrenceDate(dueDate, recurrence)
-        if (currentTask.yineleme_bitis_tarihi && nextDate > currentTask.yineleme_bitis_tarihi) {
-          setSelected(previous => previous?.id === task.id ? { ...previous, durum: status } : previous)
-          await load()
-          return
-        }
-        const { data: nextTask, error: nextTaskError } = await supabase.from('gorevler').insert({
+        const nextAllowed = !currentTask.yineleme_bitis_tarihi || nextDate <= currentTask.yineleme_bitis_tarihi
+        const { data: nextTask, error: nextTaskError } = nextAllowed ? await supabase.from('gorevler').insert({
           firma_id: firma.id, baslik: currentTask.baslik, aciklama: currentTask.aciklama, durum: 'bekliyor', oncelik: currentTask.oncelik,
           kategori: currentTask.kategori, atanan_kisi: currentTask.atanan_kisi, son_tarih: nextDate, hatirlatma_tarihi: monthEndReminder(nextDate),
           yineleme_tipi: recurrence, yineleme_bitis_tarihi: currentTask.yineleme_bitis_tarihi,
-        }).select('*').single()
-        if (nextTaskError || !nextTask) {
+        }).select('*').single() : { data: null, error: null }
+        if (nextAllowed && (nextTaskError || !nextTask)) {
           alert('Sonraki yineleme oluşturulamadı: ' + (nextTaskError?.message || 'Kayıt dönmedi'))
+          return
         } else {
           setTasks(previous => [nextTask as Gorev, ...previous])
         }
       }
     }
+    const { error } = await supabase.from('gorevler').update({ durum: status, tamamlanma_tarihi: status === 'tamamlandi' ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('id', task.id)
+    if (error) return alert('Durum güncellenemedi: ' + error.message)
     setSelected(previous => previous?.id === task.id ? { ...previous, durum: status } : previous); load()
   }
   async function remove() { if (!deleteId) return; await supabase.from('gorevler').delete().eq('id', deleteId); setDeleteId(null); setSelected(null); load() }
