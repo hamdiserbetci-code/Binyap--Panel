@@ -66,6 +66,7 @@ export default function BordroModule({ firma }: AppCtx) {
   const [donemler, setDonemler]   = useState<BordroDonemiDetay[]>([])
   const [loading, setLoading]     = useState(true)
   const [expanded, setExpanded]   = useState<string | null>(null)
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set())
   const [modal, setModal]         = useState(false)
   const [delId, setDelId]         = useState<string | null>(null)
   const [saving, setSaving]       = useState(false)
@@ -216,12 +217,24 @@ export default function BordroModule({ firma }: AppCtx) {
           <div className="divide-y divide-gray-100">
             {projeGruplari.map(([proje, ekipDonemleri]) => (
               <div key={proje}>
-                <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setCollapsedProjects(previous => {
+                    const next = new Set(previous)
+                    if (next.has(proje)) next.delete(proje)
+                    else next.add(proje)
+                    return next
+                  })}
+                  className="w-full flex items-center gap-2 px-4 py-3 bg-slate-50 border-b border-gray-200 hover:bg-slate-100 text-left"
+                >
+                  {collapsedProjects.has(proje)
+                    ? <ChevronRight className="w-4 h-4 text-cyan-600" />
+                    : <ChevronDown className="w-4 h-4 text-cyan-600" />}
                   <FolderOpen className="w-4 h-4 text-cyan-600" />
                   <span className="font-semibold text-gray-800">{proje}</span>
                   <span className="text-xs text-gray-500">{ekipDonemleri.length} ekip</span>
-                </div>
-                <div className="divide-y divide-gray-100 pl-3">
+                </button>
+                {!collapsedProjects.has(proje) && <div className="divide-y divide-gray-100 pl-3">
                   {ekipDonemleri.map(d => (
                     <DonemSatir
                       key={d.id}
@@ -233,7 +246,7 @@ export default function BordroModule({ firma }: AppCtx) {
                       onRefresh={load}
                     />
                   ))}
-                </div>
+                </div>}
               </div>
             ))}
           </div>
