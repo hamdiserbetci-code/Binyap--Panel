@@ -57,7 +57,9 @@ BEGIN
     NEW.firma_id, task_title, task_description, task_priority, task_category, 'bekliyor',
     task_due, TG_TABLE_NAME, NEW.id
   )
-  ON CONFLICT (kaynak_tablo, kaynak_id) DO UPDATE SET
+  ON CONFLICT (kaynak_tablo, kaynak_id)
+  WHERE kaynak_tablo IS NOT NULL AND kaynak_id IS NOT NULL
+  DO UPDATE SET
     baslik = EXCLUDED.baslik,
     aciklama = EXCLUDED.aciklama,
     son_tarih = EXCLUDED.son_tarih,
