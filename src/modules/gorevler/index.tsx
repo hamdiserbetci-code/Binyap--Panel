@@ -81,11 +81,16 @@ export default function GorevlerModule({ firma }: AppCtx) {
     if (status === 'tamamlandi' && task.durum !== 'tamamlandi' && task.yineleme_tipi && task.son_tarih) {
       const nextDate = nextRecurrenceDate(task.son_tarih, task.yineleme_tipi)
       if (!task.yineleme_bitis_tarihi || nextDate <= task.yineleme_bitis_tarihi) {
-        await supabase.from('gorevler').insert({
+        const { data: nextTask, error: nextTaskError } = await supabase.from('gorevler').insert({
           firma_id: firma.id, baslik: task.baslik, aciklama: task.aciklama, durum: 'bekliyor', oncelik: task.oncelik,
           kategori: task.kategori, atanan_kisi: task.atanan_kisi, son_tarih: nextDate, hatirlatma_tarihi: monthEndReminder(nextDate),
           yineleme_tipi: task.yineleme_tipi, yineleme_bitis_tarihi: task.yineleme_bitis_tarihi,
-        })
+        }).select('*').single()
+        if (nextTaskError || !nextTask) {
+          alert('Sonraki yineleme oluşturulamadı: ' + (nextTaskError?.message || 'Kayıt dönmedi'))
+        } else {
+          setTasks(previous => [nextTask as Gorev, ...previous])
+        }
       }
     }
     setSelected(previous => previous?.id === task.id ? { ...previous, durum: status } : previous); load()
