@@ -17,9 +17,14 @@ CREATE TABLE IF NOT EXISTS gorevler (
   erteleme_tarihi   DATE,
   erteleme_notu     TEXT,
   tamamlanma_tarihi TIMESTAMPTZ,
+  yineleme_tipi     TEXT CHECK (yineleme_tipi IN ('gunluk','haftalik','aylik','yillik')),
+  yineleme_bitis_tarihi DATE,
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS yineleme_tipi TEXT CHECK (yineleme_tipi IN ('gunluk','haftalik','aylik','yillik'));
+ALTER TABLE gorevler ADD COLUMN IF NOT EXISTS yineleme_bitis_tarihi DATE;
 
 CREATE TABLE IF NOT EXISTS gorev_belgeler (
   id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
